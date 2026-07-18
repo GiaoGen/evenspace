@@ -1,0 +1,10 @@
+.reportBox { margin-top: 22px; padding: 17px; border: 1px solid var(--line); border-radius: 18px; background: var(--canvas); }
+.reportBox > strong { font-family: var(--font-bodoni),Georgia,serif; font-size: 20px; }
+.reportBox > p { color: var(--muted); font-size: 7px; line-height: 1.5; }
+.reportBox textarea,.reportInbox input { width: 100%; padding: 10px; border: 1px solid var(--line); border-radius: 11px; outline: 0; resize: none; background: var(--surface); color: inherit; font: inherit; }
+.reportBox form > button,.reportInbox button { min-height: 35px; margin-top: 6px; padding: 0 11px; border: 0; border-radius: 10px; background: var(--ink); color: var(--canvas); font-size: 7px; }
+.reportBox button:disabled { opacity: .4; }
+.reportInbox { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--line); }
+.reportInbox > strong { font-size: 8px; }
+.reportInbox article { padding-top: 12px; }
+.reportInbox article p,.reportInbox article span { display: block; color: var(--muted); font-size: 7px; line-height: 1.5; }

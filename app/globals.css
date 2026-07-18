@@ -1,0 +1,109 @@
+@import "tailwindcss";
+
+@font-face {
+  font-family: "Geist";
+  src: url("/fonts/geist.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Geist Mono";
+  src: url("/fonts/geist-mono.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Bodoni Moda";
+  src: url("/fonts/bodoni-moda.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 400 900;
+  font-display: swap;
+}
+
+@theme inline {
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+html,
+body {
+  min-height: 100%;
+}
+
+:root {
+  --font-geist-sans: "Geist", ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+  --font-geist-mono: "Geist Mono", ui-monospace, "SFMono-Regular", "Cascadia Code", "Roboto Mono", Consolas, monospace;
+  --font-bodoni: "Bodoni Moda", Didot, "Bodoni 72", Georgia, "Times New Roman", serif;
+  --canvas: #f3f0ea;
+  --surface: #fffdf9;
+  --surface-2: #e9e4dc;
+  --ink: #171613;
+  --muted: #706b63;
+  --line: #d8d2c9;
+  --shadow: 0 24px 70px rgba(49, 43, 35, .12), 0 4px 16px rgba(49, 43, 35, .06);
+  color-scheme: light;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--canvas);
+  color: var(--ink);
+  font-family: var(--font-geist-sans), Arial, sans-serif;
+  text-rendering: optimizeLegibility;
+}
+
+button,
+input,
+textarea { font: inherit; }
+
+button { color: inherit; }
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --canvas: #12110f;
+    --surface: #1b1916;
+    --surface-2: #292621;
+    --ink: #f5f1ea;
+    --muted: #b9b2a9;
+    --line: #39352f;
+    --shadow: 0 28px 80px rgba(0, 0, 0, .34), 0 5px 18px rgba(0, 0, 0, .22);
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme="light"] {
+  --canvas: #f3f0ea;
+  --surface: #fffdf9;
+  --surface-2: #e9e4dc;
+  --ink: #171613;
+  --muted: #706b63;
+  --line: #d8d2c9;
+  --shadow: 0 24px 70px rgba(49, 43, 35, .12), 0 4px 16px rgba(49, 43, 35, .06);
+  color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+  --canvas: #12110f;
+  --surface: #1b1916;
+  --surface-2: #292621;
+  --ink: #f5f1ea;
+  --muted: #b9b2a9;
+  --line: #39352f;
+  --shadow: 0 28px 80px rgba(0, 0, 0, .34), 0 5px 18px rgba(0, 0, 0, .22);
+  color-scheme: dark;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
+}

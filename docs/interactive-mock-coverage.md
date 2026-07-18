@@ -1,0 +1,122 @@
+# EventSpace 交互式 Mock 覆盖与边界
+
+> 状态：2026-07-14。正式产品路由已经从静态高保真原型进入可操作 Mock。本文用于防止把“界面存在”“浏览器 Mock 可操作”和“生产后端已安全实现”混为一谈。
+
+## 1. Mock 会话模型
+
+- 所有正式产品路由共享同一套类型化 `MockSession` 和纯 reducer 命令。
+- fixture 只用于首次初始化；后续创建、消息、投票、画板、行程、成员与归档操作都写入当前标签页的 `sessionStorage`。
+- 刷新当前标签页会恢复状态；关闭标签页、清除会话存储或执行 `Reset Mock session` 会恢复 fixture。
+- 从存储恢复前进行版本和基本结构检查；无效或旧版本数据被丢弃。
+- Mock 数据不会写入服务器、数据库、Storage、支付或真实身份系统。
+- 本地 `npm run build` 与 `npm start` 可直接验证 Mock。真实生产部署通过 Vercel/Netlify 的生产标记或 `EVENTSPACE_DEPLOYMENT=production` 识别，并默认拒绝固定 Mock 身份；只有受控预览显式设置 `EVENTSPACE_MODE=mock` 才放行。
+
+## 2. 正式可操作路由
+
+| 路由 | 当前可操作能力 |
+| --- | --- |
+| `/` | Landing、创建入口、样例邀请、账户与法律入口 |
+| `/rooms` | Active/Archived、搜索、视图切换、收藏、打开新创建房间 |
+| `/rooms/new` | 登录门槛、五步创建状态机、完整校验、创建到列表/房间闭环 |
+| `/rooms/[roomId]` | Chat / Board / Itinerary、Share / Members / More、归档与访问终止状态 |
+| `/join` | 邀请码解析、失效反馈、跳转到当前有效邀请 |
+| `/join/[roomId]` | 私密邀请、唯一昵称、头像选择、申请备注、免审核直入、Host 审核或 Community 多数表决闭环 |
+| `/account` | 昵称/头像缩写、访客/登录 Mock、主题、会话重置、法律入口 |
+| `/legal/[document]` | Terms、Privacy、Community Rules、Cookie Notice 的结构草案与法律审阅警告 |
+
+## 3. 房间交互覆盖
+
+### Chat
+
+- 文字发送、房内搜索、回复、表情回应、两分钟撤回；管理员删除与置顶。
+- 按住录制、松开发送且最多 60 秒的语音计时 Mock；不调用麦克风、不生成音频文件。
+- 公开/匿名 yes-no 投票创建、固定分母、票数显示、单人单票与过半即时决议。
+- Community-led 的入房、行程、延时、结束与移除成员提案可在多数票通过后落地到对应状态；Host-led 的 Host/Admin 也可发起治理投票。
+
+### Board
+
+- Board / Sequence 切换；添加样例照片或文字注释。
+- 发布者移动与删除；Host/管理员只可删除他人内容。
+- 新元素从共享区域开始，命令层执行世界边界、照片最多 20% 重叠、注释不遮挡与邻近距离检查；冲突位置自动吸附到最近可用位置，照片数量配额生效。
+- “Mock photo”明确不读取真实文件，因此不声称已完成压缩、EXIF 清理或私有上传。
+
+### Itinerary
+
+- Host/Admin 创建，Community-led 创建投票提案。
+- 时间、地点文字、负责人、容量、参加/不参加/签到与名额释放。
+- 负责人或管理者可在未开始/进行中/已完成之间前进及回退。
+- 仅允许固定的 Google/Apple Maps HTTPS 外链；不渲染地图、不调用 Places API。
+
+### 治理与生命周期
+
+- 邀请链接/邀请码复制反馈与轮换；入房申请批准/拒绝。
+- 成员角色、管理员、禁言、移除、拉黑均要求明确确认。
+- Host 延长时间、二次确认结束、`freezing → archiving → archived` 状态演示。
+- 归档只读；每位用户只移除自己的归档入口，不改变其他人的共享归档资格。
+
+## 4. 明确暂缓、禁止伪造的能力
+
+以下能力不能因为 Mock 中有入口就被视为完成：
+
+- Supabase Auth、匿名身份认领、RLS、RPC、Realtime 权威事件和服务器时间冻结；
+- 真实照片/语音上传、MIME 与文件签名验证、EXIF 清理、转码、私有 bucket 和签名 URL；
+- Stripe Checkout、webhook、退款、永久归档权益与真实价格；
+- Browser Push、PWA 安装、Resend 邮件、Google Places、Cron 归档和删除任务；
+- 真实速率限制、设备封禁、审计日志、备份清理与法律文本。
+
+这些项目继续以技术架构、安全规格和开发前审计登记册为生产实现门槛。Mock 文案不得宣称端到端加密、真实付款、真实邀请发送、真实媒体处理或生产级权限已经完成。
+
+## 5. 后续真实后端接入原则
+
+1. UI 继续调用领域命令，不直接写 Supabase 表。
+2. 为服务端建立独立 DTO/schema，不复用可信度不足的客户端 draft 或 session 数据。
+3. Mock reducer 负责演示和交互回归；生产授权以数据库事务、RLS、RPC 和服务器时间为准。
+4. 每替换一个 Mock 命令，都先补无权限、过期、重复、乱序和失败路径测试，再移除对应 Mock 边界文案。
+## 2026-07-18 当前同步：本地优先 Mock 覆盖
+
+本文件仍用于区分“界面存在”“浏览器本地 Mock 可操作”和“生产后端已安全实现”。当前代码已经从早期 `sessionStorage` 单标签 mock 推进到 `localStorage` 本地优先 session：主键为 `eventspace:local-session:v1`，同时兼容读取旧键 `eventspace:mock-session:v3`。这提升了刷新和重新打开浏览器后的恢复能力，但仍不是多设备、多人实时或服务端持久化。
+
+### 当前已经覆盖的正式路由
+
+- `/`：正式 Landing、创建入口、邀请/加入入口、账号与法律入口。
+- `/rooms`：All / Active / Achieved / Favorite 筛选、搜索、单列横滑/双列网格、编辑模式、收藏、删除个人入口、真实画板快照预览、到期房间展示层归档。
+- `/rooms/new`：本地账号门槛、五步创建、小时/分钟纵向滚轮、创建后写入本地 session、邀请卡片、mock QR / 邀请码、Open this room。
+- `/rooms/[roomId]`：Chat / Board / Itinerary 主体验，Board/Sequence 由顶部 Board tab 的下拉切换承载。
+- `/join` 与 `/join/[roomId]`：邀请码解析、私密邀请、昵称唯一性、头像/备注、审核等待、Host 审核或 Community 多数准入。
+- `/account`：本地身份、昵称、头像缩写、主题、Mock 登录状态、重置本地 session。
+- `/legal/[document]`：Terms、Privacy、Community Rules、Cookie Notice 草稿结构。
+
+### Chat 当前覆盖
+
+- 底部输入栏、右侧自己的消息、发送后滚动到最新消息、搜索、回复、反应、撤回、置顶、管理员删除。
+- 加号工具托盘承载 Search、Poll、Votes；语音按钮在输入框内部，支持 `hold to record` 的本地计时 mock，不产生真实音频文件。
+- Poll 创建器支持 yes/no、选项、行程三类；支持 open minutes、匿名/公开、负责人、时间、地点、容量。
+- 投票卡支持投票后百分比进度条和票数；用户投过的当前 poll 不再作为内联投票卡重复出现。
+- Votes 全屏覆盖层展示全部投票历史，最新投票在最顶部。
+
+### Board 当前覆盖
+
+- 无限画布式交互：单指平移、双指缩放、进入时自动 fit 到当前全部画板内容。
+- 双指落在照片/文本/涂鸦上也优先触发画布缩放；单指滑动画布碰到内容不阻断。
+- 相机、相册、文本、画线、画布背景拆成独立工具入口。
+- 相机/相册读取真实图片文件，使用 canvas 压缩成 data URL，保留 aspect ratio、文件名和画板宽度元数据。
+- 图片按原图比例显示，Rooms 卡片也按真实 Board item 的位置和尺寸预览。
+- 照片点击上部显示作者头像昵称、弹幕文本评论和评论输入框；评论只保存在当前本地 session。
+- 文本标注支持预览、添加、按内容自适应初始尺寸、选中后拖动角点调整大小。
+- 全屏涂鸦板支持画笔、颜色、橡皮、清空、双指缩放/平移、brush 尺寸预览、添加为画板 drawing item；涂鸦 item 不支持旋转。
+- 本人内容或管理员权限下可以删除画板 item；点击画布空白处会结束当前编辑状态。
+
+### Itinerary 与治理当前覆盖
+
+- Host/Admin 可创建行程；Community-led 可通过投票提案创建行程。
+- 行程支持负责人、时间、容量、参与状态、签到、状态推进与回退。
+- 成员审核、禁言、移除、拉黑、邀请轮换、个人归档移除、房间结束与归档生命周期均有本地 mock 状态。
+
+### 仍然不能宣称完成的能力
+
+- 没有 Supabase Auth、真实访客认领、RLS、RPC、Realtime Authorization。
+- 没有多设备同步、多人并发冲突处理、服务端时间、事务或数据库唯一约束。
+- 媒体仍是 `imageDataUrl` 写入本地 JSON；没有私有 Storage、Blob asset 表、EXIF 清理、签名 URL 或服务端转码。
+- 语音只是交互 mock，没有麦克风采集、音频文件、上传和回放。
+- `Save card` 目前是视觉入口，没有真实图片导出。
+- 到期归档在 Rooms 展示层可见，但生产仍需要服务端定时任务或查询层统一裁决。
