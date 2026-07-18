@@ -19,6 +19,7 @@ function toSummary(room: RoomDetail): RoomSummary {
     photoCount: room.photoCount,
     boardPreview: room.boardPreview,
     boardNote: room.boardNote,
+    boardBackground: room.boardBackground,
     isFavorite: room.isFavorite,
   };
 }

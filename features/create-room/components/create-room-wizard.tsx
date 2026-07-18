@@ -1,7 +1,7 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
-import { useReducer, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useMemo, useReducer, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { Icon } from "@/components/ui/icon";
 import { roomId, roomPublicId, type RoomPublicId } from "@/core/domain/ids";
 import { createCompactId, createUuid } from "@/core/domain/uuid";
@@ -11,9 +11,10 @@ import { createRoomReducer, createRoomSteps, initialCreateRoomState, validateDra
 import styles from "./create-room-wizard.module.css";
 
 const stepLabels: Record<CreateRoomStep, string> = { details: "Room identity", leadership: "Decision model", timing: "Time and capacity", access: "Private access", review: "Review" };
-const durations = [{ value: 15, label: "15 min" }, { value: 60, label: "1 hour" }, { value: 180, label: "3 hours" }, { value: 360, label: "6 hours" }, { value: 720, label: "12 hours" }, { value: 1440, label: "24 hours" }] as const;
 const durationHours = Array.from({ length: 25 }, (_, hour) => hour);
 const durationMinutes = Array.from({ length: 12 }, (_, index) => index * 5);
+const wheelRepeatCount = 9;
+const wheelCenterSegment = Math.floor(wheelRepeatCount / 2);
 
 function formatDuration(minutes: number) {
   const hours = Math.floor(minutes / 60);
@@ -32,26 +33,62 @@ function Toggle({ active, onClick }: { readonly active: boolean; readonly onClic
 }
 
 function DetailsStep({ draft, nameError, descriptionError, setName, setDescription }: { readonly draft: CreateRoomDraft; readonly nameError?: string; readonly descriptionError?: string; readonly setName: (value: string) => void; readonly setDescription: (value: string) => void }) {
-  return <><p className={styles.eyebrow}>Start with the feeling</p><h1>Give the moment<br /><em>a name.</em></h1><p className={styles.intro}>People will see this before they enter. Keep it short enough to feel like an invitation.</p><label>Room name <span>{draft.name.length} / 80</span></label><input className={nameError ? styles.invalid : ""} autoFocus value={draft.name} onChange={(event) => setName(event.target.value)} placeholder="After the rain" maxLength={80} />{nameError ? <p className={styles.error}>{nameError}</p> : null}<label>Description · Optional <span>{draft.description.length} / 500</span></label><textarea className={descriptionError ? styles.invalid : ""} value={draft.description} onChange={(event) => setDescription(event.target.value)} placeholder="Rain stopped. Nobody wanted to go home yet." maxLength={500} rows={3} />{descriptionError ? <p className={styles.error}>{descriptionError}</p> : null}</>;
+  return <><p className={styles.eyebrow}>Start with the feeling</p><h1>Give the moment<br /><em>a name.</em></h1><p className={styles.intro}>People will see this before they enter. Keep it short enough to feel like an invitation.</p><label>Room name <span>{draft.name.length} / 80</span></label><input className={nameError ? styles.invalid : ""} autoFocus value={draft.name} onChange={(event) => setName(event.target.value)} placeholder="After the rain" maxLength={80} />{nameError ? <p className={styles.error}>{nameError}</p> : null}<label>Description 路 Optional <span>{draft.description.length} / 500</span></label><textarea className={descriptionError ? styles.invalid : ""} value={draft.description} onChange={(event) => setDescription(event.target.value)} placeholder="Rain stopped. Nobody wanted to go home yet." maxLength={500} rows={3} />{descriptionError ? <p className={styles.error}>{descriptionError}</p> : null}</>;
 }
 
 function LeadershipStep({ draft, setLeadership }: { readonly draft: CreateRoomDraft; readonly setLeadership: (value: CreateRoomDraft["leadership"]) => void }) {
   return <><p className={styles.eyebrow}>How decisions get made</p><h1>Who should lead<br /><em>this moment?</em></h1><p className={styles.intro}>This choice stays with the room and cannot be changed after creation.</p><div className={styles.choiceList}><Choice active={draft.leadership === "host-led"} icon={<Icon name="members" />} title="Host-led" copy="A host and admins guide the room." onClick={() => setLeadership("host-led")} /><Choice active={draft.leadership === "community-led"} icon={<Icon name="heart" />} title="Community-led" copy="Members make room decisions by vote." onClick={() => setLeadership("community-led")} /></div></>;
 }
+function WheelColumn({ label, values, selected, format, disabled, onSelect }: { readonly label: string; readonly values: readonly number[]; readonly selected: number; readonly format: (value: number) => string; readonly disabled?: (value: number) => boolean; readonly onSelect: (value: number) => void }) {
+  const scrollerRef = useRef<HTMLDivElement | null>(null);
+  const settleRef = useRef<number | null>(null);
+  const repeatedValues = useMemo(() => Array.from({ length: wheelRepeatCount }, (_, segment) => values.map((value, index) => ({ value, index, segment, wheelIndex: segment * values.length + index }))).flat(), [values]);
+  const selectedIndex = values.indexOf(selected);
 
-function TimingStep({ draft, durationError, memberError, setDuration, setLimit }: { readonly draft: CreateRoomDraft; readonly durationError?: string; readonly memberError?: string; readonly setDuration: (value: number) => void; readonly setLimit: (value: number) => void }) {
-  return <><p className={styles.eyebrow}>Temporary by design</p><h1>How long should<br /><em>it stay live?</em></h1><p className={styles.intro}>Local rooms use the free first-version limits. The backend will enforce the same rules with server time later.</p><label>Room duration</label><div className={styles.durationGrid}>{durations.map((duration) => <button type="button" key={duration.value} className={draft.durationMinutes === duration.value ? styles.durationActive : ""} onClick={() => setDuration(duration.value)}>{duration.label}<i /></button>)}</div>{durationError ? <p className={styles.error}>{durationError}</p> : null}<label>Maximum people</label><div className={styles.stepper}><button type="button" onClick={() => setLimit(draft.memberLimit - 1)} disabled={draft.memberLimit <= 2}>−</button><strong>{draft.memberLimit}</strong><button type="button" onClick={() => setLimit(draft.memberLimit + 1)} disabled={draft.memberLimit >= 10}>+</button><span>Default itinerary capacity follows this limit.</span></div>{memberError ? <p className={styles.error}>{memberError}</p> : null}</>;
+  useEffect(() => {
+    const scroller = scrollerRef.current;
+    if (!scroller || selectedIndex < 0) return;
+    const target = scroller.querySelector<HTMLButtonElement>(`button[data-wheel-index="${wheelCenterSegment * values.length + selectedIndex}"]`);
+    target?.scrollIntoView({ block: "center" });
+  }, [selectedIndex, values.length]);
+
+  function settleOnCenter() {
+    if (settleRef.current !== null) window.clearTimeout(settleRef.current);
+    settleRef.current = window.setTimeout(() => {
+      const scroller = scrollerRef.current;
+      if (!scroller) return;
+      const center = scroller.getBoundingClientRect().top + scroller.clientHeight / 2;
+      const buttons = [...scroller.querySelectorAll<HTMLButtonElement>("button[data-wheel-index]")].filter((button) => !button.disabled);
+      const closest = buttons.reduce<HTMLButtonElement | null>((best, button) => {
+        const rect = button.getBoundingClientRect();
+        const distance = Math.abs(rect.top + rect.height / 2 - center);
+        if (!best) return button;
+        const bestRect = best.getBoundingClientRect();
+        return distance < Math.abs(bestRect.top + bestRect.height / 2 - center) ? button : best;
+      }, null);
+      if (!closest) return;
+      const value = Number(closest.dataset.value);
+      const index = Number(closest.dataset.index);
+      const segment = Number(closest.dataset.segment);
+      if (Number.isFinite(value) && value !== selected) onSelect(value);
+      if (Number.isFinite(index) && Number.isFinite(segment) && segment !== wheelCenterSegment) {
+        const target = scroller.querySelector<HTMLButtonElement>(`button[data-wheel-index="${wheelCenterSegment * values.length + index}"]`);
+        target?.scrollIntoView({ block: "center" });
+      }
+    }, 90);
+  }
+
+  return <div><span>{label}</span><div ref={scrollerRef} className={styles.durationWheel} onScroll={settleOnCenter}>{repeatedValues.map((item) => <button type="button" key={item.wheelIndex} data-value={item.value} data-index={item.index} data-segment={item.segment} data-wheel-index={item.wheelIndex} className={selected === item.value ? styles.durationWheelActive : ""} disabled={disabled?.(item.value)} onClick={() => onSelect(item.value)}>{format(item.value)}</button>)}</div></div>;
 }
-
 function TimingWheelStep({ draft, durationError, memberError, setDuration, setLimit }: { readonly draft: CreateRoomDraft; readonly durationError?: string; readonly memberError?: string; readonly setDuration: (value: number) => void; readonly setLimit: (value: number) => void }) {
   const selectedHour = Math.floor(draft.durationMinutes / 60);
   const selectedMinute = draft.durationMinutes % 60;
   const updateDuration = (hour: number, minute: number) => setDuration(Math.min(1440, Math.max(15, hour * 60 + minute)));
-  return <><p className={styles.eyebrow}>Temporary by design</p><h1>How long should<br /><em>it stay live?</em></h1><p className={styles.intro}>Local rooms use the free first-version limits. The backend will enforce the same rules with server time later.</p><label>Room duration <span>{formatDuration(draft.durationMinutes)}</span></label><div className={styles.durationWheels}><div><span>Hours</span><div className={styles.durationWheel}>{durationHours.map((hour) => <button type="button" key={hour} className={selectedHour === hour ? styles.durationWheelActive : ""} onClick={() => updateDuration(hour, selectedMinute)}>{String(hour).padStart(2, "0")}</button>)}</div></div><div><span>Minutes</span><div className={styles.durationWheel}>{durationMinutes.map((minute) => <button type="button" key={minute} className={selectedMinute === minute ? styles.durationWheelActive : ""} disabled={selectedHour === 24 && minute > 0 || selectedHour === 0 && minute < 15} onClick={() => updateDuration(selectedHour, minute)}>{String(minute).padStart(2, "0")}</button>)}</div></div></div>{durationError ? <p className={styles.error}>{durationError}</p> : null}<label>Maximum people</label><div className={styles.stepper}><button type="button" onClick={() => setLimit(draft.memberLimit - 1)} disabled={draft.memberLimit <= 2}>-</button><strong>{draft.memberLimit}</strong><button type="button" onClick={() => setLimit(draft.memberLimit + 1)} disabled={draft.memberLimit >= 10}>+</button><span>Default itinerary capacity follows this limit.</span></div>{memberError ? <p className={styles.error}>{memberError}</p> : null}</>;
+  return <><p className={styles.eyebrow}>Temporary by design</p><h1>How long should<br /><em>it stay live?</em></h1><p className={styles.intro}>Local rooms use the free first-version limits. The backend will enforce the same rules with server time later.</p><label>Room duration <span>{formatDuration(draft.durationMinutes)}</span></label><div className={styles.durationWheels}><WheelColumn label="Hours" values={durationHours} selected={selectedHour} format={(hour) => String(hour).padStart(2, "0")} onSelect={(hour) => updateDuration(hour, selectedMinute)} /><WheelColumn label="Minutes" values={durationMinutes} selected={selectedMinute} format={(minute) => String(minute).padStart(2, "0")} disabled={(minute) => selectedHour === 24 && minute > 0 || selectedHour === 0 && minute < 15} onSelect={(minute) => updateDuration(selectedHour, minute)} /></div>{durationError ? <p className={styles.error}>{durationError}</p> : null}<label>Maximum people</label><div className={styles.stepper}><button type="button" onClick={() => setLimit(draft.memberLimit - 1)} disabled={draft.memberLimit <= 2}>-</button><strong>{draft.memberLimit}</strong><button type="button" onClick={() => setLimit(draft.memberLimit + 1)} disabled={draft.memberLimit >= 10}>+</button><span>Default itinerary capacity follows this limit.</span></div>{memberError ? <p className={styles.error}>{memberError}</p> : null}</>;
 }
 
 function AccessStep({ draft, update }: { readonly draft: CreateRoomDraft; readonly update: (patch: Partial<CreateRoomDraft>) => void }) {
-  return <><p className={styles.eyebrow}>Private from the start</p><h1>Choose how people<br /><em>step inside.</em></h1><p className={styles.intro}>Rooms are never publicly discoverable. Invitations only control how invited people enter.</p><div className={styles.choiceList}><Choice active={draft.entryPolicy === "link"} icon={<Icon name="share" />} title="Invitation link" copy="The QR code opens this same private link." onClick={() => update({ entryPolicy: "link" })} /><Choice active={draft.entryPolicy === "invite-code"} icon={<strong className={styles.codeIcon}>7K2P</strong>} title="Invite code" copy="Guests enter a code you can revoke later." onClick={() => update({ entryPolicy: "invite-code" })} /></div><div className={styles.settingRows}><div><span><strong>Approve entry requests</strong><small>{draft.leadership === "host-led" ? "Host and admins review the avatar, name and note." : "Existing members decide each request by majority vote."}</small></span><Toggle active={draft.requiresApproval} onClick={() => update({ requiresApproval: !draft.requiresApproval })} /></div><div><span><strong>Member list</strong><small>{draft.leadership === "community-led" ? "Always visible to members in a Community-led room" : draft.memberListVisibility === "members" ? "Visible to everyone in the room" : "Visible only to Host and admins"}</small></span>{draft.leadership === "community-led" ? <span className={styles.fixedValue}>Everyone</span> : <button type="button" className={styles.valueButton} onClick={() => update({ memberListVisibility: draft.memberListVisibility === "members" ? "moderators" : "members" })}>{draft.memberListVisibility === "members" ? "Everyone" : "Moderators"}<Icon name="chevron" size={15} /></button>}</div></div></>;
+  return <><p className={styles.eyebrow}>Private from the start</p><h1>Choose how people<br /><em>step inside.</em></h1><p className={styles.intro}>Rooms are never publicly discoverable. Invitations only control how invited people enter.</p><div className={styles.choiceList}><Choice active={draft.entryPolicy === "link"} icon={<Icon name="share" />} title="Invitation link" copy="The QR code opens this same private link." onClick={() => update({ entryPolicy: "link" })} /><Choice active={draft.entryPolicy === "invite-code"} icon={<strong className={styles.codeIcon}>7K2P</strong>} title="Invite code" copy="Guests enter a code you can revoke later." onClick={() => update({ entryPolicy: "invite-code" })} /></div><div className={styles.settingRows}><div><span><strong>Approve entry requests</strong><small>{draft.leadership === "host-led" ? "Host and admins review the avatar, name and note." : "Existing members decide each request by majority vote."}</small></span><Toggle active={draft.requiresApproval} onClick={() => update({ requiresApproval: !draft.requiresApproval })} /></div><div className={styles.memberListRow}><span><strong>Member list</strong><small>{draft.leadership === "community-led" ? "Always visible to members in a Community-led room" : draft.memberListVisibility === "members" ? "Visible to everyone in the room" : "Visible only to Host and admins"}</small></span><div className={styles.memberVisibilityControl} aria-label="Member list visibility"><button type="button" className={draft.memberListVisibility === "moderators" ? styles.memberVisibilityActive : ""} disabled={draft.leadership === "community-led"} onClick={() => update({ memberListVisibility: "moderators" })}>Moderators</button><i /><button type="button" className={draft.memberListVisibility === "members" ? styles.memberVisibilityActive : ""} onClick={() => update({ memberListVisibility: "members" })}>Everyone</button></div></div></div></>;
 }
 
 function ReviewStep({ draft, termsError, setTerms }: { readonly draft: CreateRoomDraft; readonly termsError?: string; readonly setTerms: (value: boolean) => void }) {

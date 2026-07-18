@@ -5,6 +5,7 @@ export type RoomStatus = "active" | "archived";
 export type RoomRole = "host" | "admin" | "member";
 export type MembershipState = "active" | "muted" | "removed";
 export type ArtVariant = "one" | "two" | "three" | "four";
+export type BoardBackground = "stone" | "linen" | "charcoal";
 
 export interface PersonSummary {
   readonly actorId: ActorId;
@@ -28,6 +29,7 @@ export interface RoomSummary {
   readonly photoCount: number;
   readonly boardPreview: readonly ArtVariant[];
   readonly boardNote: string;
+  readonly boardBackground: BoardBackground;
   readonly isFavorite: boolean;
 }
 
@@ -40,6 +42,10 @@ export interface ChatMessage {
   readonly isOwn: boolean;
   readonly reactions: readonly { readonly emoji: string; readonly count: number }[];
   readonly replyToId?: string;
+  readonly content?:
+    | { readonly type: "image"; readonly dataUrl: string; readonly name: string; readonly aspectRatio: number }
+    | { readonly type: "location"; readonly latitude: number; readonly longitude: number; readonly label: string }
+    | { readonly type: "voice"; readonly durationSeconds: number; readonly dataUrl: string; readonly mimeType: string };
 }
 
 export interface PollPreview {

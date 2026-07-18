@@ -7,7 +7,7 @@ import { AppHeader } from "@/components/app-header/app-header";
 import { PinnedPhoto } from "@/components/pinboard/pinned-photo";
 import { Icon } from "@/components/ui/icon";
 import { BOARD_UNIT, computeBoardFit, getBoardItemPixelSize } from "@/core/domain/board-layout";
-import type { BoardItem, RoomStatus, RoomSummary } from "@/core/domain/room";
+import type { BoardBackground, BoardItem, RoomStatus, RoomSummary } from "@/core/domain/room";
 import { useMockSession } from "@/features/mock-session/components/mock-session-provider";
 import { selectVisibleRooms, toRoomSummary } from "@/features/mock-session/model/mock-session";
 import styles from "./rooms-page.module.css";
@@ -19,7 +19,13 @@ function formatRoomMeta(room: RoomSummary) {
   return room.status === "active" ? `Ends ${formatted} · ${room.memberCount} people` : `Archived ${formatted} · ${room.memberCount} people`;
 }
 
-function BoardSnapshot({ items }: { readonly items: readonly BoardItem[] }) {
+const boardPreviewBackgroundClasses: Record<BoardBackground, string> = {
+  stone: styles.boardPreviewStone,
+  linen: styles.boardPreviewLinen,
+  charcoal: styles.boardPreviewCharcoal,
+};
+
+function BoardSnapshot({ items, background }: { readonly items: readonly BoardItem[]; readonly background: BoardBackground }) {
   const previewRef = useRef<HTMLDivElement | null>(null);
   const [fit, setFit] = useState({ x: 0, y: 0, scale: 1 });
 
@@ -48,7 +54,7 @@ function BoardSnapshot({ items }: { readonly items: readonly BoardItem[] }) {
   }
 
   return (
-    <div ref={previewRef} className={styles.boardPreview}>
+    <div ref={previewRef} className={`${styles.boardPreview} ${boardPreviewBackgroundClasses[background]}`}>
       <div className={styles.boardWorld} style={{ transform: `translate3d(${fit.x}px, ${fit.y}px, 0) scale(${fit.scale})` }}>
         {items.map((item) => item.kind === "photo" ? (
           <div key={item.id} className={styles.boardSnapshotItem} style={itemStyle(item)}>
@@ -81,7 +87,7 @@ function RoomCard({ room, boardItems, grid, editing, toggleFavorite, removeRoom 
       {editing ? <button className={`${styles.favorite} ${room.isFavorite ? styles.favoriteActive : ""}`} onClick={toggleFavorite} aria-label={room.isFavorite ? `Remove ${room.name} from favorites` : `Favorite ${room.name}`}><Icon name="heart" size={16} /><span>Favorite</span></button> : null}
       {editing ? <button className={styles.deleteRoom} onClick={removeRoom} aria-label={`Delete ${room.name}`}><Icon name="minus" size={16} /></button> : null}
       <Link href={`/rooms/${room.publicId}`} className={styles.cardLink}>
-        <BoardSnapshot items={boardItems} />
+        <BoardSnapshot items={boardItems} background={room.boardBackground} />
         <div className={styles.cardInfo}><div><h2>{room.name}</h2><p><i className={room.status === "active" ? styles.liveDot : ""} />{formatRoomMeta(room)}</p></div><span><Icon name="arrow" /></span></div>
       </Link>
     </article>

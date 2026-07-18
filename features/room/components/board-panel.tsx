@@ -6,7 +6,7 @@ import { PinnedPhoto } from "@/components/pinboard/pinned-photo";
 import { Icon } from "@/components/ui/icon";
 import { BOARD_UNIT, computeBoardFit, getBoardItemPixelSize, getBoardPhotoFrameAspectRatio } from "@/core/domain/board-layout";
 import type { ActorId, RoomPublicId } from "@/core/domain/ids";
-import type { ArtVariant, BoardItem, PersonSummary } from "@/core/domain/room";
+import type { ArtVariant, BoardBackground, BoardItem, PersonSummary } from "@/core/domain/room";
 import { createUuid } from "@/core/domain/uuid";
 import { useMockSession } from "@/features/mock-session/components/mock-session-provider";
 import styles from "./room-experience.module.css";
@@ -28,6 +28,16 @@ type DoodleGestureState = { readonly startDistance: number; readonly startScale:
 
 const clamp = (value: number, min: number, max: number) => Number.isFinite(value) ? Math.min(Math.max(value, min), max) : min;
 const drawingColors = ["#171613", "#9f3f35", "#52715f", "#49647f", "#c29b55"] as const;
+const boardBackgroundClasses: Record<BoardBackground, string> = {
+  stone: styles.boardBgStone,
+  linen: styles.boardBgLinen,
+  charcoal: styles.boardBgCharcoal,
+};
+const backgroundSwatchClasses: Record<BoardBackground, string> = {
+  stone: styles.backgroundSwatchStone,
+  linen: styles.backgroundSwatchLinen,
+  charcoal: styles.backgroundSwatchCharcoal,
+};
 
 function isImageFile(file: File) {
   return file.type.startsWith("image/") || IMAGE_FILE_PATTERN.test(file.name);
@@ -94,7 +104,7 @@ async function compressImage(file: File): Promise<CompressedImage> {
   throw new Error("Image is too large for session storage.");
 }
 
-export function BoardPanel({ roomPublicId, items, members, canAdd, canModerate, viewerActorId, photoCount, maxPhotos, sequence, setSequence }: { readonly roomPublicId: RoomPublicId; readonly items: readonly BoardItem[]; readonly members: readonly PersonSummary[]; readonly canAdd: boolean; readonly canModerate: boolean; readonly viewerActorId: ActorId; readonly photoCount: number; readonly maxPhotos: number; readonly sequence: boolean; readonly setSequence: (value: boolean) => void }) {
+export function BoardPanel({ roomPublicId, items, members, canAdd, canModerate, viewerActorId, photoCount, maxPhotos, sequence, setSequence, boardBackground }: { readonly roomPublicId: RoomPublicId; readonly items: readonly BoardItem[]; readonly members: readonly PersonSummary[]; readonly canAdd: boolean; readonly canModerate: boolean; readonly viewerActorId: ActorId; readonly photoCount: number; readonly maxPhotos: number; readonly sequence: boolean; readonly setSequence: (value: boolean) => void; readonly boardBackground: BoardBackground }) {
   const { session, dispatch } = useMockSession();
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const cameraInputRef = useRef<HTMLInputElement | null>(null);
@@ -114,7 +124,6 @@ export function BoardPanel({ roomPublicId, items, members, canAdd, canModerate, 
   const [resizing, setResizing] = useState<ResizeState | null>(null);
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [backgroundMenuOpen, setBackgroundMenuOpen] = useState(false);
-  const [background, setBackground] = useState<"stone" | "linen" | "charcoal">("stone");
   const [noteComposerOpen, setNoteComposerOpen] = useState(false);
   const [noteText, setNoteText] = useState("");
   const [doodleComposerOpen, setDoodleComposerOpen] = useState(false);
@@ -518,7 +527,7 @@ export function BoardPanel({ roomPublicId, items, members, canAdd, canModerate, 
   }
 
   return (
-    <div className={`${styles.boardPanel} ${styles[`boardBg${background[0].toUpperCase()}${background.slice(1)}`]}`}>
+    <div className={`${styles.boardPanel} ${boardBackgroundClasses[boardBackground]}`}>
       {sequence ? (
         <div className={styles.sequence}>
           {items.map((item) => item.kind === "photo" ? <article key={item.id} className={styles.sequencePhoto}><div className={styles.sequencePhotoFrame} style={sequencePhotoStyle(item)}><PinnedPhoto variant={item.variant} note={item.imageDataUrl ? null : item.note} imageDataUrl={item.imageDataUrl} imageName={item.imageName} className={styles.sequencePinnedPhoto} />{commentItemId === item.id ? <div className={styles.photoAuthor}><b>{ownerFor(item)?.initials ?? "?"}</b><span>{ownerFor(item)?.displayName ?? "Member"}</span></div> : null}<button type="button" className={styles.photoCommentHotspot} aria-label="Show photo comments" onPointerDown={(event) => event.stopPropagation()} onPointerUp={(event) => event.stopPropagation()} onClick={(event) => { event.stopPropagation(); openPhotoComments(item.id); }} />{photoCommentOverlay(item)}</div></article> : item.kind === "drawing" ? <article key={item.id} className={styles.sequenceDrawing}><button type="button" className={styles.sequenceItem} onClick={() => setSelectedItemId(item.id)}><NextImage src={item.imageDataUrl} alt="Board drawing" width={640} height={480} unoptimized /></button></article> : <article key={item.id} className={styles.sequenceNote}><button type="button" className={styles.sequenceItem} onClick={() => setSelectedItemId(item.id)}><p>{item.text}</p></button></article>)}
@@ -548,7 +557,7 @@ export function BoardPanel({ roomPublicId, items, members, canAdd, canModerate, 
       <input ref={albumInputRef} className={styles.fileInput} type="file" accept="image/*" onChange={addLocalPhoto} />
       {canDeleteSelected && selectedItem ? <button type="button" className={styles.deleteBoardAction} aria-label="Delete selected board item" onClick={() => remove(selectedItem)}><Icon name="minus" /></button> : null}
       <div className={styles.boardActions}><button type="button" aria-label="Return to board overview" onClick={() => { setSequence(false); setCommentItemId(null); setSelectedItemId(null); window.requestAnimationFrame(fitBoardToItems); }}><Icon name="home" /></button><button type="button" aria-label="Choose canvas background" aria-expanded={backgroundMenuOpen} onClick={() => setBackgroundMenuOpen((open) => !open)}><Icon name="grid" /></button>{canAdd ? <><button type="button" className={styles.addBoard} aria-label="Open camera" disabled={photoCount >= maxPhotos} onClick={() => cameraInputRef.current?.click()}><Icon name="camera" /></button><button type="button" className={styles.addBoard} aria-label="Choose from photo library" disabled={photoCount >= maxPhotos} onClick={() => albumInputRef.current?.click()}><Icon name="image" /></button><button type="button" className={styles.addBoard} aria-label="Add text note" onClick={() => { setNoteComposerOpen(true); setAddError(null); }}><Icon name="text" /></button><button type="button" className={styles.addBoard} aria-label="Draw on a card" onClick={() => { setDoodleComposerOpen(true); setAddError(null); }}><Icon name="draw" /></button></> : null}</div>
-      {backgroundMenuOpen ? <div className={styles.backgroundPicker} aria-label="Canvas backgrounds">{(["stone","linen","charcoal"] as const).map((item) => <button type="button" key={item} className={`${styles.backgroundSwatch} ${styles[`backgroundSwatch${item[0].toUpperCase()}${item.slice(1)}`]} ${background === item ? styles.backgroundSwatchSelected : ""}`} onClick={() => { setBackground(item); setBackgroundMenuOpen(false); }}><span>{item}</span></button>)}</div> : null}
+      {backgroundMenuOpen ? <div className={styles.backgroundPicker} aria-label="Canvas backgrounds">{(["stone","linen","charcoal"] as const).map((item) => <button type="button" key={item} className={`${styles.backgroundSwatch} ${backgroundSwatchClasses[item]} ${boardBackground === item ? styles.backgroundSwatchSelected : ""}`} onClick={() => { dispatch({ type: "COMMAND", command: { type: "SET_BOARD_BACKGROUND", ...commandBase(), background: item } }); setBackgroundMenuOpen(false); }}><span>{item}</span></button>)}</div> : null}
       {noteComposerOpen ? <div className={styles.noteComposerOverlay} role="dialog" aria-modal="true" aria-label="Add text to board" onClick={() => setNoteComposerOpen(false)}><article onClick={(event) => event.stopPropagation()}><header><div><p>Text</p><strong>Preview your note.</strong></div><button type="button" aria-label="Close text note composer" onClick={() => setNoteComposerOpen(false)}><Icon name="close" /></button></header><div className={styles.noteStyleRail}><div className={styles.notePreview}>{noteText.trim() || "Write something for the board."}</div></div><label>Text <span>{noteText.length} / 500</span></label><textarea value={noteText} onChange={(event) => setNoteText(event.target.value.slice(0,500))} placeholder="Leave something on the board..." rows={4} /><button type="button" className={styles.addNote} disabled={!noteText.trim()} onClick={addNote}>Pin this text <Icon name="arrow" /></button>{addError ? <p className={styles.addError}>{addError}</p> : null}</article></div> : null}
       {doodleComposerOpen ? <div className={styles.doodleOverlay} role="dialog" aria-modal="true" aria-label="Draw on a board card"><div className={styles.doodleStage}><canvas ref={doodleCanvasRef} width={640} height={480} className={styles.doodleCanvas} style={{ transform: `translate3d(${doodlePan.x}px, ${doodlePan.y}px, 0) scale(${doodleScale})` }} onPointerDown={beginDoodle} onPointerMove={updateDoodle} onPointerUp={endDoodle} onPointerCancel={endDoodle} />{brushPreviewVisible ? <div className={styles.brushPreview} style={{ width: `${doodleBrush * 2.8}px`, height: `${doodleBrush * 2.8}px`, borderColor: doodleTool === "eraser" ? "#171613" : doodleColor, background: doodleTool === "eraser" ? "rgba(245,241,234,.72)" : doodleColor }} /> : null}</div><div className={styles.doodleTools}><div className={styles.doodleColors}>{drawingColors.map((color) => <button type="button" key={color} className={doodleColor === color && doodleTool === "brush" ? styles.doodleColorSelected : ""} style={{ background: color }} aria-label={`Use color ${color}`} onClick={() => { setDoodleColor(color); setDoodleTool("brush"); }} />)}</div><button type="button" className={doodleTool === "eraser" ? styles.doodleToolSelected : ""} aria-label="Use eraser" onClick={() => setDoodleTool("eraser")}>Erase</button><label>Brush <input type="range" min={2} max={22} value={doodleBrush} onPointerDown={() => setBrushPreviewVisible(true)} onPointerUp={() => setBrushPreviewVisible(false)} onPointerCancel={() => setBrushPreviewVisible(false)} onBlur={() => setBrushPreviewVisible(false)} onChange={(event) => { setBrushPreviewVisible(true); setDoodleBrush(Number(event.target.value)); }} /></label><button type="button" aria-label="Close drawing board" onClick={() => setDoodleComposerOpen(false)}><Icon name="close" /></button><button type="button" onClick={clearDoodle}>Clear</button><button type="button" className={styles.doodleConfirm} onClick={addDrawing}>Add <Icon name="arrow" /></button>{addError ? <p className={styles.addError}>{addError}</p> : null}</div></div> : null}
     </div>

@@ -13,14 +13,20 @@ export type IconName =
   | "home"
   | "image"
   | "list"
+  | "location"
   | "members"
   | "minus"
   | "more"
+  | "copy"
+  | "pause"
+  | "pin"
   | "plus"
   | "search"
+  | "reply"
   | "send"
   | "share"
   | "text"
+  | "trash"
   | "voice";
 
 export function Icon({ name, size = 18 }: { readonly name: IconName; readonly size?: number }) {
@@ -51,14 +57,20 @@ export function Icon({ name, size = 18 }: { readonly name: IconName; readonly si
     home: <><path d="m4 10 8-6 8 6" /><path d="M6.5 9v10h11V9M10 19v-5h4v5" /></>,
     image: <><rect x="3.5" y="5" width="17" height="14" rx="3" /><path d="m7 16 3-3.2 2.4 2.2 3.2-3.9L20 16" /><circle cx="8.5" cy="9.5" r="1" /></>,
     list: <><path d="M9 6h11M9 12h11M9 18h11" /><circle cx="4.5" cy="6" r=".7" fill="currentColor" stroke="none" /><circle cx="4.5" cy="12" r=".7" fill="currentColor" stroke="none" /><circle cx="4.5" cy="18" r=".7" fill="currentColor" stroke="none" /></>,
+    location: <><path d="M20 10c0 5-8 11-8 11S4 15 4 10a8 8 0 1 1 16 0Z" /><circle cx="12" cy="10" r="2.5" /></>,
     members: <><circle cx="9" cy="8" r="3" /><path d="M3.8 19c.5-3.2 2.2-5 5.2-5s4.8 1.8 5.2 5" /><path d="M15 6.5a2.5 2.5 0 0 1 0 4.9M16 14c2.2.5 3.5 2.2 3.8 4.5" /></>,
     minus: <path d="M5 12h14" />,
     more: <><circle cx="5" cy="12" r="1" fill="currentColor" stroke="none" /><circle cx="12" cy="12" r="1" fill="currentColor" stroke="none" /><circle cx="19" cy="12" r="1" fill="currentColor" stroke="none" /></>,
+    copy: <><rect x="8" y="8" width="11" height="11" rx="2" /><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2" /></>,
+    pause: <><path d="M9 6v12M15 6v12" /></>,
+    pin: <><path d="m14 4 6 6-3 1-4 4-1 4-7-7 4-1 4-4 1-3Z" /><path d="m9 16-5 5" /></>,
     plus: <><path d="M12 5v14M5 12h14" /></>,
     search: <><circle cx="10.5" cy="10.5" r="6.5" /><path d="m16 16 4 4" /></>,
+    reply: <><path d="m9 8-5 4 5 4" /><path d="M5 12h8c4 0 6 2 6 6" /></>,
     send: <><path d="m5 12 14-7-4 14-3-6-7-1Z" /><path d="m12 13 7-8" /></>,
     share: <><circle cx="18" cy="5" r="2.5" /><circle cx="6" cy="12" r="2.5" /><circle cx="18" cy="19" r="2.5" /><path d="m8.2 10.8 7.6-4.5M8.2 13.2l7.6 4.5" /></>,
     text: <><path d="M5 5h14M12 5v14M9 19h6" /></>,
+    trash: <><path d="M4 7h16M9 7V4h6v3M7 7l1 13h8l1-13M10 11v5M14 11v5" /></>,
     voice: <><rect x="9" y="3" width="6" height="11" rx="3" /><path d="M6 11a6 6 0 0 0 12 0M12 17v4M9 21h6" /></>,
   };
 

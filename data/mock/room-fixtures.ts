@@ -58,6 +58,7 @@ const roomFixtures = [
     photoCount: 18,
     boardPreview: ["one", "four", "three"],
     boardNote: "after the rain",
+    boardBackground: "stone",
     isFavorite: true,
     memberListVisibility: "members",
     members: [avery, maya, jon, leah],
@@ -94,12 +95,12 @@ const roomFixtures = [
     ],
   },
   {
-    id: roomId("22222222-2222-4222-8222-222222222222"), publicId: roomPublicId("room_sunday_slowly"), name: "Sunday, slowly", description: "A long lunch that became an evening.", mode: "community-led", status: "archived", timeZone: "Asia/Taipei", endsAt: null, archivedAt: "2026-07-12T21:10:00+08:00", memberCount: 6, photoCount: 14, boardPreview: ["two", "one"], boardNote: "stay a little longer", isFavorite: false, memberListVisibility: "members",
+    id: roomId("22222222-2222-4222-8222-222222222222"), publicId: roomPublicId("room_sunday_slowly"), name: "Sunday, slowly", description: "A long lunch that became an evening.", mode: "community-led", status: "archived", timeZone: "Asia/Taipei", endsAt: null, archivedAt: "2026-07-12T21:10:00+08:00", memberCount: 6, photoCount: 14, boardPreview: ["two", "one"], boardNote: "stay a little longer", boardBackground: "linen", isFavorite: false, memberListVisibility: "members",
     members: [avery, maya, jon], messages: [], activePoll: null,
     boardItems: [{ id: "board_sunday_1", kind: "photo", ownerActorId: maya.actorId, variant: "two", note: "one more coffee", x: 25, y: 20, rotation: -3, width: 27 }], itinerary: [],
   },
   {
-    id: roomId("33333333-3333-4333-8333-333333333333"), publicId: roomPublicId("room_long_table"), name: "A very long table", description: "Everyone brought one more person.", mode: "host-led", status: "archived", timeZone: "Asia/Taipei", endsAt: null, archivedAt: "2026-06-28T23:40:00+08:00", memberCount: 9, photoCount: 25, boardPreview: ["three", "four", "one"], boardNote: "one very long table", isFavorite: true, memberListVisibility: "members",
+    id: roomId("33333333-3333-4333-8333-333333333333"), publicId: roomPublicId("room_long_table"), name: "A very long table", description: "Everyone brought one more person.", mode: "host-led", status: "archived", timeZone: "Asia/Taipei", endsAt: null, archivedAt: "2026-06-28T23:40:00+08:00", memberCount: 9, photoCount: 25, boardPreview: ["three", "four", "one"], boardNote: "one very long table", boardBackground: "charcoal", isFavorite: true, memberListVisibility: "members",
     members: [avery, maya, jon, leah], messages: [], activePoll: null,
     boardItems: [{ id: "board_table_1", kind: "photo", ownerActorId: jon.actorId, variant: "three", note: "all together", x: 33, y: 25, rotation: 4, width: 28 }], itinerary: [],
   },
@@ -154,6 +155,7 @@ function assertRoomFixture(value: unknown): asserts value is RoomDetail {
   if (typeof value.timeZone !== "string" || value.timeZone.length > 64) throw new Error("Room fixture has an invalid time zone");
   if (!Array.isArray(value.members) || !Array.isArray(value.messages) || !Array.isArray(value.boardItems) || !Array.isArray(value.itinerary)) throw new Error("Room fixture collections are invalid");
   if (!Array.isArray(value.boardPreview) || value.boardPreview.length === 0) throw new Error("Room fixture needs a board preview");
+  if (!["stone", "linen", "charcoal"].includes(String(value.boardBackground ?? "stone"))) throw new Error("Room fixture has invalid board background");
   if (!isFiniteNumber(value.memberCount) || !isFiniteNumber(value.photoCount)) throw new Error("Room fixture counts are invalid");
   if (value.status === "active" && !isValidDate(value.endsAt)) throw new Error("Active room fixture needs a valid end time");
   if (value.status === "archived" && !isValidDate(value.archivedAt)) throw new Error("Archived room fixture needs a valid archive time");
