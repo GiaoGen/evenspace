@@ -6,6 +6,14 @@ export type RoomRole = "host" | "admin" | "member";
 export type MembershipState = "active" | "muted" | "removed";
 export type ArtVariant = "one" | "two" | "three" | "four";
 export type BoardBackground = "stone" | "linen" | "charcoal";
+export type BoardNoteVariant = "paper" | "ink" | "sage";
+
+export interface BoardComment {
+  readonly id: string;
+  readonly actorId: ActorId;
+  readonly body: string;
+  readonly createdAt: string;
+}
 
 export interface PersonSummary {
   readonly actorId: ActorId;
@@ -71,6 +79,7 @@ export interface BoardPhoto {
   readonly y: number;
   readonly rotation: number;
   readonly width: number;
+  readonly comments?: readonly BoardComment[];
 }
 
 export interface BoardNote {
@@ -83,6 +92,7 @@ export interface BoardNote {
   readonly rotation: number;
   readonly width?: number;
   readonly height?: number;
+  readonly variant?: BoardNoteVariant;
 }
 
 export interface BoardDrawing {

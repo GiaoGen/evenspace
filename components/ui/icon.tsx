@@ -8,6 +8,7 @@ export type IconName =
   | "chevron"
   | "close"
   | "draw"
+  | "eraser"
   | "grid"
   | "heart"
   | "home"
@@ -27,6 +28,8 @@ export type IconName =
   | "share"
   | "text"
   | "trash"
+  | "undo"
+  | "redo"
   | "voice";
 
 export function Icon({ name, size = 18 }: { readonly name: IconName; readonly size?: number }) {
@@ -52,6 +55,7 @@ export function Icon({ name, size = 18 }: { readonly name: IconName; readonly si
     chevron: <path d="m9 6 6 6-6 6" />,
     close: <><path d="m6 6 12 12M18 6 6 18" /></>,
     draw: <><path d="M4 20c4.5-1.2 3.4-5.8 6.6-5.8 2.1 0 2.6 1.9 4.6 1.9 1.4 0 2.7-.8 4.8-3.1" /><path d="m14.2 5.3 4.5 4.5" /><path d="m13.2 13.1-3.8 1.2 1.2-3.8 6.9-6.9a1.8 1.8 0 0 1 2.5 0l.4.4a1.8 1.8 0 0 1 0 2.5l-7.2 6.6Z" /></>,
+    eraser: <><path d="m4 15 8.5-10a2 2 0 0 1 2.8-.2l3.9 3.3a2 2 0 0 1 .2 2.8L12 19.5H7.8L4 16.3A1 1 0 0 1 4 15Z" /><path d="m9.5 8.5 7 6M12 19.5h8" /></>,
     grid: <><rect x="4" y="4" width="6" height="6" rx="1.5" /><rect x="14" y="4" width="6" height="6" rx="1.5" /><rect x="4" y="14" width="6" height="6" rx="1.5" /><rect x="14" y="14" width="6" height="6" rx="1.5" /></>,
     heart: <path d="M20.8 8.7c0 5-8.8 10-8.8 10s-8.8-5-8.8-10A4.7 4.7 0 0 1 12 6.3a4.7 4.7 0 0 1 8.8 2.4Z" />,
     home: <><path d="m4 10 8-6 8 6" /><path d="M6.5 9v10h11V9M10 19v-5h4v5" /></>,
@@ -71,6 +75,8 @@ export function Icon({ name, size = 18 }: { readonly name: IconName; readonly si
     share: <><circle cx="18" cy="5" r="2.5" /><circle cx="6" cy="12" r="2.5" /><circle cx="18" cy="19" r="2.5" /><path d="m8.2 10.8 7.6-4.5M8.2 13.2l7.6 4.5" /></>,
     text: <><path d="M5 5h14M12 5v14M9 19h6" /></>,
     trash: <><path d="M4 7h16M9 7V4h6v3M7 7l1 13h8l1-13M10 11v5M14 11v5" /></>,
+    undo: <><path d="m9 7-5 5 5 5" /><path d="M5 12h8a6 6 0 0 1 6 6" /></>,
+    redo: <><path d="m15 7 5 5-5 5" /><path d="M19 12h-8a6 6 0 0 0-6 6" /></>,
     voice: <><rect x="9" y="3" width="6" height="11" rx="3" /><path d="M6 11a6 6 0 0 0 12 0M12 17v4M9 21h6" /></>,
   };
 

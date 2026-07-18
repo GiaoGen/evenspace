@@ -1,0 +1,133 @@
+.boardPanel { position: relative; height: 100%; min-height: 0; overflow: hidden; isolation: isolate; color: #191815; }
+.boardBgStone { background: #aaa49a; }
+.boardBgLinen { background-color: #b9aa94; background-image: linear-gradient(rgba(255,255,255,.08) 1px, transparent 1px), linear-gradient(90deg,rgba(255,255,255,.06) 1px,transparent 1px); background-size: 22px 22px; }
+.boardBgCharcoal { background: #686862; }
+.fileInput { position: fixed; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+
+.canvasViewport { position: absolute; inset: 0; overflow: hidden; touch-action: none; cursor: grab; }
+.canvasViewport:active { cursor: grabbing; }
+.canvasWorld { position: absolute; left: 0; top: 0; width: 1px; height: 1px; transform-origin: 0 0; will-change: transform; }
+.canvasViewport:global(.is-fitting) .canvasWorld { transition: transform 340ms cubic-bezier(.22,.8,.28,1); }
+.canvasItem { position: absolute; margin: 0; touch-action: none; transform-origin: center; user-select: none; -webkit-user-select: none; will-change: transform; transition: filter 180ms ease, box-shadow 180ms ease; }
+.canvasPhoto { overflow: visible; }
+.pinnedPhoto { width: 100%; height: 100%; }
+.canvasDrawing { overflow: visible; border: 7px solid #f7f3ed; background: #f7f3ed; box-shadow: 0 12px 26px rgba(39,34,27,.16); }
+.canvasDrawing img { object-fit: contain; }
+.canvasNote { display: grid; place-items: center; overflow: visible; box-sizing: border-box; padding: 20px; color: #24211c; font-family: var(--font-bodoni), Georgia, serif; font-size: 25px; line-height: 1.03; text-align: center; white-space: pre-wrap; box-shadow: 0 13px 26px rgba(39,34,27,.16); }
+.notepaper { background: #e6d8bc; }
+.noteink { background: #30332f; color: #f4efe5; }
+.notesage { background: #879485; color: #f8f4eb; }
+.itemSelected { z-index: 20; filter: drop-shadow(0 12px 16px rgba(25,24,21,.16)); }
+.itemSelected::after { position: absolute; content: ""; inset: -6px; border: 1.5px solid rgba(25,24,21,.88); pointer-events: none; animation: selectionIn 180ms ease-out both; }
+.canvasPhoto.itemSelected::after { inset: -7px; }
+.itemDragging { z-index: 30; filter: drop-shadow(0 18px 20px rgba(25,24,21,.22)); transition: none; }
+.resizeHandle { position: absolute; z-index: 15; right: -14px; bottom: -14px; width: 28px; height: 28px; border: 5px solid #f7f3ed; border-radius: 50%; background: #20201c; box-shadow: 0 3px 10px rgba(0,0,0,.2); touch-action: none; }
+
+.emptyBoard { position: absolute; left: 50%; top: 44%; display: grid; justify-items: center; gap: 9px; width: min(270px,78vw); color: rgba(247,243,237,.92); text-align: center; transform: translate(-50%,-50%); pointer-events: none; animation: emptyIn 520ms cubic-bezier(.2,.75,.2,1) both; }
+.emptyBoard span { display: grid; width: 42px; height: 42px; place-items: center; border: 1px solid rgba(247,243,237,.55); border-radius: 50%; font: 300 25px/1 Arial,sans-serif; }
+.emptyBoard strong { font-family: var(--font-bodoni), Georgia, serif; font-size: 30px; font-weight: 400; }
+.emptyBoard small { color: rgba(247,243,237,.7); font-size: 9px; }
+
+.photoConversation { position: absolute; z-index: 8; inset: 18px 8px 8px; overflow: hidden; pointer-events: auto; animation: conversationIn 220ms ease-out both; }
+.photoAuthor { position: absolute; z-index: 4; top: 9px; left: 9px; display: flex; align-items: center; gap: 7px; max-width: calc(100% - 18px); color: #fff; text-shadow: 0 1px 7px rgba(0,0,0,.45); }
+.photoAuthor b { display: grid; flex: 0 0 25px; height: 25px; place-items: center; border: 1px solid rgba(255,255,255,.62); border-radius: 50%; background: #555f53; font: 700 8px/1 Arial,sans-serif; text-shadow: none; }
+.photoAuthor span { overflow: hidden; font-size: 8px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+.commentBarrage { position: absolute; z-index: 3; inset: 0; overflow: hidden; pointer-events: none; }
+.commentBarrage span { position: absolute; left: 100%; width: max-content; max-width: 90%; overflow: hidden; color: #fff; font-size: 8px; font-weight: 650; text-overflow: ellipsis; text-shadow: 0 1px 5px rgba(0,0,0,.78); white-space: nowrap; animation: barrage 7s linear infinite; }
+.photoCommentComposer { position: absolute; z-index: 5; right: 7px; bottom: 7px; left: 7px; display: flex; align-items: center; gap: 5px; min-height: 31px; padding: 4px 4px 4px 10px; border: 0; border-radius: 6px; background: #788477; box-shadow: 0 6px 16px rgba(24,23,20,.18); }
+.photoCommentComposer input { min-width: 0; flex: 1; border: 0; outline: 0; background: transparent; color: #fff; font: 600 8px/1 Arial,sans-serif; }
+.photoCommentComposer input::placeholder { color: rgba(255,255,255,.68); }
+.photoCommentComposer button { min-width: 43px; align-self: stretch; border: 0; border-radius: 4px; background: #f3eee5; color: #24231f; font-size: 7px; font-weight: 800; }
+.photoCommentComposer button:disabled { opacity: .45; }
+
+.boardDock { position: absolute; z-index: 42; right: max(14px,env(safe-area-inset-right)); bottom: max(14px,env(safe-area-inset-bottom)); display: flex; align-items: center; gap: 4px; padding: 4px; border-radius: 18px; background: rgba(31,30,27,.94); box-shadow: 0 13px 32px rgba(32,29,24,.24); animation: dockIn 360ms cubic-bezier(.2,.8,.25,1) both; backdrop-filter: blur(14px); }
+.boardDock button { display: grid; width: 40px; height: 40px; place-items: center; border: 0; border-radius: 14px; background: transparent; color: #f6f1e8; transition: background 160ms ease, color 160ms ease, transform 160ms ease; }
+.boardDock button:active { transform: scale(.9); }
+.boardDock .dockAdd { margin-left: 3px; background: #f4efe6; color: #1d1c19; }
+.boardDock .dockActive { background: #8c9989; color: #fff; }
+.trayScrim { position: absolute; z-index: 38; inset: 0; border: 0; background: rgba(27,26,23,.12); animation: fadeIn 160ms ease-out both; }
+.createTray,.backgroundTray { position: absolute; z-index: 41; right: max(14px,env(safe-area-inset-right)); bottom: calc(max(14px,env(safe-area-inset-bottom)) + 58px); background: #f3eee5; box-shadow: 0 18px 40px rgba(35,31,25,.23); transform-origin: right bottom; animation: trayIn 230ms cubic-bezier(.2,.82,.24,1) both; }
+.createTray { display: grid; grid-template-columns: repeat(2,104px); gap: 5px; padding: 6px; border-radius: 8px; }
+.createTray button { display: flex; min-height: 74px; flex-direction: column; align-items: flex-start; justify-content: space-between; padding: 10px; border: 0; border-radius: 5px; background: #dfd8cd; color: #25231f; text-align: left; }
+.createTray button:nth-child(2) { background: #c4c9c2; }.createTray button:nth-child(3) { background: #e4d5b8; }.createTray button:nth-child(4) { background: #909b8e; color: #fff; }
+.createTray button:active { transform: scale(.97); }
+.createTray button:disabled { opacity: .42; }
+.createTray i { display: grid; width: 28px; height: 28px; place-items: center; border-radius: 50%; background: rgba(255,255,255,.42); font-style: normal; }
+.createTray span { font-family: var(--font-bodoni), Georgia, serif; font-size: 17px; }
+.backgroundTray { display: flex; gap: 5px; padding: 6px; border-radius: 8px; }
+.backgroundTray button { position: relative; width: 68px; padding: 0 0 8px; overflow: hidden; border: 0; border-radius: 5px; background: #fff; color: #25231f; }
+.backgroundTray i { display: block; width: 100%; height: 56px; }
+.backgroundTray span { display: block; margin-top: 7px; font-size: 7px; font-weight: 750; }
+.backgroundSelected::after { position: absolute; content: ""; inset: 3px; border: 2px solid #f7f3ed; border-radius: 3px; box-shadow: 0 0 0 1px #24231f; pointer-events: none; }
+.swatchstone { background: #aaa49a; }.swatchlinen { background: #b9aa94; }.swatchcharcoal { background: #686862; }
+.boardToast { position: absolute; z-index: 44; left: 50%; bottom: 82px; max-width: calc(100% - 32px); padding: 10px 13px; border-radius: 6px; background: #a24e44; color: #fff; font-size: 8px; transform: translateX(-50%); animation: toastIn 220ms ease-out both; }
+.deleteAction { position: absolute; z-index: 45; top: 14px; right: 14px; display: grid; width: 40px; height: 40px; place-items: center; border: 0; border-radius: 50%; background: #9c433b; color: #fff; box-shadow: 0 8px 22px rgba(54,28,24,.22); animation: actionIn 180ms ease-out both; }
+
+.noteStudioBackdrop { position: absolute; z-index: 80; inset: 0; display: flex; align-items: flex-end; justify-content: center; padding: 16px 0 max(16px,env(safe-area-inset-bottom)); background: rgba(26,25,22,.58); animation: fadeIn 180ms ease-out both; }
+.noteStudio { width: 100%; min-width: 0; animation: studioUp 300ms cubic-bezier(.2,.8,.22,1) both; }
+.noteCardRail { display: grid; grid-auto-columns: min(78vw,330px); grid-auto-flow: column; gap: 10px; overflow-x: auto; padding: 10px max(11vw,24px) 18px; scroll-padding-inline: max(11vw,24px); scroll-snap-type: x mandatory; scrollbar-width: none; }
+.noteCardRail::-webkit-scrollbar { display: none; }
+.noteStyleCard { position: relative; aspect-ratio: 1.3; overflow: hidden; box-sizing: border-box; padding: 24px; scroll-snap-align: center; box-shadow: 0 16px 42px rgba(22,20,17,.25); transform: scale(.92); transition: transform 210ms ease, opacity 210ms ease; opacity: .72; }
+.noteStyleSelected { transform: scale(1); opacity: 1; }
+.noteStyleCard textarea,.noteStyleCard > button { width: 100%; height: 100%; border: 0; outline: 0; background: transparent; color: inherit; font-family: var(--font-bodoni), Georgia, serif; font-size: clamp(28px,8vw,42px); line-height: 1.02; text-align: center; resize: none; }
+.noteStyleCard textarea::placeholder { color: currentColor; opacity: .42; }
+.noteStyleCard > button { padding: 0; }
+.noteStyleCard span { display: block; overflow: hidden; }
+.noteStudioActions { display: grid; width: fit-content; grid-template-columns: 42px 74px 42px; align-items: center; gap: 4px; margin: 0 auto; padding: 4px; border-radius: 18px; background: #1f1e1b; box-shadow: 0 12px 30px rgba(0,0,0,.24); color: #f5f0e7; }
+.noteStudioActions button { display: grid; width: 42px; height: 42px; place-items: center; border: 0; border-radius: 14px; background: transparent; color: inherit; }
+.noteStudioActions span { text-align: center; font-size: 9px; }.noteStudioActions i { opacity: .5; font-style: normal; }
+.noteStudioActions .confirmAction,.confirmAction { background: #8c9989; color: #fff; }
+.confirmAction:disabled { opacity: .35; }
+
+.studioOverlay { position: fixed; z-index: 200; inset: 0; display: grid; overflow: hidden; grid-template-rows: minmax(0,1fr) auto; padding: max(12px,env(safe-area-inset-top)) 12px max(12px,env(safe-area-inset-bottom)); animation: studioReveal 280ms ease-out both; }
+.doodlePaperStage { position: relative; min-height: 0; overflow: hidden; display: grid; place-items: center; }
+.doodlePaper { width: min(92vw,760px); height: auto; aspect-ratio: 4/3; touch-action: none; transform-origin: center; background: #f7f3ed; box-shadow: 0 18px 46px rgba(38,34,28,.22); will-change: transform; }
+.brushPreview { position: absolute; z-index: 3; left: 50%; top: 50%; border: 1px solid; border-radius: 50%; transform: translate(-50%,-50%); pointer-events: none; animation: previewIn 130ms ease-out both; }
+.doodleColorCard { position: absolute; z-index: 4; left: 50%; bottom: calc(max(12px,env(safe-area-inset-bottom)) + 118px); display: flex; gap: 8px; padding: 8px; border-radius: 18px; background: rgba(31,30,27,.94); box-shadow: 0 10px 24px rgba(25,23,19,.2); transform: translateX(-50%); }
+.doodleColorCard button { width: 27px; height: 27px; border: 3px solid transparent; border-radius: 50%; box-shadow: inset 0 0 0 1px rgba(255,255,255,.22); transition: transform 160ms ease,border-color 160ms ease; }
+.doodleColorCard .activeSwatch { border-color: #f7f3ed; transform: scale(1.12); }
+.doodleToolRow { position: relative; z-index: 4; display: grid; grid-template-areas: "tools tools" "history commit"; grid-template-columns: auto auto; justify-content: center; gap: 6px; }
+.doodleToolCard { grid-area: tools; justify-self: center; }.doodleHistoryCard { grid-area: history; justify-self: end; }.doodleCommitCard { grid-area: commit; justify-self: start; }
+.doodleToolCard,.doodleHistoryCard,.doodleCommitCard { display: flex; align-items: center; gap: 2px; padding: 4px; border-radius: 18px; background: rgba(31,30,27,.96); color: #f6f1e8; box-shadow: 0 12px 30px rgba(25,23,19,.22); }
+.doodleToolRow button { display: grid; width: 39px; height: 39px; place-items: center; border: 0; border-radius: 14px; background: transparent; color: inherit; }
+.doodleToolRow button:disabled { opacity: .28; }
+.doodleToolCard .activeTool,.doodleToolCard .activeSize { background: #8c9989; }
+.doodleToolCard i { display: block; border-radius: 50%; background: currentColor; }
+.doodleCommitCard .confirmAction { background: #f5f0e7; color: #1f1e1b; }
+
+.sequence { height: 100%; overflow-x: hidden; overflow-y: auto; padding: 24px 14px 100px; overscroll-behavior: contain; }
+.sequence > article { width: min(100%,520px); margin: 0 auto 15px; animation: sequenceIn 360ms cubic-bezier(.2,.8,.25,1) both; }
+.sequencePhoto { position: relative; }
+.sequencePinnedPhoto { width: 100%; height: 100%; }
+.sequencePhoto .photoConversation { inset: 18px 8px 8px; }
+.sequenceDrawing { padding: 8px; background: #f7f3ed; box-shadow: 0 13px 28px rgba(37,33,27,.16); }
+.sequenceDrawing img { display: block; width: 100%; height: auto; }
+.sequenceNote { box-sizing: border-box; min-height: 180px; display: grid; place-items: center; padding: 30px; font-family: var(--font-bodoni),Georgia,serif; font-size: 34px; line-height: 1.02; text-align: center; box-shadow: 0 13px 28px rgba(37,33,27,.16); white-space: pre-wrap; }
+.emptySequence { height: 60%; display: grid; place-content: center; gap: 8px; color: rgba(247,243,237,.82); text-align: center; }
+.emptySequence strong { font-family: var(--font-bodoni),Georgia,serif; font-size: 29px; font-weight: 400; }.emptySequence span { font-size: 9px; }
+.sequenceReturn { position: absolute; z-index: 40; right: 14px; bottom: max(14px,env(safe-area-inset-bottom)); display: flex; min-height: 44px; align-items: center; gap: 7px; padding: 0 15px; border: 0; border-radius: 16px; background: #1f1e1b; color: #f6f1e8; box-shadow: 0 12px 28px rgba(31,28,23,.22); font-size: 8px; }
+
+@keyframes selectionIn { from { opacity: 0; transform: scale(.96); } }
+@keyframes emptyIn { from { opacity: 0; transform: translate(-50%,-45%); } }
+@keyframes conversationIn { from { opacity: 0; } }
+@keyframes barrage { 0% { transform: translateX(0); } 100% { transform: translateX(-230%); } }
+@keyframes dockIn { from { opacity: 0; transform: translateY(12px); } }
+@keyframes trayIn { from { opacity: 0; transform: translateY(10px) scale(.94); } }
+@keyframes fadeIn { from { opacity: 0; } }
+@keyframes toastIn { from { opacity: 0; transform: translate(-50%,8px); } }
+@keyframes actionIn { from { opacity: 0; transform: scale(.75); } }
+@keyframes studioUp { from { opacity: 0; transform: translateY(26px); } }
+@keyframes studioReveal { from { opacity: 0; transform: scale(1.01); } }
+@keyframes previewIn { from { opacity: 0; transform: translate(-50%,-50%) scale(.6); } }
+@keyframes sequenceIn { from { opacity: 0; transform: translateY(15px); } }
+
+@media (min-width: 720px) {
+  .createTray { grid-template-columns: repeat(4,108px); }
+  .boardDock { right: 22px; bottom: 22px; }
+  .createTray,.backgroundTray { right: 22px; bottom: 82px; }
+  .doodlePaper { width: min(70vw,760px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .boardPanel *,.boardPanel *::before,.boardPanel *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+}

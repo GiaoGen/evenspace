@@ -63,7 +63,7 @@ function BoardSnapshot({ items, background }: { readonly items: readonly BoardIt
         ) : item.kind === "drawing" ? (
           <div key={item.id} className={styles.boardSnapshotDrawing} style={itemStyle(item)}><Image src={item.imageDataUrl} alt="Board drawing" fill sizes="220px" unoptimized /></div>
         ) : (
-          <div key={item.id} className={styles.boardSnapshotNote} style={itemStyle(item)}>{item.text}</div>
+          <div key={item.id} className={`${styles.boardSnapshotNote} ${styles[`boardSnapshotNote${item.variant ?? "paper"}`]}`} style={itemStyle(item)}>{item.text}</div>
         ))}
       </div>
       {items.length === 0 ? <span className={styles.emptyBoard}>No board items yet.</span> : null}
