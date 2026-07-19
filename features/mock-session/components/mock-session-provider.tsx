@@ -32,11 +32,7 @@ function runAfterHydration(callback: () => void) {
 }
 
 export function MockSessionProvider({ initialSession, children }: { readonly initialSession: MockSession; readonly children: ReactNode }) {
-  const [session, dispatch] = useReducer(mockSessionReducer, initialSession, (fallback) => {
-    if (typeof window === "undefined") return fallback;
-    const stored = readStoredSession();
-    return stored ? parsePersistedMockSession(stored) ?? fallback : fallback;
-  });
+  const [session, dispatch] = useReducer(mockSessionReducer, initialSession);
   const storageReady = useRef(false);
 
   useEffect(() => {

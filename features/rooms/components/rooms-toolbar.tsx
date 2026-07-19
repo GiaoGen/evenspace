@@ -1,0 +1,14 @@
+import { Icon } from "@/components/ui/icon";
+import { roomFilterLabels, roomFilterOptions, type RoomFilter } from "../model/room-collection";
+import styles from "./rooms-page.module.css";
+
+export function RoomsToolbar({ filter, counts, filterOpen, searchOpen, editing, grid, query, visibleCount, setFilterOpen, setFilter, openSearch, closeSearch, setQuery, toggleEditing, toggleGrid }: { readonly filter: RoomFilter; readonly counts: Record<RoomFilter, number>; readonly filterOpen: boolean; readonly searchOpen: boolean; readonly editing: boolean; readonly grid: boolean; readonly query: string; readonly visibleCount: number; readonly setFilterOpen: (open: boolean) => void; readonly setFilter: (filter: RoomFilter) => void; readonly openSearch: () => void; readonly closeSearch: () => void; readonly setQuery: (query: string) => void; readonly toggleEditing: () => void; readonly toggleGrid: () => void }) {
+  return (
+    <div className={styles.toolbarWrap}>
+      <div className={`${styles.toolbar} ${searchOpen ? styles.toolbarSearch : ""} ${editing ? styles.toolbarEditing : ""}`}>
+        {searchOpen ? <div className={styles.searchMode}><Icon name="search" size={17} /><input autoFocus value={query} onChange={(event) => setQuery(event.target.value.slice(0, 80))} placeholder="Search your rooms" aria-label="Search your rooms" /><button type="button" onClick={closeSearch} aria-label="Close search"><Icon name="close" size={17} /></button></div> : editing ? <><div className={styles.editingLabel}><Icon name="edit" size={16} /><span><strong>Editing rooms</strong><small>{visibleCount} visible</small></span></div><button type="button" className={styles.doneButton} onClick={toggleEditing}><Icon name="check" size={15} />Done</button></> : <><button type="button" className={styles.filterButton} aria-expanded={filterOpen} onClick={() => setFilterOpen(!filterOpen)}><span><strong>{roomFilterLabels[filter]}</strong><small>{counts[filter]}</small></span><Icon name="chevron" size={14} /></button><div className={styles.toolbarActions}><button type="button" onClick={openSearch} aria-label="Search rooms"><Icon name="search" size={17} /></button><button type="button" onClick={toggleGrid} aria-label={grid ? "Use magazine view" : "Use grid view"}><Icon name={grid ? "list" : "grid"} size={17} /></button><button type="button" className={styles.editAction} onClick={toggleEditing}><Icon name="edit" size={15} /><span>Edit</span></button></div></>}
+      </div>
+      {filterOpen && !searchOpen && !editing ? <div className={styles.filterOptions}>{roomFilterOptions.map((item) => <button type="button" key={item} className={item === filter ? styles.filterSelected : ""} onClick={() => { setFilter(item); setFilterOpen(false); }}><span>{roomFilterLabels[item]}<small>{counts[item]}</small></span>{item === filter ? <Icon name="check" size={15} /> : null}</button>)}</div> : null}
+    </div>
+  );
+}

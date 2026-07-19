@@ -1,0 +1,175 @@
+.panel {
+  --itinerary-ended: #d7aaa3;
+  --itinerary-ended-ink: #412522;
+  --itinerary-current: #748779;
+  --itinerary-current-ink: #fffaf2;
+  --itinerary-upcoming: #d8d6cf;
+  --itinerary-upcoming-ink: #26251f;
+  height: 100%;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 24px max(16px, calc((100% - 760px) / 2)) 92px;
+  background: var(--canvas);
+  scrollbar-width: none;
+}
+
+.panel::-webkit-scrollbar { display: none; }
+
+.panelHeader {
+  position: sticky;
+  z-index: 8;
+  top: -24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  min-height: 84px;
+  margin: 0 -4px 26px;
+  padding: 20px 4px 12px;
+  background: color-mix(in srgb, var(--canvas) 91%, transparent);
+  backdrop-filter: blur(14px);
+}
+
+.panelHeader div { min-width: 0; }
+.panelHeader span { display: block; margin-bottom: 6px; color: var(--muted); font-size: 7px; font-weight: 750; text-transform: uppercase; }
+.panelHeader strong { display: block; overflow: hidden; font-family: var(--font-bodoni), Georgia, serif; font-size: 23px; font-weight: 600; line-height: 1; text-overflow: ellipsis; white-space: nowrap; }
+.panelHeader button { flex: 0 0 auto; display: grid; place-items: center; width: 43px; height: 43px; border: 0; border-radius: 14px; background: var(--ink); color: var(--canvas); box-shadow: var(--shadow); }
+
+.timeline { display: grid; gap: 34px; }
+.day > header { display: grid; grid-template-columns: auto 1fr; gap: 12px; align-items: center; margin: 0 3px 12px; }
+.day > header span { color: var(--muted); font-size: 8px; font-weight: 750; }
+.day > header i { height: 1px; background: var(--line); }
+.day > div { display: grid; gap: 11px; }
+
+.card {
+  overflow: hidden;
+  border-radius: 8px;
+  color: var(--card-ink);
+  background: var(--card-background);
+  box-shadow: 0 10px 24px rgba(48, 42, 35, .08);
+  animation: itineraryCardIn 260ms cubic-bezier(.2, .8, .2, 1) both;
+  scroll-margin: 110px 0;
+}
+
+.ended { --card-background: var(--itinerary-ended); --card-ink: var(--itinerary-ended-ink); }
+.current { --card-background: var(--itinerary-current); --card-ink: var(--itinerary-current-ink); box-shadow: 0 16px 34px rgba(52, 67, 57, .2); }
+.upcoming { --card-background: var(--itinerary-upcoming); --card-ink: var(--itinerary-upcoming-ink); }
+.cardMain { width: 100%; display: grid; gap: 13px; padding: 18px; border: 0; background: transparent; color: inherit; text-align: left; touch-action: manipulation; }
+.cardTopline { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 8px; font-weight: 700; }
+.cardTopline time { white-space: nowrap; }
+.cardTopline em { display: flex; align-items: center; gap: 6px; font-style: normal; text-transform: uppercase; }
+.cardTopline em i { width: 6px; height: 6px; border-radius: 50%; background: currentColor; animation: itineraryPulse 1.8s ease-in-out infinite; }
+.cardTitle { max-width: 560px; overflow-wrap: anywhere; font-family: var(--font-bodoni), Georgia, serif; font-size: 31px; font-weight: 600; line-height: .95; }
+.cardPlace { min-height: 18px; display: flex; align-items: center; gap: 7px; opacity: .78; font-size: 8px; }
+.cardFooter { display: flex; align-items: end; justify-content: space-between; gap: 12px; padding-top: 2px; }
+.cardFooter > span:first-child { min-width: 0; display: grid; grid-template-columns: 31px minmax(0, auto); column-gap: 9px; align-items: center; }
+.cardFooter b { grid-row: span 2; display: grid; place-items: center; width: 31px; height: 31px; border: 1px solid color-mix(in srgb, currentColor 24%, transparent); border-radius: 50%; background: color-mix(in srgb, var(--card-background) 65%, white 35%); font-size: 7px; }
+.cardFooter strong { overflow: hidden; align-self: end; font-size: 8px; text-overflow: ellipsis; white-space: nowrap; }
+.cardFooter small { align-self: start; opacity: .68; font-size: 7px; }
+.cardFooter > span:last-child { display: flex; align-items: center; gap: 4px; opacity: .76; font-size: 7px; white-space: nowrap; }
+.cardFooter > span:last-child svg { transition: transform 180ms ease-out; }
+.cardMain[aria-expanded="true"] .cardFooter > span:last-child svg { transform: rotate(90deg); }
+
+.cardDetails { display: grid; grid-template-rows: 0fr; padding: 0 18px; opacity: 0; transition: grid-template-rows 210ms ease-out, padding 210ms ease-out, opacity 160ms ease-out; }
+.cardDetailsInner { min-height: 0; overflow: hidden; }
+.cardDetailsOpen { grid-template-rows: 1fr; padding-bottom: 17px; opacity: 1; }
+.cardDetails p { margin: 0; padding-top: 15px; border-top: 1px solid color-mix(in srgb, currentColor 20%, transparent); font-size: 8px; line-height: 1.55; }
+.cardDetailsInner > div { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 14px; }
+.cardDetails a, .cardDetails button { min-height: 34px; display: inline-flex; align-items: center; gap: 7px; padding: 0 10px; border: 1px solid color-mix(in srgb, currentColor 24%, transparent); border-radius: 8px; background: transparent; color: inherit; font-size: 7px; font-weight: 700; text-decoration: none; }
+
+.empty { min-height: min(470px, 64dvh); display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 32px; text-align: center; }
+.empty > svg { margin-bottom: 20px; color: var(--muted); }
+.empty strong { font-family: var(--font-bodoni), Georgia, serif; font-size: 34px; font-weight: 600; }
+.empty p { margin: 9px 0 23px; color: var(--muted); font-size: 9px; }
+.empty button { min-height: 43px; display: flex; align-items: center; gap: 9px; padding: 0 14px; border: 0; border-radius: 8px; background: var(--ink); color: var(--canvas); font-size: 8px; }
+
+.composerBackdrop { position: absolute; z-index: 50; inset: 0; display: flex; align-items: flex-end; justify-content: center; padding: 18px; background: rgba(15, 14, 12, .58); backdrop-filter: blur(5px); animation: itineraryFadeIn 160ms ease-out both; }
+.composer { width: min(560px, 100%); max-height: calc(100dvh - 146px); overflow-y: auto; padding: 18px; border-radius: 8px; background: var(--surface); color: var(--ink); box-shadow: 0 26px 70px rgba(0, 0, 0, .3); animation: itinerarySheetIn 240ms cubic-bezier(.2, .8, .2, 1) both; }
+.composer > header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+.composer > header span { color: var(--muted); font-size: 8px; font-weight: 750; text-transform: uppercase; }
+.composer > header button { display: grid; place-items: center; width: 34px; height: 34px; padding: 0; border: 1px solid var(--line); border-radius: 50%; background: transparent; }
+.composerPreview { display: grid; gap: 12px; padding: 18px; border-radius: 8px; background: var(--itinerary-upcoming); color: var(--itinerary-upcoming-ink); }
+.composerPreview label { display: grid; gap: 5px; min-width: 0; }
+.composerPreview label > span, .durationControl > span { opacity: .62; font-size: 7px; font-weight: 750; text-transform: uppercase; }
+.composerPreview input, .composerPreview textarea, .composerPreview select { width: 100%; min-width: 0; padding: 0; border: 0; border-bottom: 1px solid color-mix(in srgb, currentColor 23%, transparent); border-radius: 0; outline: 0; resize: none; background: transparent; color: inherit; }
+.composerPreview input, .composerPreview select { height: 34px; }
+.composerPreview textarea { min-height: 60px; padding: 7px 0; line-height: 1.45; }
+.composerPreview input:focus, .composerPreview textarea:focus, .composerPreview select:focus { border-bottom-color: currentColor; }
+.titleField input { height: 48px; font-family: var(--font-bodoni), Georgia, serif; font-size: 27px; font-weight: 600; }
+.timingRow { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(130px, .75fr); gap: 16px; }
+.durationControl { display: grid; gap: 5px; }
+.durationControl > div { height: 34px; display: grid; grid-template-columns: 30px 1fr 30px; align-items: center; border-bottom: 1px solid color-mix(in srgb, currentColor 23%, transparent); }
+.durationControl button { display: grid; place-items: center; width: 28px; height: 28px; padding: 0; border: 0; border-radius: 50%; background: color-mix(in srgb, currentColor 10%, transparent); color: inherit; }
+.durationControl strong { font-size: 8px; text-align: center; white-space: nowrap; }
+.conflict { display: flex; align-items: center; gap: 7px; margin: 0; padding-top: 3px; font-size: 7px; font-weight: 650; }
+.composer > footer { display: grid; grid-template-columns: auto 1fr; gap: 9px; align-items: center; margin-top: 14px; }
+.composer > footer > span { min-width: 0; }
+.deleteButton { display: grid; place-items: center; width: 43px; height: 43px; padding: 0; border: 0; border-radius: 8px; background: #9f4e47; color: #fff7f1; }
+.saveButton { justify-self: end; min-height: 43px; display: flex; align-items: center; justify-content: center; gap: 12px; min-width: 160px; padding: 0 15px; border: 0; border-radius: 8px; background: var(--ink); color: var(--canvas); font-size: 8px; font-weight: 750; }
+.saveButton:disabled { opacity: .35; }
+.deleteConfirm { display: flex; gap: 6px; }
+.deleteConfirm button { min-height: 40px; padding: 0 10px; border: 1px solid var(--line); border-radius: 8px; background: transparent; font-size: 7px; }
+.deleteConfirm button:last-child { border-color: #9f4e47; background: #9f4e47; color: #fff7f1; }
+
+@keyframes itineraryCardIn { from { opacity: 0; transform: translateY(8px); } }
+@keyframes itineraryPulse { 50% { opacity: .35; transform: scale(.82); } }
+@keyframes itineraryFadeIn { from { opacity: 0; } }
+@keyframes itinerarySheetIn { from { opacity: 0; transform: translateY(24px); } }
+
+@media (prefers-color-scheme: dark) {
+  .panel {
+    --itinerary-ended: #6e4642;
+    --itinerary-ended-ink: #fff0ea;
+    --itinerary-current: #506657;
+    --itinerary-current-ink: #f7f4ec;
+    --itinerary-upcoming: #34332f;
+    --itinerary-upcoming-ink: #f2eee7;
+  }
+  .card { box-shadow: 0 12px 28px rgba(0, 0, 0, .2); }
+  .cardFooter b { background: color-mix(in srgb, var(--card-background) 72%, white 28%); }
+}
+
+:global(:root[data-theme="light"]) .panel {
+  --itinerary-ended: #d7aaa3;
+  --itinerary-ended-ink: #412522;
+  --itinerary-current: #748779;
+  --itinerary-current-ink: #fffaf2;
+  --itinerary-upcoming: #d8d6cf;
+  --itinerary-upcoming-ink: #26251f;
+}
+
+:global(:root[data-theme="dark"]) .panel {
+  --itinerary-ended: #6e4642;
+  --itinerary-ended-ink: #fff0ea;
+  --itinerary-current: #506657;
+  --itinerary-current-ink: #f7f4ec;
+  --itinerary-upcoming: #34332f;
+  --itinerary-upcoming-ink: #f2eee7;
+}
+
+@media (max-width: 700px) {
+  .panel { padding: 14px 12px max(72px, env(safe-area-inset-bottom)); }
+  .panelHeader { top: -14px; min-height: 72px; margin-bottom: 18px; padding-top: 12px; }
+  .panelHeader strong { font-size: 20px; }
+  .panelHeader button { width: 40px; height: 40px; }
+  .timeline { gap: 27px; }
+  .day > div { gap: 9px; }
+  .cardMain { gap: 11px; padding: 16px; }
+  .cardTitle { font-size: 27px; }
+  .cardDetails { padding-left: 16px; padding-right: 16px; }
+  .cardDetailsOpen { padding-bottom: 15px; }
+  .composerBackdrop { padding: 0; }
+  .composer { width: 100%; max-height: calc(100dvh - 112px); padding: 14px 12px max(14px, env(safe-area-inset-bottom)); border-radius: 8px 8px 0 0; }
+  .composerPreview { padding: 15px; }
+  .timingRow { grid-template-columns: 1fr; gap: 12px; }
+  .composer > footer { position: sticky; bottom: 0; padding-top: 4px; background: var(--surface); }
+  .deleteConfirm { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 1fr; order: 2; }
+  .deleteConfirm + .saveButton { display: none; }
+}
+
+@media (max-width: 350px) {
+  .cardFooter { align-items: start; flex-direction: column; }
+  .cardFooter > span:last-child { align-self: flex-end; }
+  .composer > footer { grid-template-columns: 43px minmax(0, 1fr); }
+  .saveButton { width: 100%; min-width: 0; }
+}

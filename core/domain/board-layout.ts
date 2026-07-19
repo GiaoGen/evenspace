@@ -1,10 +1,15 @@
-import type { BoardItem } from "./room";
+import type { BoardFrameVariant, BoardItem } from "./room";
 
 export const BOARD_UNIT = 12;
 export const DEFAULT_PHOTO_ASPECT_RATIO = 1 / 1.18;
 
-const PHOTO_FRAME_HORIZONTAL_CHROME = 16;
-const PHOTO_FRAME_VERTICAL_CHROME = 26;
+const PHOTO_FRAME_INSETS: Record<BoardFrameVariant, { readonly horizontal: number; readonly vertical: number }> = {
+  pin: { horizontal: 16, vertical: 26 },
+  gallery: { horizontal: 12, vertical: 12 },
+  instant: { horizontal: 14, vertical: 34 },
+  tape: { horizontal: 16, vertical: 20 },
+  dark: { horizontal: 12, vertical: 12 },
+};
 
 const clamp = (value: number, min: number, max: number) => Number.isFinite(value) ? Math.min(Math.max(value, min), max) : min;
 
@@ -12,6 +17,16 @@ export function getBoardPhotoAspectRatio(item: BoardItem) {
   return item.kind === "photo" && typeof item.aspectRatio === "number" && Number.isFinite(item.aspectRatio) && item.aspectRatio > 0
     ? clamp(item.aspectRatio, 0.05, 20)
     : DEFAULT_PHOTO_ASPECT_RATIO;
+}
+
+export function getBoardPhotoFrameVariant(item: BoardItem): BoardFrameVariant {
+  return item.kind === "photo" ? item.frameVariant ?? "pin" : "pin";
+}
+
+export function getBoardPhotoFramePreviewAspectRatio(imageAspectRatio: number, frameVariant: BoardFrameVariant, width = 320) {
+  const insets = PHOTO_FRAME_INSETS[frameVariant];
+  const imageWidth = Math.max(1, width - insets.horizontal);
+  return width / (imageWidth / clamp(imageAspectRatio, .05, 20) + insets.vertical);
 }
 
 export function getBoardItemPixelSize(item: BoardItem) {
@@ -27,8 +42,9 @@ export function getBoardItemPixelSize(item: BoardItem) {
   if (item.kind === "drawing") return { width: clamp(item.width, 10, 42) * BOARD_UNIT, height: clamp(item.height, 8, 34) * BOARD_UNIT };
   const width = clamp(item.width, 16, 34) * BOARD_UNIT;
   if (typeof item.aspectRatio !== "number") return { width, height: clamp(item.width, 16, 34) * 1.18 * BOARD_UNIT };
-  const imageWidth = Math.max(1, width - PHOTO_FRAME_HORIZONTAL_CHROME);
-  return { width, height: imageWidth / getBoardPhotoAspectRatio(item) + PHOTO_FRAME_VERTICAL_CHROME };
+  const insets = PHOTO_FRAME_INSETS[getBoardPhotoFrameVariant(item)];
+  const imageWidth = Math.max(1, width - insets.horizontal);
+  return { width, height: imageWidth / getBoardPhotoAspectRatio(item) + insets.vertical };
 }
 
 export function getBoardItemUnitSize(item: BoardItem) {

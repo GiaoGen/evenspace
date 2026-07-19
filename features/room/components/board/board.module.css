@@ -2,6 +2,9 @@
 .boardBgStone { background: #aaa49a; }
 .boardBgLinen { background-color: #b9aa94; background-image: linear-gradient(rgba(255,255,255,.08) 1px, transparent 1px), linear-gradient(90deg,rgba(255,255,255,.06) 1px,transparent 1px); background-size: 22px 22px; }
 .boardBgCharcoal { background: #686862; }
+.boardBgHerbarium { background: #d7d1c6 url("/board-backgrounds/herbarium.webp") center/cover no-repeat; }
+.boardBgClover { background: #aeb7a7 url("/board-backgrounds/clover.webp") center/cover no-repeat; }
+.boardBgBluebell { background: #a8b3b6 url("/board-backgrounds/bluebell.webp") center/cover no-repeat; }
 .fileInput { position: fixed; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
 
 .canvasViewport { position: absolute; inset: 0; overflow: hidden; touch-action: none; cursor: grab; }
@@ -54,12 +57,16 @@
 .createTray button:disabled { opacity: .42; }
 .createTray i { display: grid; width: 28px; height: 28px; place-items: center; border-radius: 50%; background: rgba(255,255,255,.42); font-style: normal; }
 .createTray span { font-family: var(--font-bodoni), Georgia, serif; font-size: 17px; }
-.backgroundTray { display: flex; gap: 5px; padding: 6px; border-radius: 8px; }
-.backgroundTray button { position: relative; width: 68px; padding: 0 0 8px; overflow: hidden; border: 0; border-radius: 5px; background: #fff; color: #25231f; }
+.backgroundTray { display: flex; width: min(452px,calc(100vw - 28px)); gap: 5px; overflow-x: auto; padding: 6px; border-radius: 8px; overscroll-behavior-x: contain; scroll-snap-type: x proximity; scrollbar-width: none; }
+.backgroundTray::-webkit-scrollbar { display: none; }
+.backgroundTray button { position: relative; width: 68px; flex: 0 0 68px; padding: 0 0 8px; overflow: hidden; border: 0; border-radius: 5px; background: #fff; color: #25231f; scroll-snap-align: end; }
 .backgroundTray i { display: block; width: 100%; height: 56px; }
 .backgroundTray span { display: block; margin-top: 7px; font-size: 7px; font-weight: 750; }
 .backgroundSelected::after { position: absolute; content: ""; inset: 3px; border: 2px solid #f7f3ed; border-radius: 3px; box-shadow: 0 0 0 1px #24231f; pointer-events: none; }
 .swatchstone { background: #aaa49a; }.swatchlinen { background: #b9aa94; }.swatchcharcoal { background: #686862; }
+.swatchherbarium { background: #d7d1c6 url("/board-backgrounds/herbarium.webp") center/cover no-repeat; }
+.swatchclover { background: #aeb7a7 url("/board-backgrounds/clover.webp") center/cover no-repeat; }
+.swatchbluebell { background: #a8b3b6 url("/board-backgrounds/bluebell.webp") center/cover no-repeat; }
 .boardToast { position: absolute; z-index: 44; left: 50%; bottom: 82px; max-width: calc(100% - 32px); padding: 10px 13px; border-radius: 6px; background: #a24e44; color: #fff; font-size: 8px; transform: translateX(-50%); animation: toastIn 220ms ease-out both; }
 .deleteAction { position: absolute; z-index: 45; top: 14px; right: 14px; display: grid; width: 40px; height: 40px; place-items: center; border: 0; border-radius: 50%; background: #9c433b; color: #fff; box-shadow: 0 8px 22px rgba(54,28,24,.22); animation: actionIn 180ms ease-out both; }
 
@@ -78,6 +85,21 @@
 .noteStudioActions span { text-align: center; font-size: 9px; }.noteStudioActions i { opacity: .5; font-style: normal; }
 .noteStudioActions .confirmAction,.confirmAction { background: #8c9989; color: #fff; }
 .confirmAction:disabled { opacity: .35; }
+
+.frameStudioBackdrop { position: absolute; z-index: 80; inset: 0; display: flex; align-items: flex-end; justify-content: center; padding: 14px 0 max(16px,env(safe-area-inset-bottom)); background: rgba(26,25,22,.58); animation: fadeIn 180ms ease-out both; }
+.frameStudio { width: 100%; min-width: 0; animation: studioUp 300ms cubic-bezier(.2,.8,.22,1) both; }
+.frameCardRail { display: grid; min-height: min(60dvh,510px); grid-auto-columns: min(78vw,330px); grid-auto-flow: column; align-items: center; gap: 10px; overflow-x: auto; padding: 10px max(11vw,24px) 18px; scroll-padding-inline: max(11vw,24px); scroll-snap-type: x mandatory; scrollbar-width: none; }
+.frameCardRail::-webkit-scrollbar { display: none; }
+.frameStyleCard { position: relative; width: 100%; max-height: min(60dvh,510px); scroll-snap-align: center; filter: saturate(.8); transform: scale(.91); transition: filter 220ms ease,transform 220ms cubic-bezier(.2,.8,.22,1),opacity 220ms ease; opacity: .58; }
+.frameStyleCard button { display: block; width: 100%; height: 100%; padding: 0; border: 0; background: transparent; color: inherit; }
+.frameStyleSelected { filter: saturate(1); transform: scale(1); opacity: 1; }
+.framePreviewPhoto { width: 100%; height: 100%; }
+.frameStudioActions { display: grid; width: fit-content; grid-template-columns: 42px 88px 42px; align-items: center; gap: 4px; margin: 0 auto; padding: 4px; border-radius: 18px; background: #1f1e1b; box-shadow: 0 12px 30px rgba(0,0,0,.24); color: #f5f0e7; }
+.frameStudioActions button { display: grid; width: 42px; height: 42px; place-items: center; border: 0; border-radius: 14px; background: transparent; color: inherit; }
+.frameStudioActions span { display: grid; gap: 2px; text-align: center; font-size: 9px; }
+.frameStudioActions b { font: inherit; font-weight: 750; }
+.frameStudioActions i { opacity: .5; font-style: normal; }
+.frameStudioActions .confirmAction { background: #8c9989; color: #fff; }
 
 .studioOverlay { position: fixed; z-index: 200; inset: 0; display: grid; overflow: hidden; grid-template-rows: minmax(0,1fr) auto; padding: max(12px,env(safe-area-inset-top)) 12px max(12px,env(safe-area-inset-bottom)); animation: studioReveal 280ms ease-out both; }
 .doodlePaperStage { position: relative; min-height: 0; overflow: hidden; display: grid; place-items: center; }

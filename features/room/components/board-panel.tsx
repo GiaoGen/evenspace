@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import { Icon } from "@/components/ui/icon";
 import type { ActorId, RoomPublicId } from "@/core/domain/ids";
-import type { ArtVariant, BoardBackground, BoardItem, BoardNoteVariant, PersonSummary } from "@/core/domain/room";
+import type { ArtVariant, BoardBackground, BoardFrameVariant, BoardItem, BoardNoteVariant, PersonSummary } from "@/core/domain/room";
 import { createUuid } from "@/core/domain/uuid";
 import { useMockSession } from "@/features/mock-session/components/mock-session-provider";
 import { BoardCanvas } from "./board/board-canvas";
@@ -11,11 +11,19 @@ import { BoardChrome } from "./board/board-chrome";
 import { DoodleStudio } from "./board/doodle-studio";
 import { compressImage, validateImageFile } from "./board/image-upload";
 import { NoteStudio } from "./board/note-studio";
+import { PhotoFrameStudio, type PendingBoardPhoto } from "./board/photo-frame-studio";
 import { SequenceView } from "./board/sequence-view";
 import styles from "./board/board.module.css";
 
 const photoVariants: readonly ArtVariant[] = ["one", "two", "three", "four"];
-const backgroundClasses: Record<BoardBackground, string> = { stone: styles.boardBgStone, linen: styles.boardBgLinen, charcoal: styles.boardBgCharcoal };
+const backgroundClasses: Record<BoardBackground, string> = {
+  stone: styles.boardBgStone,
+  linen: styles.boardBgLinen,
+  charcoal: styles.boardBgCharcoal,
+  herbarium: styles.boardBgHerbarium,
+  clover: styles.boardBgClover,
+  bluebell: styles.boardBgBluebell,
+};
 
 type Studio = "note" | "doodle" | null;
 type Tray = "create" | "background" | null;
@@ -36,6 +44,7 @@ export function BoardPanel({ roomPublicId, items, members, canAdd, canModerate, 
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [tray, setTray] = useState<Tray>(null);
   const [studio, setStudio] = useState<Studio>(null);
+  const [pendingPhoto, setPendingPhoto] = useState<PendingBoardPhoto | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const selectedItem = items.find((item) => item.id === selectedItemId) ?? null;
@@ -70,6 +79,13 @@ export function BoardPanel({ roomPublicId, items, members, canAdd, canModerate, 
     addItem({ id: `board_drawing_${createUuid()}`, kind: "drawing", ownerActorId: viewerActorId, imageDataUrl, width: 22, height: 16, ...nextPlacement(items), rotation: 0 });
   }
 
+  function addPhoto(frameVariant: BoardFrameVariant) {
+    if (!pendingPhoto) return;
+    const index = items.length;
+    addItem({ id: `board_photo_${createUuid()}`, kind: "photo", ownerActorId: viewerActorId, variant: photoVariants[index % photoVariants.length], frameVariant, imageDataUrl: pendingPhoto.dataUrl, imageName: pendingPhoto.name, aspectRatio: pendingPhoto.aspectRatio, note: null, width: 24, ...nextPlacement(items) });
+    setPendingPhoto(null);
+  }
+
   async function addLocalPhoto(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     event.target.value = "";
@@ -78,8 +94,9 @@ export function BoardPanel({ roomPublicId, items, members, canAdd, canModerate, 
     if (validation) { setError(validation); return; }
     try {
       const image = await compressImage(file);
-      const index = items.length;
-      addItem({ id: `board_photo_${createUuid()}`, kind: "photo", ownerActorId: viewerActorId, variant: photoVariants[index % photoVariants.length], imageDataUrl: image.dataUrl, imageName: file.name, aspectRatio: image.aspectRatio, note: null, width: 24, ...nextPlacement(items) });
+      setPendingPhoto({ ...image, name: file.name.slice(0, 120) });
+      setTray(null);
+      setError(null);
     } catch {
       setError("This photo could not be read here. Try JPEG, PNG, WebP, or a smaller original.");
     }
@@ -109,9 +126,10 @@ export function BoardPanel({ roomPublicId, items, members, canAdd, canModerate, 
     <input ref={albumInputRef} className={styles.fileInput} type="file" accept="image/*" onChange={addLocalPhoto} />
 
     {canDeleteSelected ? <button type="button" className={styles.deleteAction} onClick={removeSelected} aria-label="Delete selected board item"><Icon name="trash" /></button> : null}
-    {!sequence && studio === null ? <BoardChrome tray={tray} background={boardBackground} canAdd={canAdd} photoLimitReached={photoCount >= maxPhotos} error={error} onTray={(next) => { setTray(next); setSelectedItemId(null); setError(null); }} onFit={() => { finishEditing(); fitRef.current?.(); }} onCamera={() => cameraInputRef.current?.click()} onAlbum={() => albumInputRef.current?.click()} onNote={() => { setStudio("note"); setTray(null); }} onDoodle={() => { setStudio("doodle"); setTray(null); }} onBackground={selectBackground} /> : null}
+    {!sequence && studio === null && pendingPhoto === null ? <BoardChrome tray={tray} background={boardBackground} canAdd={canAdd} photoLimitReached={photoCount >= maxPhotos} error={error} onTray={(next) => { setTray(next); setSelectedItemId(null); setError(null); }} onFit={() => { finishEditing(); fitRef.current?.(); }} onCamera={() => cameraInputRef.current?.click()} onAlbum={() => albumInputRef.current?.click()} onNote={() => { setStudio("note"); setTray(null); }} onDoodle={() => { setStudio("doodle"); setTray(null); }} onBackground={selectBackground} /> : null}
     {sequence ? <button type="button" className={styles.sequenceReturn} onClick={() => { setSequence(false); finishEditing(); window.requestAnimationFrame(() => fitRef.current?.()); }}><Icon name="board" /><span>Board</span></button> : null}
     {studio === "note" ? <NoteStudio onClose={() => setStudio(null)} onAdd={addNote} /> : null}
     {studio === "doodle" ? <DoodleStudio backgroundClass={backgroundClasses[boardBackground]} onClose={() => setStudio(null)} onAdd={addDoodle} /> : null}
+    {pendingPhoto ? <PhotoFrameStudio photo={pendingPhoto} onClose={() => setPendingPhoto(null)} onAdd={addPhoto} /> : null}
   </div>;
 }

@@ -3,7 +3,7 @@ import { getBoardItemUnitSize } from "@/core/domain/board-layout";
 import type { BoardBackground, BoardItem, ChatMessage, ItineraryItem, MembershipState, PersonSummary, PollPreview, RoomCapabilities, RoomDetail, RoomSummary } from "@/core/domain/room";
 import type { CreateRoomDraft } from "@/features/create-room/model/create-room-machine";
 
-export const MOCK_SESSION_VERSION = 3 as const;
+export const MOCK_SESSION_VERSION = 4 as const;
 export type MockRoomLifecycle = "active" | "freezing" | "archiving" | "archived";
 export type JoinRequestState = "pending" | "approved" | "rejected";
 
@@ -93,8 +93,8 @@ export type MockCommand =
   | ({ readonly type: "DELETE_BOARD_ITEM"; readonly itemId: string } & TimedRoomCommand)
   | ({ readonly type: "ADD_BOARD_COMMENT"; readonly itemId: string; readonly comment: { readonly id: string; readonly body: string } } & TimedRoomCommand)
   | ({ readonly type: "ADD_ITINERARY"; readonly item: ItineraryItem } & TimedRoomCommand)
-  | ({ readonly type: "SET_ITINERARY_STATUS"; readonly itemId: string; readonly status: ItineraryItem["status"] } & TimedRoomCommand)
-  | ({ readonly type: "SET_ATTENDANCE"; readonly itemId: string; readonly attendance: ItineraryItem["viewerAttendance"] } & TimedRoomCommand)
+  | ({ readonly type: "UPDATE_ITINERARY"; readonly item: ItineraryItem } & TimedRoomCommand)
+  | ({ readonly type: "DELETE_ITINERARY"; readonly itemId: string } & TimedRoomCommand)
   | ({ readonly type: "UPDATE_DURATION"; readonly endsAt: string } & TimedRoomCommand)
   | ({ readonly type: "ROTATE_INVITE"; readonly inviteCode: string } & TimedRoomCommand)
   | ({ readonly type: "REVIEW_JOIN"; readonly requestId: string; readonly decision: "approved" | "rejected" } & TimedRoomCommand)
@@ -113,9 +113,15 @@ export type MockCommand =
 export type MockSessionAction = { readonly type: "HYDRATE" | "RESET"; readonly session: MockSession } | { readonly type: "COMMAND"; readonly command: MockCommand };
 
 const asTime = (value: string) => Number.isFinite(Date.parse(value)) ? Date.parse(value) : 0;
+const compareItinerary = (left: ItineraryItem, right: ItineraryItem) => asTime(left.startsAt) - asTime(right.startsAt);
 const memberFor = (room: MockRoom, actorId: ActorId) => room.members.find((member) => member.actorId === actorId) ?? null;
 const activeMembership = (state: MembershipState | "banned" | undefined) => state !== "removed" && state !== "banned";
 const activeMemberCount = (room: MockRoom) => room.members.filter((member) => activeMembership(room.membershipStates[member.actorId])).length;
+const itineraryFitsRoom = (item: ItineraryItem, room: MockRoom) => asTime(item.startsAt) > 0
+  && asTime(item.endsAt) > asTime(item.startsAt)
+  && asTime(item.endsAt) <= asTime(room.endsAt ?? item.endsAt)
+  && room.members.some((member) => member.actorId === item.responsible.actorId)
+  && room.members.some((member) => member.actorId === item.createdByActorId);
 const boardSize = getBoardItemUnitSize;
 function boardPlacementAllowed(items: readonly BoardItem[], candidate: BoardItem, ignoreId?: string) {
   const size = boardSize(candidate);
@@ -238,7 +244,7 @@ function applyCommand(session: MockSession, command: MockCommand): MockSession {
     const closesAt = asTime(poll.closesAt);
     const proposal = poll.proposal;
     const proposalValid = !proposal
-      || proposal.kind === "itinerary" && asTime(proposal.item.startsAt) <= asTime(room.endsAt ?? proposal.item.startsAt) && room.members.some((member) => member.actorId === proposal.item.responsible.actorId) && proposal.item.capacity >= 1 && proposal.item.capacity <= room.memberLimit
+      || proposal.kind === "itinerary" && itineraryFitsRoom(proposal.item, room)
       || proposal.kind === "extend-room" && asTime(proposal.endsAt) > asTime(room.endsAt ?? command.nowIso) && asTime(proposal.endsAt) <= asTime(command.nowIso) + 24 * 60 * 60_000
       || proposal.kind === "end-room"
       || proposal.kind === "remove-member" && memberFor(room, proposal.targetActorId)?.role !== "host" && proposal.targetActorId !== command.actorId;
@@ -295,15 +301,17 @@ function applyCommand(session: MockSession, command: MockCommand): MockSession {
     return { ...value, boardItems: value.boardItems.filter((item) => item.id !== command.itemId), photoCount: Math.max(0, value.photoCount - (target.kind === "photo" ? 1 : 0)) };
   }) : session;
   if (command.type === "ADD_BOARD_COMMENT") return capabilities.canAddBoardItem && command.comment.body.trim() ? updateRoom(session, command.roomPublicId, (value) => ({ ...value, boardItems: value.boardItems.map((item) => item.id === command.itemId && item.kind === "photo" ? { ...item, comments: [...(item.comments ?? []), { id: command.comment.id, actorId: command.actorId, body: command.comment.body.trim().slice(0, 120), createdAt: command.nowIso }] } : item) })) : session;
-  if (command.type === "ADD_ITINERARY") return capabilities.canCreateItinerary && asTime(command.item.startsAt) <= asTime(room.endsAt ?? command.item.startsAt) && command.item.capacity >= 1 && command.item.capacity <= room.memberLimit && room.members.some((member) => member.actorId === command.item.responsible.actorId) ? updateRoom(session, command.roomPublicId, (value) => ({ ...value, itinerary: [...value.itinerary, command.item].sort((a, b) => asTime(a.startsAt) - asTime(b.startsAt)) })) : session;
-  if (command.type === "SET_ITINERARY_STATUS") return capabilities.canRead && room.lifecycle === "active" && asTime(room.endsAt ?? "") > asTime(command.nowIso) && actor ? updateRoom(session, command.roomPublicId, (value) => ({ ...value, itinerary: value.itinerary.map((item) => item.id === command.itemId && (capabilities.canModerate || item.responsible.actorId === command.actorId) ? { ...item, status: command.status } : item) })) : session;
-  if (command.type === "SET_ATTENDANCE") return capabilities.canRead && room.lifecycle === "active" && asTime(room.endsAt ?? "") > asTime(command.nowIso) ? updateRoom(session, command.roomPublicId, (value) => ({ ...value, itinerary: value.itinerary.map((item) => {
-    if (item.id !== command.itemId) return item;
-    const wasGoing = item.viewerAttendance === "going" || item.viewerAttendance === "checked-in";
-    const willGo = command.attendance === "going" || command.attendance === "checked-in";
-    if (!wasGoing && willGo && item.goingCount >= item.capacity) return item;
-    return { ...item, viewerAttendance: command.attendance, goingCount: item.goingCount + Number(willGo) - Number(wasGoing) };
-  }) })) : session;
+  if (command.type === "ADD_ITINERARY") return capabilities.canCreateItinerary && itineraryFitsRoom(command.item, room) ? updateRoom(session, command.roomPublicId, (value) => ({ ...value, itinerary: [...value.itinerary, command.item].sort(compareItinerary) })) : session;
+  if (command.type === "UPDATE_ITINERARY") return capabilities.canRead && itineraryFitsRoom(command.item, room) ? updateRoom(session, command.roomPublicId, (value) => {
+    const current = value.itinerary.find((item) => item.id === command.item.id);
+    if (!current || current.createdByActorId !== command.item.createdByActorId || current.createdAt !== command.item.createdAt || current.responsible.actorId !== command.actorId && !capabilities.canModerate) return value;
+    return { ...value, itinerary: value.itinerary.map((item) => item.id === command.item.id ? command.item : item).sort(compareItinerary) };
+  }) : session;
+  if (command.type === "DELETE_ITINERARY") return capabilities.canRead ? updateRoom(session, command.roomPublicId, (value) => {
+    const current = value.itinerary.find((item) => item.id === command.itemId);
+    if (!current || current.responsible.actorId !== command.actorId && !capabilities.canModerate) return value;
+    return { ...value, itinerary: value.itinerary.filter((item) => item.id !== command.itemId) };
+  }) : session;
   if (command.type === "UPDATE_DURATION") return capabilities.canChangeDuration && asTime(command.endsAt) > asTime(command.nowIso) && asTime(command.endsAt) <= asTime(command.nowIso) + 24 * 60 * 60_000 ? updateRoom(session, command.roomPublicId, (value) => ({ ...value, endsAt: command.endsAt })) : session;
   if (command.type === "ROTATE_INVITE") return capabilities.canModerate ? updateRoom(session, command.roomPublicId, (value) => ({ ...value, inviteCode: command.inviteCode, inviteRevision: value.inviteRevision + 1 })) : session;
   if (command.type === "REVIEW_JOIN") return capabilities.canModerate ? updateRoom(session, command.roomPublicId, (value) => {
@@ -350,8 +358,8 @@ const isMessageContent = (value: unknown) => value === undefined || isRecord(val
 );
 const isMessage = (value: unknown) => isRecord(value) && isText(value.id, 100, false) && ["message", "system"].includes(String(value.kind)) && (value.author === null || isPerson(value.author)) && isText(value.body, 2000) && isIso(value.sentAt) && isMessageContent(value.content) && Array.isArray(value.reactions) && value.reactions.length <= 24 && value.reactions.every((reaction) => isRecord(reaction) && isText(reaction.emoji, 16, false) && isInt(reaction.count, 0, 100000));
 const isBoardComment = (value: unknown) => isRecord(value) && isText(value.id, 100, false) && isActor(value.actorId) && isText(value.body, 120, false) && isIso(value.createdAt);
-const isBoardItem = (value: unknown) => isRecord(value) && isText(value.id, 100, false) && isActor(value.ownerActorId) && Number.isFinite(value.x) && Number.isFinite(value.y) && Number.isFinite(value.rotation) && (value.kind === "note" ? isText(value.text, 500, false) && (value.width === undefined || Number.isFinite(value.width)) && (value.height === undefined || Number.isFinite(value.height)) && (value.variant === undefined || ["paper", "ink", "sage"].includes(String(value.variant))) : value.kind === "drawing" ? typeof value.imageDataUrl === "string" && value.imageDataUrl.startsWith("data:image/") && value.imageDataUrl.length <= 1_200_000 && Number.isFinite(value.width) && Number.isFinite(value.height) : value.kind === "photo" && ["one", "two", "three", "four"].includes(String(value.variant)) && (value.note === null || isText(value.note, 500)) && (value.imageDataUrl === undefined || typeof value.imageDataUrl === "string" && value.imageDataUrl.startsWith("data:image/") && value.imageDataUrl.length <= 3_200_000) && (value.imageName === undefined || isText(value.imageName, 120)) && (value.aspectRatio === undefined || Number.isFinite(value.aspectRatio) && Number(value.aspectRatio) > 0) && Number.isFinite(value.width) && (value.comments === undefined || Array.isArray(value.comments) && value.comments.length <= 1000 && value.comments.every(isBoardComment)));
-const isItinerary = (value: unknown) => isRecord(value) && isText(value.id, 100, false) && isText(value.title, 80, false) && isText(value.description, 500) && isIso(value.startsAt) && (value.locationLabel === null || isText(value.locationLabel, 120)) && (value.mapsUrl === null || isText(value.mapsUrl, 500)) && isPerson(value.responsible) && ["not-started", "in-progress", "completed"].includes(String(value.status)) && isInt(value.capacity, 1, 100) && isInt(value.goingCount, 0, 100) && [null, "going", "not-going", "checked-in"].includes(value.viewerAttendance as never);
+const isBoardItem = (value: unknown) => isRecord(value) && isText(value.id, 100, false) && isActor(value.ownerActorId) && Number.isFinite(value.x) && Number.isFinite(value.y) && Number.isFinite(value.rotation) && (value.kind === "note" ? isText(value.text, 500, false) && (value.width === undefined || Number.isFinite(value.width)) && (value.height === undefined || Number.isFinite(value.height)) && (value.variant === undefined || ["paper", "ink", "sage"].includes(String(value.variant))) : value.kind === "drawing" ? typeof value.imageDataUrl === "string" && value.imageDataUrl.startsWith("data:image/") && value.imageDataUrl.length <= 1_200_000 && Number.isFinite(value.width) && Number.isFinite(value.height) : value.kind === "photo" && ["one", "two", "three", "four"].includes(String(value.variant)) && (value.frameVariant === undefined || ["pin", "gallery", "instant", "tape", "dark"].includes(String(value.frameVariant))) && (value.note === null || isText(value.note, 500)) && (value.imageDataUrl === undefined || typeof value.imageDataUrl === "string" && value.imageDataUrl.startsWith("data:image/") && value.imageDataUrl.length <= 3_200_000) && (value.imageName === undefined || isText(value.imageName, 120)) && (value.aspectRatio === undefined || Number.isFinite(value.aspectRatio) && Number(value.aspectRatio) > 0) && Number.isFinite(value.width) && (value.comments === undefined || Array.isArray(value.comments) && value.comments.length <= 1000 && value.comments.every(isBoardComment)));
+const isItinerary = (value: unknown) => isRecord(value) && isText(value.id, 100, false) && isText(value.title, 80, false) && isText(value.description, 500) && isIso(value.startsAt) && isIso(value.endsAt) && asTime(String(value.endsAt)) > asTime(String(value.startsAt)) && (value.locationLabel === null || isText(value.locationLabel, 120)) && (value.mapsUrl === null || isText(value.mapsUrl, 500)) && isPerson(value.responsible) && isActor(value.createdByActorId) && isIso(value.createdAt) && isIso(value.updatedAt);
 const isJoinRequest = (value: unknown) => isRecord(value) && isText(value.id, 100, false) && isActor(value.actorId) && isText(value.displayName, 60, false) && isText(value.initials, 3, false) && isText(value.note, 240) && isIso(value.requestedAt) && ["pending", "approved", "rejected"].includes(String(value.state));
 const isReport = (value: unknown) => isRecord(value) && isText(value.id, 100, false) && isActor(value.reporterActorId) && isText(value.description, 1000, false) && isIso(value.createdAt) && (value.hostReply === null || isText(value.hostReply, 500, false));
 const isProposal = (value: unknown) => value === undefined || isRecord(value) && (value.kind === "itinerary" && isItinerary(value.item) || value.kind === "extend-room" && isIso(value.endsAt) || value.kind === "end-room" || value.kind === "remove-member" && isActor(value.targetActorId));
@@ -360,16 +368,49 @@ const isPoll = (value: unknown) => value === null || isRecord(value) && isText(v
 function isMockRoom(value: unknown) {
   if (!isRecord(value) || typeof value.id !== "string" || !parseRoomId(value.id) || typeof value.publicId !== "string" || !parseRoomPublicId(value.publicId)) return false;
   if (!isText(value.name, 80, false) || !isText(value.description, 500) || !["host-led", "community-led"].includes(String(value.mode)) || !["active", "archived"].includes(String(value.status)) || !["active", "freezing", "archiving", "archived"].includes(String(value.lifecycle))) return false;
-  if (!isText(value.timeZone, 80, false) || !["stone", "linen", "charcoal"].includes(String(value.boardBackground ?? "stone")) || !isIso(value.endsAt, true) || !isIso(value.archivedAt, true) || !isIso(value.createdAt) || !isInt(value.memberCount, 0, 100) || !isInt(value.memberLimit, 2, 100) || !isInt(value.photoCount, 0, 500) || !isInt(value.maxPhotos, 1, 500) || !isInt(value.mediaLimitMb, 1, 100000)) return false;
+  if (!isText(value.timeZone, 80, false) || !["stone", "linen", "charcoal", "herbarium", "clover", "bluebell"].includes(String(value.boardBackground ?? "stone")) || !isIso(value.endsAt, true) || !isIso(value.archivedAt, true) || !isIso(value.createdAt) || !isInt(value.memberCount, 0, 100) || !isInt(value.memberLimit, 2, 100) || !isInt(value.photoCount, 0, 500) || !isInt(value.maxPhotos, 1, 500) || !isInt(value.mediaLimitMb, 1, 100000)) return false;
   if (!Array.isArray(value.members) || value.members.length > 100 || !value.members.every(isPerson) || !Array.isArray(value.messages) || value.messages.length > 5000 || !value.messages.every(isMessage) || !Array.isArray(value.boardItems) || value.boardItems.length > 500 || !value.boardItems.every(isBoardItem) || !Array.isArray(value.itinerary) || value.itinerary.length > 500 || !value.itinerary.every(isItinerary)) return false;
   if (!isPoll(value.activePoll) || value.pollHistory !== undefined && (!Array.isArray(value.pollHistory) || value.pollHistory.length > 500 || !value.pollHistory.every((item) => item !== null && isPoll(item))) || !Array.isArray(value.joinRequests) || value.joinRequests.length > 500 || !value.joinRequests.every(isJoinRequest) || !Array.isArray(value.reports) || value.reports.length > 500 || !value.reports.every(isReport)) return false;
   if (!Array.isArray(value.archiveActorIds) || !value.archiveActorIds.every(isActor) || !Array.isArray(value.archiveRemovedBy) || !value.archiveRemovedBy.every(isActor) || !isRecord(value.membershipStates) || !Object.entries(value.membershipStates).every(([id, state]) => isActor(id) && ["active", "muted", "removed", "banned"].includes(String(state)))) return false;
   return isText(value.inviteCode, 40, false) && isInt(value.inviteRevision, 1, 1000000) && typeof value.requiresApproval === "boolean" && (value.pinnedMessageId === null || isText(value.pinnedMessageId, 100, false));
 }
 
+function migrateItineraryItem(value: unknown): unknown {
+  if (!isRecord(value) || !isIso(value.startsAt)) return value;
+  if (!isPerson(value.responsible)) return value;
+  const responsible = value.responsible as PersonSummary;
+  const startsAt = String(value.startsAt);
+  return {
+    ...value,
+    endsAt: isIso(value.endsAt) && asTime(String(value.endsAt)) > asTime(startsAt) ? value.endsAt : new Date(asTime(startsAt) + 60 * 60_000).toISOString(),
+    createdByActorId: isActor(value.createdByActorId) ? value.createdByActorId : responsible.actorId,
+    createdAt: isIso(value.createdAt) ? value.createdAt : startsAt,
+    updatedAt: isIso(value.updatedAt) ? value.updatedAt : startsAt,
+  };
+}
+
+function migratePoll(value: unknown): unknown {
+  if (!isRecord(value) || !isRecord(value.proposal) || value.proposal.kind !== "itinerary") return value;
+  return { ...value, proposal: { ...value.proposal, item: migrateItineraryItem(value.proposal.item) } };
+}
+
+function migratePersistedSession(value: unknown): unknown {
+  if (!isRecord(value) || value.version !== 3 || !Array.isArray(value.rooms)) return value;
+  return {
+    ...value,
+    version: MOCK_SESSION_VERSION,
+    rooms: value.rooms.map((room) => isRecord(room) ? {
+      ...room,
+      itinerary: Array.isArray(room.itinerary) ? room.itinerary.map(migrateItineraryItem) : room.itinerary,
+      activePoll: migratePoll(room.activePoll),
+      pollHistory: Array.isArray(room.pollHistory) ? room.pollHistory.map(migratePoll) : room.pollHistory,
+    } : room),
+  };
+}
+
 export function parsePersistedMockSession(value: string): MockSession | null {
   try {
-    const candidate = JSON.parse(value) as Partial<MockSession>;
+    const candidate = migratePersistedSession(JSON.parse(value)) as Partial<MockSession>;
     if (candidate.version !== MOCK_SESSION_VERSION || typeof candidate.sessionId !== "string" || !candidate.viewer || !Array.isArray(candidate.rooms)) return null;
     if (typeof candidate.viewer.actorId !== "string" || !parseActorId(candidate.viewer.actorId) || typeof candidate.viewer.displayName !== "string" || candidate.viewer.authState !== "guest" && candidate.viewer.authState !== "signed-in" || !["system","light","dark"].includes(candidate.viewer.theme ?? "")) return null;
     if (!candidate.rooms.every(isMockRoom)) return null;

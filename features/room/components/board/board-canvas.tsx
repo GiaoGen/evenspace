@@ -80,7 +80,7 @@ export function BoardCanvas({ items, members, viewerActorId, selectedItemId, onS
           onContextMenu: (event: MouseEvent<HTMLElement>) => event.preventDefault(),
         };
         if (item.kind === "photo") return <article key={item.id} className={`${styles.canvasItem} ${styles.canvasPhoto} ${selected ? styles.itemSelected : ""} ${drag?.itemId === item.id ? styles.itemDragging : ""}`} style={itemStyle(item)} {...pointerProps}>
-          <PinnedPhoto variant={item.variant} note={item.imageDataUrl ? null : item.note} imageDataUrl={item.imageDataUrl} imageName={item.imageName} className={styles.pinnedPhoto} />
+          <PinnedPhoto variant={item.variant} frameVariant={item.frameVariant} note={item.imageDataUrl ? null : item.note} imageDataUrl={item.imageDataUrl} imageName={item.imageName} className={styles.pinnedPhoto} />
           {selected ? <PhotoConversation photo={item} owner={ownerFor(item)} onComment={(body) => onComment(item.id, body)} /> : null}
         </article>;
         if (item.kind === "drawing") return <article key={item.id} className={`${styles.canvasItem} ${styles.canvasDrawing} ${selected ? styles.itemSelected : ""} ${drag?.itemId === item.id ? styles.itemDragging : ""}`} style={itemStyle(item)} {...pointerProps}>

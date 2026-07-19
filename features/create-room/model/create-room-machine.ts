@@ -32,6 +32,7 @@ export type CreateRoomState =
   | { readonly status: "complete"; readonly room: CreatedLocalRoom };
 
 export type CreateRoomEvent =
+  | { readonly type: "RESTORE_DRAFT"; readonly draft: CreateRoomDraft }
   | { readonly type: "SET_NAME"; readonly value: string }
   | { readonly type: "SET_DESCRIPTION"; readonly value: string }
   | { readonly type: "SET_LEADERSHIP"; readonly value: RoomLeadership }
@@ -43,6 +44,7 @@ export type CreateRoomEvent =
   | { readonly type: "SET_TERMS"; readonly value: boolean }
   | { readonly type: "NEXT" }
   | { readonly type: "BACK" }
+  | { readonly type: "GO_TO"; readonly step: CreateRoomStep }
   | { readonly type: "SUBMIT"; readonly nowIso: string }
   | { readonly type: "RESET" };
 
@@ -81,7 +83,7 @@ export function validateDraft(draft: CreateRoomDraft): CreateRoomErrors {
   if (draft.description.trim().length > 500) errors.description = "Keep the description within 500 characters.";
   if (draft.leadership !== "host-led" && draft.leadership !== "community-led") errors.leadership = "Choose a valid decision model.";
   if (!Number.isInteger(draft.durationMinutes) || draft.durationMinutes < 15 || draft.durationMinutes > 1440) errors.durationMinutes = "Choose between 15 minutes and 24 hours.";
-  if (!Number.isInteger(draft.memberLimit) || draft.memberLimit < 2 || draft.memberLimit > 10) errors.memberLimit = "Free local rooms support 2–10 people.";
+  if (!Number.isInteger(draft.memberLimit) || draft.memberLimit < 2 || draft.memberLimit > 10) errors.memberLimit = "Free local rooms support 2 to 10 people.";
   if (draft.entryPolicy !== "link" && draft.entryPolicy !== "invite-code") errors.entryPolicy = "Choose a valid private entry method.";
   if (draft.memberListVisibility !== "members" && draft.memberListVisibility !== "moderators") errors.memberListVisibility = "Choose a valid member-list setting.";
   if (draft.leadership === "community-led" && draft.memberListVisibility !== "members") errors.memberListVisibility = "Community-led rooms keep the member list visible to all members.";
@@ -124,6 +126,7 @@ export function createRoomReducer(state: CreateRoomState, event: CreateRoomEvent
   if (event.type === "RESET") return initialCreateRoomState;
   if (state.status === "complete") return state;
 
+  if (event.type === "RESTORE_DRAFT") return { ...state, draft: normalizeDraft({ ...event.draft, acceptedTerms: false }), errors: {} };
   if (event.type === "SET_NAME") return updateDraft(state, { name: event.value.slice(0, 80) });
   if (event.type === "SET_DESCRIPTION") return updateDraft(state, { description: event.value.slice(0, 500) });
   if (event.type === "SET_LEADERSHIP") return updateDraft(state, { leadership: event.value, ...(event.value === "community-led" ? { memberListVisibility: "members" as const } : {}) });
@@ -138,6 +141,8 @@ export function createRoomReducer(state: CreateRoomState, event: CreateRoomEvent
     const index = createRoomSteps.indexOf(state.step);
     return index > 0 ? { ...state, step: createRoomSteps[index - 1], errors: {} } : state;
   }
+
+  if (event.type === "GO_TO") return { ...state, step: event.step, errors: {} };
 
   if (event.type === "NEXT") {
     const errors = errorsForStep(state.step, validateDraft(state.draft));

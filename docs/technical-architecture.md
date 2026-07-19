@@ -137,7 +137,7 @@ Service role key 只在服务端环境使用，绝不发送到浏览器。涉及
 - `MockSession` command reducer 已经覆盖大部分写操作，后端接入时可以把 command 逐步映射为 Server Action / RPC / repository mutation。
 - 媒体目前是浏览器 canvas 压缩后的 `imageDataUrl`，尚未建立 IndexedDB asset layer；后端前建议先抽象 asset id，避免直接迁移大 JSON。
 - Board 和 Rooms 的画板预览共用 `core/domain/board-layout.ts`，这类纯领域计算应继续保留在无 React 依赖的 core 层。
-- `features/room/components/chat-panel.tsx` 与 `features/room/components/board-panel.tsx` 已经承载较多复杂交互，接后端前建议拆分数据编排和展示组件。
+- Board 已拆分编排、手势、展示与 Studio；`features/room/components/chat-panel.tsx` 仍承载较多媒体权限、录音、定位、Poll 和滚动状态，接后端前应继续拆分。
 - 字体已改为本地 `public/fonts` + `@font-face`，生产构建不应再依赖构建期远程字体下载。
 
 ### 后端接入优先技术事项
@@ -147,3 +147,18 @@ Service role key 只在服务端环境使用，绝不发送到浏览器。涉及
 3. 所有到期、撤回窗口、投票关闭、房间归档必须使用服务端时间。
 4. 媒体需要 Storage object、metadata 表、缩略图、EXIF 清理和签名 URL。
 5. Realtime 事件只能作为同步通知，不能替代服务端授权和持久化结果。
+
+## 2026-07-19 当前同步：媒体消息与 Board 数据契约
+
+- `ChatMessage.content` 已形成 image / location / voice 联合类型；生产 schema 不应沿用 data URL 字段，而应改为 asset reference 或结构化 location DTO。
+- 本地图片使用 canvas 解码和 JPEG 压缩；本地语音使用 `MediaRecorder`；这些是采集端实现，不等于生产上传流水线。
+- 生产媒体流程必须采用“申请上传 → 私有 Storage → 服务端校验/转码 → 消息提交 asset id → Realtime 广播”的两阶段或受控事务流程。
+- Board comment 已进入本地命令。生产端建议使用独立 `board_comments` mutation/table，而不是更新整个 `board_items.comments` JSON 数组。
+- Board background 是轻量共享房间状态；需要服务端版本字段或权威更新时间，避免 Realtime 乱序覆盖较新选择。
+- Board 拖动和缩放继续在客户端高频渲染，只在手势结束时提交最终坐标；后端不得接收每个 pointer move 作为数据库写入。
+
+### 当前新增后端风险
+
+1. `POST_MESSAGE` 本地 reducer 尚未对 content 调用与恢复解析相同的运行时 schema；服务端 DTO 必须独立校验 discriminant、asset、坐标、MIME、时长和文本。
+2. 精确位置需要显式用户动作、最小精度和保留策略，不能默认持续采集。
+3. Safari 可能产生 MP4/AAC，Chromium 常见 WebM/Opus；后端必须转码为统一播放格式并保留可信 metadata。

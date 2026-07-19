@@ -1,6 +1,6 @@
 # EventSpace 类型化 Mock MVP 架构
 
-> 状态：2026-07-14 已扩展为正式交互式 Mock。该实现用于验证产品结构、页面边界、响应式布局、领域命令和完整核心旅程，不连接 Supabase，也不代表真实身份、权限、实时同步或服务器数据持久化已经完成。
+> 状态：2026-07-19 本地优先交互式 Mock。该实现用于验证产品结构、页面边界、响应式布局、领域命令和完整核心旅程，不连接 Supabase，也不代表真实身份、权限、实时同步或服务器数据持久化已经完成。
 
 ## 1. 可运行范围
 
@@ -14,7 +14,7 @@
 | `/account` | Client settings | 资料、Mock 登录状态、主题与会话重置 |
 | `/legal/[document]` | Server page | 法律文档结构草案与专业审阅警告 |
 
-正式产品路由共享版本化 `MockSession`。创建、消息、投票、Board、Itinerary、治理和个人归档操作通过同一纯 reducer 命令写入当前标签页 `sessionStorage`；刷新恢复，关闭标签页或 Reset 恢复 fixture。界面持续说明其没有写入服务端。
+正式产品路由共享版本化 `MockSession`。创建、消息、投票、Board、Itinerary、治理和个人归档操作通过同一纯 reducer 命令写入 `localStorage`；刷新和重开浏览器通常恢复，Reset 或清除站点数据恢复 fixture。界面持续说明其没有写入服务端。
 
 ## 2. 目录与依赖方向
 
@@ -23,7 +23,7 @@ app/                    路由、Metadata、加载/错误/Not Found 边界
 components/             无业务数据访问的共享 UI
 features/landing/       Landing 页面组合
 features/rooms/         房间列表与卡片交互
-features/room/          Room 外壳及 Chat/Board/Itinerary 子组件
+features/room/          Room 外壳及 Chat/Board/Itinerary；Board 与 Itinerary 已拆分编排、模型和展示组件
 features/create-room/   创建草稿类型、纯 reducer 状态机与五步向导
 features/mock-session/  版本化浏览器会话、领域命令、selectors 与恢复校验
 features/join/          私密邀请与申请状态机
@@ -100,6 +100,7 @@ data/rooms.ts           server-only 数据访问入口和最小 View DTO
 - 页面、feature、domain、data contract 的方向仍然清晰。
 - 主要写操作已收敛到 command/reducer，后续可以逐个映射到 Server Action、RPC 或 repository mutation。
 - Board fit、照片比例、画板预览等逻辑已经开始进入 `core/domain`，不是完全散落在 UI。
+- Itinerary 已拆为纯时间模型、编排组件、日期时间线、状态卡片和移动端编辑器；状态由起止时间计算，命令仍可映射为后端 mutation。
 - Mock runtime 与生产环境保护边界仍存在。
 
 ### 当前架构风险
@@ -117,3 +118,25 @@ data/rooms.ts           server-only 数据访问入口和最小 View DTO
 3. 统一 capability / policy 规则，形成服务端可复核的权限契约。
 4. 为投票、行程提案、成员治理、归档推进设计事务边界和幂等键。
 5. 为移动端文件上传、手势和键盘建立回归测试或手动验收表。
+
+## 2026-07-19 当前同步：组件与领域命令变化
+
+### Board 边界
+
+- `features/room/components/board-panel.tsx` 现在只负责本地命令编排和少量页面级状态。
+- `features/room/components/board/` 分别承载 canvas 手势、内容渲染、Sequence、创建/背景卡、Note、Doodle、评论和图片压缩。
+- 画布手势通过 `use-board-interaction.ts` 隔离；Board 与 Rooms 继续共用 `core/domain/board-layout.ts`。
+- `BoardBackground`、`BoardNoteVariant`、`BoardComment` 已进入 domain；`SET_BOARD_BACKGROUND`、`ADD_BOARD_COMMENT` 已进入 `MockCommand`。
+
+### Chat 边界
+
+- `ChatMessage.content` 是 image / location / voice 的可辨识联合类型，`chat-message.tsx` 负责消息展示。
+- `chat-panel.tsx` 仍同时管理列表滚动、附件权限、图片处理、录音、定位、消息操作和 Poll，是当前主要超长组件风险。
+- 持久化恢复会校验消息 content 的类型、坐标范围、持续时间、MIME 和 data URL 长度；但 `POST_MESSAGE` reducer 写入路径尚未调用同等级运行时 schema，只检查房间能力和 author。
+
+### 后端映射要求
+
+- image / voice 必须映射为 asset id 或 Storage object，不得把 data URL 放进消息 DTO。
+- location DTO 应明确坐标精度、显示 label、用户确认和删除/保留规则。
+- Board comment 应成为独立实体或受控 mutation，服务端复核成员资格、目标 item、内容长度、限流和服务器时间。
+- Board background 属于房间级共享状态，生产写入需要版本或更新时间处理 Realtime 乱序。

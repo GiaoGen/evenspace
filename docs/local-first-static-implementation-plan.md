@@ -133,3 +133,17 @@
 ### 后端替换提醒
 
 当前本地 command 的存在不代表服务端安全已经完成。后端接入时，所有身份、权限、成员资格、投票、归档、媒体所有权、撤回窗口和到期判断都必须由服务端重新校验。本地 reducer 只能作为交互回归和 DTO 设计参考。
+
+## 2026-07-19 执行状态补充
+
+- Phase C 继续推进：Chat 已有真实本地图片、位置和录音消息，以及消息分组、长按操作、回复、置顶、未读跳转和附件托盘。
+- Phase D 继续推进：Board 组件边界已拆分，评论和背景进入本地命令/领域模型，Note、Doodle、Sequence 形成独立模块。
+- Phase A 仍未完成关键媒体目标：Chat image/voice、Board photo/drawing 仍直接保存 data URL，尚未使用 IndexedDB Blob + asset id。
+- `/rooms/new` 时间滚轮和成员可见性已完成移动端交互优化，但创建命令仍是客户端本地状态机。
+
+### 下一切片调整
+
+1. 建立统一 `LocalAsset` 元数据和 IndexedDB repository，使消息与 Board item 只保存 asset id、尺寸、MIME 和必要显示信息。
+2. 为 Chat 媒体采集建立 adapter：图片解码/压缩、录音生命周期、定位权限分别与 UI 解耦，并补 Safari/Chromium 失败路径。
+3. 为 `POST_MESSAGE` content、`ADD_BOARD_COMMENT` 和 `SET_BOARD_BACKGROUND` 增加独立运行时 schema 与 reducer 测试。
+4. 保持 Board 当前组件边界；下一轮复杂交互优先进入专用 hook/子组件，不再回填到编排器。

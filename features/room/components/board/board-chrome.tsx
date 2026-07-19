@@ -10,6 +10,9 @@ const backgrounds: readonly { readonly value: BoardBackground; readonly label: s
   { value: "stone", label: "Stone" },
   { value: "linen", label: "Linen" },
   { value: "charcoal", label: "Night" },
+  { value: "herbarium", label: "Herbarium" },
+  { value: "clover", label: "Clover" },
+  { value: "bluebell", label: "Bluebell" },
 ];
 
 export function BoardChrome({ tray, background, canAdd, photoLimitReached, error, onTray, onFit, onCamera, onAlbum, onNote, onDoodle, onBackground }: {

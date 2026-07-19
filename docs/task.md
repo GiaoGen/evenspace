@@ -1,9 +1,9 @@
 # EventSpace 当前任务记录
 
-> 最后更新：2026-07-18  
+> 最后更新：2026-07-20
 > 用途：记录最近任务做了什么、当前真实进度、验证结果、遗留事项和下一步。  
 > 规则：本文件保持为当前阶段活文档；更早阶段摘要迁移到 [`history_taks.md`](./history_taks.md)。  
-> 注意：当前工作区的 `.git` 元数据为空，无法使用 `git diff` 追溯历史差异；本次补记依据代码现状、文件修改时间、功能搜索和既有文档对比完成。
+> 本次同步范围：Git 基线 `328e760` 之后的提交 `c83225e`、`665a4bd`，以及当前文档同步改动。
 
 ## 项目当前状态
 
@@ -16,6 +16,98 @@
 - `/prototype` 系列路由只作为视觉历史参考，不再代表当前功能完成度。
 
 ## 最近完成任务
+
+### TASK-015 - Rooms 浏览控制与横滑动效重构
+
+- 日期：2026-07-20
+- 状态：已完成当前轮。
+- 完成内容：
+  - 保留既有房间卡片、信息区和真实 Board snapshot，将筛选、搜索、视图与编辑收敛为一条统一工具条。
+  - 搜索模式在工具条内原位展开；编辑模式转换为 Editing / Done，并让收藏、删除操作从卡片两角动效进入。
+  - Magazine / Grid 改为单图标切换，筛选菜单显示全部状态、数量和当前勾选。
+  - 新增基于真实 `scrollLeft`、容器宽度和卡片中心距离的 Carousel hook；底部进度块连续跟随横滑，当前序号随 Scroll Snap 更新。
+  - 移动端重新计算卡片首屏高度，为进度条预留稳定区域；Grid 模式隐藏进度条。
+  - 删除房间入口增加全视口底部确认卡，不再点击红色减号后立即移除。
+  - 将集合筛选/排序、RoomCard、Toolbar、Progress、DeleteSheet 和 Carousel hook 从 `rooms-page.tsx` 拆出。
+- 后端边界：
+  - 当前筛选、搜索与排序仍针对本地完整集合；接入分页后应由查询 DTO 返回筛选结果、总数和稳定游标，不能继续假设客户端持有全部房间。
+  - 本地删除只移除当前用户入口；生产 mutation 必须区分离开房间、删除个人归档入口和 Host 结束共享房间。
+- 验证：
+  - `npm run check` 与 `npm run build` 通过。
+  - 已在 390 × 844、320 × 700 验证 Magazine、Grid、筛选、搜索、编辑、删除确认和真实进度联动；亮暗主题无横向溢出，控制台无 error/warning。
+
+### TASK-014 - Account 移动端账户中心重构
+
+- 日期：2026-07-20
+- 状态：已完成当前轮。
+- 完成内容：
+  - 删除左侧营销大标题和桌面双栏表单结构，页面改为移动端优先的单列账户中心。
+  - 顶部改为严格居中的 `EventSpace`，左侧返回按钮保留 44px 触控区但去掉可见圆形外框。
+  - 身份卡展示昵称、账户状态、邮箱及 Active / Memories / Board items 本地摘要；昵称编辑在卡片内部展开，并检查活动房间重名。
+  - Account mode、本地数据、法律入口分别拆成独立组件；模式切换和数据清除使用全视口底部确认卡。
+  - System / Light / Dark 改为带真实配色预览的三列卡片，并补齐亮暗主题、进入/退出、展开、按压和选中动效。
+  - `account-page.tsx` 只负责 session 与 command 编排；账户摘要和重名判断进入纯模型模块。
+- 后端边界：
+  - 当前邮箱、身份模式和统计均来自本地 `MockSession`；后端接入时需要由 Auth/Profile API 和服务端可见房间查询返回。
+  - 昵称重名的客户端预检查只服务本地体验，生产仍需服务端约束与冲突响应。
+- 验证：
+  - `npm run check` 与 `npm run build` 通过。
+  - 已验证 390 × 844、320 × 700 的亮色、深色与 System 主题；页面无横向溢出，确认卡覆盖层正常，浏览器控制台无 error/warning。
+
+### TASK-013 - Itinerary 时间线重构
+
+- 日期：2026-07-20
+- 状态：已完成当前轮。
+- 完成内容：
+  - 移除 Going / Not going / Checked in、容量报名和手动状态推进，行程回归共享活动时间线。
+  - 已结束、进行中、未开始由起止时间自动推导，并使用低饱和红、绿、灰卡片区分；亮色和深色模式分别定义可读配色。
+  - 行程按日期分组纵向排列；首次进入优先滚动到进行中项目，没有进行中项时定位到下一项或最后一项。
+  - 卡片默认保持紧凑，点击后展开说明、地图入口和权限操作；新增/编辑改为移动端底部编辑卡，支持 5 分钟步进时长、负责人、地点、说明和时间冲突提示。
+  - 新增 `UPDATE_ITINERARY` / `DELETE_ITINERARY` 命令，并将 `MockSession` 升级到 v4；旧 v3 行程会补齐结束时间、所有者和时间戳后迁移。
+  - 将 Itinerary 拆为时间模型、页面编排、时间线、卡片和编辑器，避免继续堆积在单一 TSX。
+  - 修正 `MockSessionProvider` 首帧读取本地状态造成的 hydration mismatch：服务端与客户端首帧统一使用初始状态，挂载后再恢复 `localStorage`。
+- 后端边界：
+  - 当前状态和滚动定位使用浏览器时间；接入后端后必须由服务器保存 UTC 起止时间，并用服务器时间或权威事件决定状态。
+  - 当前冲突检查只提供本地提示，不是数据库约束；真实写入仍需鉴权、房间时间范围校验、事务和幂等键。
+- 验证：
+  - `npm run check` 通过。
+  - `npm run build` 通过，Next.js 16.2.10 生产构建成功。
+  - 已在 390 × 844 亮色/深色和 320 × 700 亮色视口验证时间线、展开卡片和底部编辑器，无横向溢出且不会自动唤起键盘。
+  - 生产构建中重新导航 Account → Room → Itinerary 后无 React error 或 warning。
+
+### TASK-012 - Board 体验与组件架构重构
+
+- 日期：2026-07-19
+- 状态：已完成当前轮。
+- 完成内容：
+  - 将 `board-panel.tsx` 从约 600 行的手势、上传、编辑器和展示混合组件缩减为约 100 行的命令编排器。
+  - 新增独立的 `BoardCanvas`、`SequenceView`、`BoardChrome`、`NoteStudio`、`DoodleStudio`、`PhotoConversation`、图片处理模块和画布手势 hook。
+  - Board 底部改为三键 Dock；创建入口使用 Camera / Photos / Note / Doodle 卡片托盘，背景使用独立纯色卡片托盘。
+  - Note Studio 改为横滑便签样式卡；Doodle Studio 使用全屏 Portal，支持画笔、橡皮、三档笔刷、颜色、撤销/重做、单指绘制和双指平移缩放。
+  - 照片评论通过新增 `ADD_BOARD_COMMENT` 命令写入 `MockSession`；评论、作者信息和弹幕在 Board / Sequence 共享展示。
+  - 新增 `BoardNoteVariant`、`BoardComment`，并让 Rooms 快照同步 Board 背景和便签样式。
+  - 保留原图比例、无限缩放、进入时 fit、长按本人内容移动、内容缩放、空白点击完成编辑和权限删除。
+- 代码质量：
+  - Board 状态和职责已经拆分，但 `MockSession` reducer 仍是集中风险；媒体仍使用 data URL。
+- 验证：
+  - `npm run check` 通过，无 warning。
+  - `npm run build` 通过，Next.js 16.2.10 生产构建成功。
+  - 已在 390 × 844 视口验证 Board 空状态、创建托盘、Note Studio、全屏 Doodle Studio和实际落笔。
+
+### TASK-011 - Chat 基础 Telegram 式交互、创建滚轮与画板背景闭环
+
+- 日期：2026-07-19
+- 状态：已完成当前轮，媒体权限仍需真机回归。
+- 完成内容：
+  - Chat 重做为移动端消息流：消息分组、日期分隔、置顶条、未读/回到底部按钮、长按消息操作卡和回复预览。
+  - 附件托盘支持 Camera、Photos、Location、Poll、Votes、Search；照片有发送前预览、说明文字、全屏查看、保存和添加到 Board。
+  - Chat 照片经过 canvas 压缩；Location 调用浏览器 Geolocation；语音使用 `MediaRecorder` 真实录制本地音频，支持按住录制、左滑取消和消息内播放。
+  - `ChatMessage.content` 新增 image / location / voice 联合类型，持久化恢复增加结构和 data URL 长度校验。
+  - `/rooms/new` Step 3 时间滚轮改为中间固定选中区、数字循环滚动并自动回到中心段；Step 4 Member list 改为居中的 Moderators / Everyone 分段选择。
+  - `BoardBackground` 写入房间模型和 `SET_BOARD_BACKGROUND` 命令，Rooms 卡片预览使用房间真实背景。
+- 真实边界：
+  - 照片和语音是真实浏览器本地数据，位置是真实浏览器坐标，但均只保存在本机 `MockSession`，没有服务器上传、跨设备同步或生产隐私控制。
+  - iOS Safari 的录音 MIME、相机权限、定位权限和 data URL 存储上限仍需真机验证。
 
 ### TASK-010 - 建立文档维护规范
 
@@ -129,11 +221,12 @@
 ### 已经具备的本地能力
 
 - 本地创建房间、进入房间、Rooms 列表展示、筛选、收藏、删除个人入口。
-- 本地聊天、回复、反应、撤回、置顶、搜索、语音条 mock。
+- 本地聊天、回复、反应、撤回、置顶、搜索，以及真实浏览器本地照片、位置和录音消息。
+- Chat/Board 媒体仍以 data URL 存入本地 session，不是生产媒体方案。
 - 本地投票创建、投票、结果进度、投票历史、行程型投票通过后添加行程。
 - 本地画板照片上传、压缩、拖动、缩放、删除、评论弹幕、文本标注、涂鸦。
 - Board 与 Rooms 卡片共享画板 item 的真实位置/大小预览逻辑。
-- 本地行程创建、状态推进、参与状态、负责人、容量和地点文本。
+- 本地行程创建、编辑、删除、负责人、起止时间、地点、说明、自动状态和重叠提示。
 - 成员审核、禁言、移除、拉黑、社区投票准入等 mock 治理状态。
 - 房间 active / freezing / archiving / archived 生命周期 mock。
 
@@ -154,12 +247,16 @@
 - 为每类命令定义稳定 DTO：创建房间、发消息、创建投票、投票、上传媒体、移动画板 item、改行程、成员治理、归档。
 - 明确 server time 规则，所有到期、投票关闭、撤回窗口、归档状态推进都不能信任客户端时间。
 - 为移动端 Safari / Chromium 建立真机验收清单，尤其是文件上传、相机、键盘、viewport、Pointer Events、双指手势。
-- 拆分超长 UI 组件，避免接后端时把数据请求、状态同步和复杂手势继续混在一个组件里。
+- 继续拆分 `chat-panel.tsx`；Board 已完成组件化，但 Chat 仍混合媒体权限、录音、Poll 和界面状态。
+
+### 已知实现与规范偏差
+
+- 当前 Board CSS 的 Dock 使用了 `backdrop-filter`，Linen 背景使用轻微 `linear-gradient` 网格；这与设计系统 v1 的“禁止毛玻璃/渐变”原则不完全一致。当前效果已通过视觉回归，但后续需要明确将其收编为受限例外，或改为纯色/静态纹理实现。
 
 ## 下一步建议
 
-1. 先做一次移动端真机回归：创建房间、上传照片、画布平移/缩放、长按移动、涂鸦板、聊天输入、Poll 创建与投票历史。
-2. 修复已知 lint hygiene：移除或接回 `TimingStep`。
-3. 把本地媒体从 `imageDataUrl` JSON 进一步抽象成 asset 引用，为 IndexedDB 或未来 Storage 做准备。
-4. 为 `MockCommand` 列出后端 API / RPC 映射表，确定哪些命令需要事务。
-5. 补充最小测试：domain 工具、mock reducer 命令、board fit、poll 投票规则、room 到期归档展示。
+1. 做移动端真机回归：iOS Safari / Android Chromium 的照片、录音、定位、键盘、Board 双指手势和全屏 Portal。
+2. 把 Chat / Board 的 image、voice、drawing data URL 抽象为 asset 引用，为 IndexedDB 和未来 Storage 做准备。
+3. 拆分 `chat-panel.tsx` 的媒体控制、消息列表、附件托盘和 Poll 编排。
+4. 为 `POST_MESSAGE`、`ADD_BOARD_COMMENT`、`SET_BOARD_BACKGROUND` 等命令建立服务端 DTO 和运行时 schema；当前 reducer 对新消息 content 的写入校验仍主要依赖 TypeScript/UI。
+5. 补充 reducer、媒体结构恢复、Board 手势/fit、Poll 和房间到期的最小测试。

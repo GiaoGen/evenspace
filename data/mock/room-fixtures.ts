@@ -89,9 +89,9 @@ const roomFixtures = [
       { id: "board_note_1", kind: "note", ownerActorId: maya.actorId, text: "Don’t rush\nthis part.", x: 10, y: 65, rotation: 2 },
     ],
     itinerary: [
-      { id: "itinerary_entrance", title: "Meet by the lower entrance", description: "Come down the riverside steps. Maya will wait by the stone wall.", startsAt: "2026-07-14T19:00:00+08:00", locationLabel: "Riverside Walk", mapsUrl: "https://maps.google.com/?q=Riverside+Walk", responsible: maya, status: "in-progress", capacity: 7, goingCount: 6, viewerAttendance: "going" },
-      { id: "itinerary_dinner", title: "Dinner, wherever we land", description: "We’ll choose the place together after the walk.", startsAt: "2026-07-14T20:00:00+08:00", locationLabel: "Place to be decided", mapsUrl: null, responsible: jon, status: "not-started", capacity: 7, goingCount: 5, viewerAttendance: "going" },
-      { id: "itinerary_walk", title: "One last walk", description: "No fixed route. We’ll follow the river lights.", startsAt: "2026-07-14T22:00:00+08:00", locationLabel: null, mapsUrl: null, responsible: avery, status: "not-started", capacity: 7, goingCount: 4, viewerAttendance: null },
+      { id: "itinerary_entrance", title: "Meet by the lower entrance", description: "Come down the riverside steps. Maya will wait by the stone wall.", startsAt: "2026-07-14T19:00:00+08:00", endsAt: "2026-07-14T19:45:00+08:00", locationLabel: "Riverside Walk", mapsUrl: "https://maps.google.com/?q=Riverside+Walk", responsible: maya, createdByActorId: maya.actorId, createdAt: "2026-07-14T18:25:00+08:00", updatedAt: "2026-07-14T18:25:00+08:00" },
+      { id: "itinerary_dinner", title: "Dinner, wherever we land", description: "We’ll choose the place together after the walk.", startsAt: "2026-07-14T20:00:00+08:00", endsAt: "2026-07-14T21:30:00+08:00", locationLabel: "Place to be decided", mapsUrl: null, responsible: jon, createdByActorId: avery.actorId, createdAt: "2026-07-14T18:30:00+08:00", updatedAt: "2026-07-14T18:30:00+08:00" },
+      { id: "itinerary_walk", title: "One last walk", description: "No fixed route. We’ll follow the river lights.", startsAt: "2026-07-14T22:00:00+08:00", endsAt: "2026-07-14T22:30:00+08:00", locationLabel: null, mapsUrl: null, responsible: avery, createdByActorId: avery.actorId, createdAt: "2026-07-14T18:35:00+08:00", updatedAt: "2026-07-14T18:35:00+08:00" },
     ],
   },
   {
@@ -140,7 +140,8 @@ function assertBoardItem(value: unknown) {
 
 function assertItinerary(value: unknown) {
   if (!isRecord(value) || typeof value.id !== "string" || typeof value.title !== "string" || !isValidDate(value.startsAt)) throw new Error("Room fixture has an invalid itinerary item");
-  if (!isFiniteNumber(value.capacity) || !isFiniteNumber(value.goingCount) || !isRecord(value.responsible)) throw new Error("Room fixture has invalid itinerary participation");
+  if (!isValidDate(value.endsAt) || Date.parse(value.endsAt) <= Date.parse(value.startsAt) || !isRecord(value.responsible)) throw new Error("Room fixture has invalid itinerary timing");
+  if (typeof value.createdByActorId !== "string" || !isValidDate(value.createdAt) || !isValidDate(value.updatedAt)) throw new Error("Room fixture has invalid itinerary ownership");
   if (value.mapsUrl !== null && typeof value.mapsUrl !== "string") throw new Error("Room fixture has an invalid maps value");
   assertPerson(value.responsible);
 }

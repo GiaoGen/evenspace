@@ -8,6 +8,7 @@ export type IconName =
   | "chevron"
   | "close"
   | "draw"
+  | "edit"
   | "eraser"
   | "grid"
   | "heart"
@@ -55,6 +56,7 @@ export function Icon({ name, size = 18 }: { readonly name: IconName; readonly si
     chevron: <path d="m9 6 6 6-6 6" />,
     close: <><path d="m6 6 12 12M18 6 6 18" /></>,
     draw: <><path d="M4 20c4.5-1.2 3.4-5.8 6.6-5.8 2.1 0 2.6 1.9 4.6 1.9 1.4 0 2.7-.8 4.8-3.1" /><path d="m14.2 5.3 4.5 4.5" /><path d="m13.2 13.1-3.8 1.2 1.2-3.8 6.9-6.9a1.8 1.8 0 0 1 2.5 0l.4.4a1.8 1.8 0 0 1 0 2.5l-7.2 6.6Z" /></>,
+    edit: <><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4Z" /></>,
     eraser: <><path d="m4 15 8.5-10a2 2 0 0 1 2.8-.2l3.9 3.3a2 2 0 0 1 .2 2.8L12 19.5H7.8L4 16.3A1 1 0 0 1 4 15Z" /><path d="m9.5 8.5 7 6M12 19.5h8" /></>,
     grid: <><rect x="4" y="4" width="6" height="6" rx="1.5" /><rect x="14" y="4" width="6" height="6" rx="1.5" /><rect x="4" y="14" width="6" height="6" rx="1.5" /><rect x="14" y="14" width="6" height="6" rx="1.5" /></>,
     heart: <path d="M20.8 8.7c0 5-8.8 10-8.8 10s-8.8-5-8.8-10A4.7 4.7 0 0 1 12 6.3a4.7 4.7 0 0 1 8.8 2.4Z" />,

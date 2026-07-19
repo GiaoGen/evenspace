@@ -5,8 +5,9 @@ export type RoomStatus = "active" | "archived";
 export type RoomRole = "host" | "admin" | "member";
 export type MembershipState = "active" | "muted" | "removed";
 export type ArtVariant = "one" | "two" | "three" | "four";
-export type BoardBackground = "stone" | "linen" | "charcoal";
+export type BoardBackground = "stone" | "linen" | "charcoal" | "herbarium" | "clover" | "bluebell";
 export type BoardNoteVariant = "paper" | "ink" | "sage";
+export type BoardFrameVariant = "pin" | "gallery" | "instant" | "tape" | "dark";
 
 export interface BoardComment {
   readonly id: string;
@@ -74,6 +75,7 @@ export interface BoardPhoto {
   readonly imageDataUrl?: string;
   readonly imageName?: string;
   readonly aspectRatio?: number;
+  readonly frameVariant?: BoardFrameVariant;
   readonly note: string | null;
   readonly x: number;
   readonly y: number;
@@ -109,20 +111,18 @@ export interface BoardDrawing {
 
 export type BoardItem = BoardPhoto | BoardNote | BoardDrawing;
 
-export type ItineraryStatus = "not-started" | "in-progress" | "completed";
-
 export interface ItineraryItem {
   readonly id: string;
   readonly title: string;
   readonly description: string;
   readonly startsAt: string;
+  readonly endsAt: string;
   readonly locationLabel: string | null;
   readonly mapsUrl: string | null;
   readonly responsible: PersonSummary;
-  readonly status: ItineraryStatus;
-  readonly capacity: number;
-  readonly goingCount: number;
-  readonly viewerAttendance: "going" | "not-going" | "checked-in" | null;
+  readonly createdByActorId: ActorId;
+  readonly createdAt: string;
+  readonly updatedAt: string;
 }
 
 export interface RoomDetail extends RoomSummary {

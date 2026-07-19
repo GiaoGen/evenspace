@@ -10,6 +10,8 @@ import styles from "./room-controls.module.css";
 import reportStyles from "./room-report.module.css";
 import shortcutStyles from "./room-control-shortcuts.module.css";
 import { usePollClock } from "@/features/room/model/use-poll-clock";
+import { getExtendedEndsAt, getExtensionPollQuestion, getMaxExtensionMinutes } from "@/features/room/model/room-extension";
+import { RoomExtensionPicker } from "./room-extension-picker";
 
 export type RoomControl = "share" | "members" | "more";
 
@@ -143,12 +145,26 @@ function Reports({ room }: { readonly room: MockRoom }) {
 function MoreControl({ room, capabilities, close, openControl }: ControlProps & { readonly openControl: (control: Exclude<RoomControl, "more">) => void }) {
   const { session, dispatch, reset } = useMockSession();
   const [confirm, setConfirm] = useState<"end" | "remove" | "reset" | null>(null);
+  const [extensionMode, setExtensionMode] = useState<"direct" | "vote" | null>(null);
+  const [extensionMinutes, setExtensionMinutes] = useState(60);
+  const [extensionNowIso, setExtensionNowIso] = useState(() => new Date().toISOString());
   const renderTime = usePollClock(room.activePoll);
   const roomVoteBlocked = Boolean(room.activePoll && !room.activePoll.resolvedChoiceId && Date.parse(room.activePoll.closesAt) > renderTime);
+  const maxExtensionMinutes = getMaxExtensionMinutes(room.endsAt, extensionNowIso);
+
+  function openExtension(mode: "direct" | "vote") {
+    const nowIso = new Date().toISOString();
+    const maximum = getMaxExtensionMinutes(room.endsAt, nowIso);
+    setExtensionNowIso(nowIso);
+    setExtensionMinutes(Math.min(60, Math.max(5, maximum)));
+    setExtensionMode(mode);
+    setConfirm(null);
+  }
 
   function extend() {
-    const base = Date.parse(room.endsAt ?? new Date().toISOString());
-    dispatch({ type: "COMMAND", command: { type: "UPDATE_DURATION", roomPublicId: room.publicId, actorId: session.viewer.actorId, endsAt: new Date(base + 60 * 60_000).toISOString(), nowIso: new Date().toISOString() } });
+    const nowIso = new Date().toISOString();
+    dispatch({ type: "COMMAND", command: { type: "UPDATE_DURATION", roomPublicId: room.publicId, actorId: session.viewer.actorId, endsAt: getExtendedEndsAt(room.endsAt, nowIso, extensionMinutes), nowIso } });
+    close();
   }
 
   function endRoom() {
@@ -156,12 +172,12 @@ function MoreControl({ room, capabilities, close, openControl }: ControlProps & 
     close();
   }
 
-  function createRoomVote(kind: "extend-room" | "end-room") {
+  function createRoomVote(kind: "extend-room" | "end-room", proposedMinutes = extensionMinutes) {
     const nowIso = new Date().toISOString();
     const activeMembers = room.members.filter((member) => !["removed", "banned"].includes(room.membershipStates[member.actorId] ?? "active")).length;
     const closesAt = new Date(Math.min(Date.parse(nowIso) + 30 * 60_000, Date.parse(room.endsAt ?? new Date(Date.parse(nowIso) + 30 * 60_000).toISOString()))).toISOString();
-    const proposal = kind === "extend-room" ? { kind, endsAt: new Date(Math.min(Date.parse(room.endsAt ?? nowIso) + 60 * 60_000, Date.parse(nowIso) + 24 * 60 * 60_000)).toISOString() } as const : { kind } as const;
-    dispatch({ type: "COMMAND", command: { type: "CREATE_POLL", roomPublicId: room.publicId, actorId: session.viewer.actorId, nowIso, poll: { id: `poll_${createUuid()}`, question: kind === "extend-room" ? "Keep this room open for one more hour?" : "End and archive this room now?", closesAt, memberSnapshot: activeMembers, requiredVotes: Math.floor(activeMembers / 2) + 1, visibility: "public", choices: [{ id: "yes", label: kind === "extend-room" ? "Keep it open" : "End the room", votes: 0 }, { id: "no", label: "Not this time", votes: 0 }], voterActorIds: [], resolvedChoiceId: null, proposal } } });
+    const proposal = kind === "extend-room" ? { kind, endsAt: getExtendedEndsAt(room.endsAt, nowIso, proposedMinutes) } as const : { kind } as const;
+    dispatch({ type: "COMMAND", command: { type: "CREATE_POLL", roomPublicId: room.publicId, actorId: session.viewer.actorId, nowIso, poll: { id: `poll_${createUuid()}`, question: kind === "extend-room" ? getExtensionPollQuestion(proposedMinutes) : "End and archive this room now?", closesAt, memberSnapshot: activeMembers, requiredVotes: Math.floor(activeMembers / 2) + 1, visibility: "public", choices: [{ id: "yes", label: kind === "extend-room" ? "Keep it open" : "End the room", votes: 0 }, { id: "no", label: "Not this time", votes: 0 }], voterActorIds: [], resolvedChoiceId: null, proposal } } });
     close();
   }
 
@@ -175,10 +191,10 @@ function MoreControl({ room, capabilities, close, openControl }: ControlProps & 
     <Sheet title="Room options." eyebrow={room.lifecycle === "archived" ? "Read-only archive" : "Private room settings"} close={close}>
       <div className={shortcutStyles.mobileShortcuts}><button type="button" onClick={() => openControl("share")}><Icon name="share" />Share</button><button type="button" onClick={() => openControl("members")}><Icon name="members" />Members</button></div>
       <div className={styles.optionList}>
-        {room.lifecycle === "active" ? <><button type="button" disabled={!capabilities.canChangeDuration} onClick={extend}><span><strong>Add one hour</strong><small>Only the Host can change the room clock.</small></span><Icon name="arrow" /></button><button type="button" disabled><span><strong>Entry approval</strong><small>Fixed when this local room is created.</small></span><span>{room.requiresApproval ? "On" : "Off"}</span></button>{capabilities.canEndRoom ? <button type="button" className={styles.dangerOption} onClick={() => setConfirm("end")}><span><strong>End this room</strong><small>Immediately freeze every write and start archiving.</small></span><Icon name="arrow" /></button> : null}</> : <button type="button" className={styles.dangerOption} onClick={() => setConfirm("remove")}><span><strong>Remove from my archive</strong><small>This affects only your personal archive list.</small></span><Icon name="arrow" /></button>}
+        {room.lifecycle === "active" ? <><button type="button" disabled={!capabilities.canChangeDuration} onClick={() => openExtension("direct")}><span><strong>Extend room</strong><small>Choose how much time to add to the room clock.</small></span><Icon name="arrow" /></button>{extensionMode === "direct" ? <RoomExtensionPicker mode="direct" minutes={extensionMinutes} maxMinutes={maxExtensionMinutes} endsAt={room.endsAt} nowIso={extensionNowIso} onChange={setExtensionMinutes} onCancel={() => setExtensionMode(null)} onConfirm={extend} /> : null}<button type="button" disabled><span><strong>Entry approval</strong><small>Fixed when this local room is created.</small></span><span>{room.requiresApproval ? "On" : "Off"}</span></button>{capabilities.canEndRoom ? <button type="button" className={styles.dangerOption} onClick={() => setConfirm("end")}><span><strong>End this room</strong><small>Immediately freeze every write and start archiving.</small></span><Icon name="arrow" /></button> : null}</> : <button type="button" className={styles.dangerOption} onClick={() => setConfirm("remove")}><span><strong>Remove from my archive</strong><small>This affects only your personal archive list.</small></span><Icon name="arrow" /></button>}
         <button type="button" onClick={() => setConfirm("reset")}><span><strong>Reset local data</strong><small>Clear rooms and interactions stored in this browser.</small></span><Icon name="arrow" /></button>
       </div>
-      {room.lifecycle === "active" && capabilities.canVote && (room.mode === "community-led" || capabilities.canModerate) ? <div className={styles.optionList}><button type="button" disabled={roomVoteBlocked} onClick={() => createRoomVote("extend-room")}><span><strong>Vote on more time</strong><small>Open a visible majority vote for one additional hour.</small></span><Icon name="arrow" /></button><button type="button" disabled={roomVoteBlocked} onClick={() => createRoomVote("end-room")}><span><strong>Vote to end the room</strong><small>Archive immediately if the majority threshold is reached.</small></span><Icon name="arrow" /></button></div> : null}
+      {room.lifecycle === "active" && capabilities.canVote && (room.mode === "community-led" || capabilities.canModerate) ? <div className={styles.optionList}><button type="button" disabled={roomVoteBlocked} onClick={() => openExtension("vote")}><span><strong>Vote to extend</strong><small>Choose an extension and open a visible majority vote.</small></span><Icon name="arrow" /></button>{extensionMode === "vote" ? <RoomExtensionPicker mode="vote" minutes={extensionMinutes} maxMinutes={maxExtensionMinutes} endsAt={room.endsAt} nowIso={extensionNowIso} onChange={setExtensionMinutes} onCancel={() => setExtensionMode(null)} onConfirm={() => createRoomVote("extend-room")} /> : null}<button type="button" disabled={roomVoteBlocked} onClick={() => createRoomVote("end-room")}><span><strong>Vote to end the room</strong><small>Archive immediately if the majority threshold is reached.</small></span><Icon name="arrow" /></button></div> : null}
       {confirm ? <div className={styles.confirmBox}><strong>{confirm === "end" ? "End this room now?" : confirm === "remove" ? "Remove your archive entry?" : "Reset all local data?"}</strong><p>{confirm === "end" ? "Chat, Board and Itinerary become read-only immediately." : "This action is scoped to this browser&apos;s local EventSpace data."}</p><div><button type="button" onClick={() => setConfirm(null)}>Cancel</button><button type="button" className={styles.confirm} onClick={confirmSelection}>Confirm</button></div></div> : null}
       <Reports room={room} />
       <p className={styles.mockBoundary}>Backend authorization, server time and archive jobs are not connected yet; this build keeps those boundaries explicit.</p>

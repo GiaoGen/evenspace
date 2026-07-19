@@ -11,7 +11,7 @@ export function SequenceView({ items, members, selectedItemId, onSelect, onClear
   return <div className={styles.sequence} onPointerDown={(event) => { if (event.target === event.currentTarget) onClear(); }}>
     {items.map((item) => {
       if (item.kind === "photo") return <article key={item.id} className={styles.sequencePhoto} style={{ aspectRatio: String(getBoardPhotoFrameAspectRatio(item)) }} onClick={() => onSelect(item)}>
-        <PinnedPhoto variant={item.variant} note={item.imageDataUrl ? null : item.note} imageDataUrl={item.imageDataUrl} imageName={item.imageName} className={styles.sequencePinnedPhoto} />
+        <PinnedPhoto variant={item.variant} frameVariant={item.frameVariant} note={item.imageDataUrl ? null : item.note} imageDataUrl={item.imageDataUrl} imageName={item.imageName} className={styles.sequencePinnedPhoto} />
         {selectedItemId === item.id ? <PhotoConversation photo={item} owner={members.find((member) => member.actorId === item.ownerActorId) ?? null} onComment={(body) => onComment(item.id, body)} /> : null}
       </article>;
       if (item.kind === "drawing") return <article key={item.id} className={styles.sequenceDrawing} onClick={() => onSelect(item)}><Image src={item.imageDataUrl} alt="Board drawing" width={960} height={720} unoptimized /></article>;

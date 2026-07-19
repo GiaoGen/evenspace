@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Icon, type IconName } from "@/components/ui/icon";
+import type { ActorId } from "@/core/domain/ids";
 import type { RoomCapabilities } from "@/core/domain/room";
 import type { MockRoom } from "@/features/mock-session/model/mock-session";
 import { useMockSession } from "@/features/mock-session/components/mock-session-provider";
@@ -36,7 +37,7 @@ function formatCountdown(value: string | null, now: number) {
   return `${days}d ${hours % 24}h left`;
 }
 
-export function RoomExperience({ room, capabilities, viewerActorId }: { readonly room: MockRoom; readonly capabilities: RoomCapabilities; readonly viewerActorId: string }) {
+export function RoomExperience({ room, capabilities, viewerActorId }: { readonly room: MockRoom; readonly capabilities: RoomCapabilities; readonly viewerActorId: ActorId }) {
   const { dispatch } = useMockSession();
   const [page, setPage] = useState<RoomPage>("chat");
   const [visitedPages, setVisitedPages] = useState<ReadonlySet<RoomPage>>(() => new Set(["chat"]));
@@ -86,7 +87,7 @@ export function RoomExperience({ room, capabilities, viewerActorId }: { readonly
           <div className={styles.roomPages}>
             <section className={`${styles.roomPage} ${page === "chat" ? styles.activePage : ""}`} aria-hidden={page !== "chat"}><ChatPanel roomPublicId={room.publicId} messages={room.messages} poll={room.activePoll} pinnedMessageId={room.pinnedMessageId} members={room.members} viewerActorId={viewerActorId} timeZone={room.timeZone} canChat={capabilities.canChat} canVote={capabilities.canVote} canModerate={capabilities.canModerate} archived={room.lifecycle !== "active"} /></section>
             {visitedPages.has("board") ? <section className={`${styles.roomPage} ${page === "board" ? styles.activePage : ""}`} aria-hidden={page !== "board"}><BoardPanel roomPublicId={room.publicId} items={room.boardItems} members={room.members} canAdd={capabilities.canAddBoardItem} canModerate={capabilities.canModerate} viewerActorId={room.members.find((member) => member.actorId === viewerActorId)?.actorId ?? room.members[0].actorId} photoCount={room.photoCount} maxPhotos={room.maxPhotos} sequence={boardSequence} setSequence={setBoardSequence} boardBackground={room.boardBackground ?? "stone"} /></section> : null}
-            {visitedPages.has("itinerary") ? <section className={`${styles.roomPage} ${page === "itinerary" ? styles.activePage : ""}`} aria-hidden={page !== "itinerary"}><ItineraryPanel roomPublicId={room.publicId} items={room.itinerary} timeZone={room.timeZone} canCreate={capabilities.canCreateItinerary} canVote={capabilities.canVote} mode={room.mode} memberCount={room.memberCount} members={room.members} /></section> : null}
+            {visitedPages.has("itinerary") ? <section className={`${styles.roomPage} ${page === "itinerary" ? styles.activePage : ""}`} aria-hidden={page !== "itinerary"}><ItineraryPanel roomPublicId={room.publicId} items={room.itinerary} timeZone={room.timeZone} canCreate={capabilities.canCreateItinerary} canVote={capabilities.canVote} canModerate={capabilities.canModerate} mode={room.mode} members={room.members} /></section> : null}
           </div>
         </main>
         <aside className={styles.sidebar}><section><p>About</p><span>{room.description}</span></section><section><p>{room.status === "active" ? "Ends at" : "Archived"}</p><strong>{room.status === "active" ? endTime : room.archivedAt ? new Intl.DateTimeFormat("en-US", { month: "long", day: "numeric", timeZone: room.timeZone }).format(new Date(room.archivedAt)) : "—"}</strong><span>{room.timeZone.replace("_", " ")}</span></section><section><p>People · {room.memberCount}</p><div className={styles.avatarStack}>{room.members.slice(0,4).map((member) => <b key={member.actorId}>{member.initials}</b>)}{room.memberCount > 4 ? <b>+{room.memberCount - 4}</b> : null}</div></section>{room.itinerary[0] ? <section><p>Next</p><div className={styles.next}><time>{formatEnd(room.itinerary[0].startsAt, room.timeZone)}</time><div><strong>{room.itinerary[0].title}</strong><span>{room.itinerary[0].locationLabel ?? "No fixed location"}</span></div><Icon name="chevron" /></div></section> : null}</aside>
