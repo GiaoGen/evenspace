@@ -1,21 +1,135 @@
 # EventSpace 当前任务记录
 
-> 最后更新：2026-07-20
+> 最后更新：2026-07-21
 > 用途：记录最近任务做了什么、当前真实进度、验证结果、遗留事项和下一步。  
 > 规则：本文件保持为当前阶段活文档；更早阶段摘要迁移到 [`history_taks.md`](./history_taks.md)。  
-> 本次同步范围：Git 基线 `328e760` 之后的提交 `c83225e`、`665a4bd`，以及当前文档同步改动。
+> 本次同步范围：Git 基线 `328e760` 之后的提交 `c83225e`、`665a4bd`、`9af63f0`，以及当前文档同步改动。
 
 ## 项目当前状态
 
 - 当前阶段：移动端优先的本地优先 Mock / 静态真实数据版本，尚未接入后端。
 - 正式产品路由已经从静态原型进入可操作状态，主要页面共享一套 `MockSession` 本地状态。
-- 浏览器持久化当前使用 `localStorage` 键 `eventspace:local-session:v1`，并兼容读取旧的 `sessionStorage` 键 `eventspace:mock-session:v3`。
+- 结构化会话使用 `localStorage` 键 `eventspace:local-session:v1`；图片、语音和涂鸦 Blob 使用 IndexedDB `eventspace-local-assets`，并兼容迁移旧 data URL 会话。
 - 当前已经支持创建房间、房间列表、聊天、投票、画板、行程、成员治理、归档、账号本地身份与法律草稿页面。
-- 图片和涂鸦目前会压缩/绘制为 `imageDataUrl` 后写入本地 JSON 状态；这能支持本地演示和移动端验证，但不是最终后端媒体方案。
+- 图片、语音和涂鸦已抽象为 `AssetReference`，会话 JSON 不再保存媒体正文；本地 Blob repository 可直接映射未来私有 Storage，但仍不具备跨设备与生产授权能力。
 - 生产构建不再依赖远程 Google Fonts / `next/font` 拉取；字体资源已通过 `public/fonts` 的本地 `@font-face` 加载，保留 Bodoni 衬线标题风格。
 - `/prototype` 系列路由只作为视觉历史参考，不再代表当前功能完成度。
 
 ## 最近完成任务
+
+### TASK-022 - 移动端本地资产保存修复与后端边界收紧
+
+- 日期：2026-07-21
+- 状态：代码修复完成；保留 iOS Safari / Android Chromium 真机上传复核。
+- 根因与修复：
+  - IndexedDB repository 曾直接调用 `crypto.randomUUID()`；手机通过局域网 HTTP 地址访问时不属于安全上下文，该 API 可能不存在，导致 Chat/Board 图片及涂鸦在事务开始前报 `could not be saved locally`。
+  - 资产 ID 改为复用 `core/domain/uuid.ts` 的跨环境实现：优先 `randomUUID`，否则使用 `getRandomValues`，最后提供非加密本地 mock fallback。
+  - Board 文本不经过资产仓库；新增 reducer 测试确认合法文本 item 可独立保存，避免把媒体错误错误归因到文本链路。
+- 后端接入准备：
+  - 新增 `data/contracts/asset-repository.ts`，IndexedDB 实现遵循统一 `AssetRepository`，未来私有 Storage adapter 可保持相同的 save/read/remove 契约。
+  - `isAssetReference` 移入 `core/domain`；`POST_MESSAGE` 与 `ADD_BOARD_ITEM` 写入前执行和恢复阶段一致的运行时结构校验，不再只依赖 UI 与 TypeScript。
+- 验证：
+  - `npm test`：4 个测试文件、20 个测试通过，覆盖不安全上下文 UUID fallback、Board 文本写入和畸形媒体消息拒绝。
+  - `npm run check`、`npm run build`、`git diff --check` 通过。
+  - 自动浏览器文件选择验证受本地 URL 安全策略阻止；仍需在真实手机上分别确认 Chat 图片、Board 图片和刷新恢复。
+
+### TASK-021 - 本地媒体 Asset Reference 与 IndexedDB Blob 存储
+
+- 日期：2026-07-21
+- 状态：已完成。
+- 完成内容：
+  - 新增稳定的 `AssetReference` 领域契约和 `features/local-assets` repository；图片、语音、涂鸦 Blob 统一写入 IndexedDB，会话仅保存 id、类型、MIME 与字节数。
+  - Board 上传、相框预览、涂鸦导出、Chat 图片发送、语音录制、下载和“添加到画板”均改为 Blob/asset 流程；同一图片可跨 Chat 与 Board 复用同一引用。
+  - 展示层通过可回收 object URL 读取本地 Blob，覆盖 Board、Sequence、照片详情、聊天室、全屏图片和 Rooms 画板快照。
+  - `MockSession` 升级为 v7；恢复旧会话时异步迁移 image/voice/drawing data URL，成功后写回新结构。
+  - 会话更新后按真实引用集合清理孤立 Blob；重置本地数据时同步清空 IndexedDB。
+- 后端边界：
+  - UI 与领域层已经不依赖 data URL；后端接入可替换 repository 为私有 Storage 上传和签名读取，但仍需服务端 asset 表、鉴权、文件嗅探、EXIF 清理、转码/缩略图、配额和垃圾回收。
+- 验证：
+  - 新增旧媒体迁移测试；`npm test`、`npm run check`、`npm run build` 与 `git diff --check` 通过。
+
+### TASK-020 - Board 评论独立实体与 v6 迁移
+
+- 日期：2026-07-20
+- 状态：第三轮已完成。
+- 完成内容：
+  - 从 `BoardPhoto` 移除内嵌评论数组，新增房间级 `boardComments` 集合；`BoardComment` 通过 `photoId` 和 `actorId` 关联照片与作者。
+  - `MockSession` 升级到 v6，恢复层兼容 v3/v4/v5，并自动抽取旧照片内嵌评论、移除旧字段。
+  - `ADD_BOARD_COMMENT` 改为向独立集合写入，只允许真实照片目标，拒绝重复 comment id，并继续由 reducer 写入作者和创建时间。
+  - 删除照片时同步清理关联评论；照片详情按当前 photo id 选择评论，视觉和操作体验保持不变。
+  - fixture、运行时结构验证和新建房间默认结构已同步到 v6。
+- 后端边界：
+  - 该结构可以直接映射独立评论表与分页接口，但本地 reducer 仍不是生产安全边界；服务端必须负责鉴权、外键、作者、时间、限流、审计和删除事务。
+- 验证：
+  - `npm test`：2 个测试文件、16 个测试全部通过，新增 v5 评论迁移、目标校验、ID 幂等与删除级联覆盖。
+  - `npm run check`、`npm run build` 与 `git diff --check` 通过。
+
+### TASK-019 - Board 照片详情连续浏览
+
+- 日期：2026-07-20
+- 状态：第二轮已完成。
+- 完成内容：
+  - Board 与 Sequence 的照片详情共用当前照片 ID 和有序照片集合，可在详情内连续浏览，不需要关闭后重新选择。
+  - 移动端仅在大图区域响应横向滑动；评论列表保留纵向滚动，首尾照片使用阻尼反馈且不会越界。
+  - 桌面端新增左右箭头，同时支持键盘方向键；顶部显示当前照片序号。
+  - 切换照片时清空未发送评论并释放输入框焦点，避免移动端键盘继续占据视口；相邻真实图片会提前加载。
+  - 删除当前照片后自动展示下一张或上一张；没有相邻照片时关闭详情。
+  - 切换动效兼容 `prefers-reduced-motion`。
+- 验证：
+  - `npm test`：2 个测试文件、12 个测试全部通过。
+  - `npm run check`、`npm run build` 与 `git diff --check` 通过。
+  - 已在 390 × 844 验证左右滑动、序号更新、草稿清理、输入失焦和无横向溢出；已在 1024 × 800 验证桌面箭头及边界禁用状态。
+
+### TASK-018 - 行程与 MockSession 领域测试底座
+
+- 日期：2026-07-20
+- 状态：第一轮已完成。
+- 完成内容：
+  - 引入 Vitest，并新增 `npm test` 与 `npm run test:watch` 命令；测试运行于 Node 环境，不依赖 React 挂载或浏览器状态。
+  - 建立共享的 MockSession / Itinerary 测试构造器，避免测试重复拼装完整房间数据。
+  - 覆盖行程 upcoming / current / ended 状态、状态分区顺序、默认滚动目标和手动结束行程的重叠判断。
+  - 覆盖 MockSession v3 / v4 到 v5 的行程迁移，包括 Poll 内嵌行程提案。
+  - 覆盖 `END_ITINERARY` 的权限、幂等性、结束时间写入，并锁定普通更新不可伪造 `endedAt` 的边界。
+- 验证：
+  - `npm test`：2 个测试文件、12 个测试全部通过。
+  - `npm run check` 与 `npm run build` 通过。
+
+### TASK-017 - Board 照片详情与 Itinerary 手动结束
+
+- 日期：2026-07-20
+- 状态：已完成当前轮。
+- 完成内容：
+  - 删除照片内部的作者、弹幕和评论输入，短点击照片改为打开覆盖完整视口的照片详情；大图保留原图比例与相框，照片下方依次展示发布者、纵向评论和安全区输入栏。
+  - Board 与 Sequence 共用 `PhotoDetailViewer`；长按照片移动、本人/管理员删除和评论本地持久化保持不变。
+  - Itinerary 改为 Upcoming 灰色在上、Current 绿色居中、Ended 红色在下，并让最接近当前时间的卡片靠近 Current 区域。
+  - Duration 改为 5 分钟步进的移动端滑块，最大值随房间剩余时间动态收敛。
+  - 新增 Scheduled / End manually 两种结束模式；手动行程开始后由负责人或管理员确认 `End now`，并记录实际结束时间。
+  - `MockSession` 升级到 v5，v3/v4 行程迁移为带 `endMode`、`endsAt`、`endedAt` 的结构；新增独立 `END_ITINERARY` 命令。
+- 后端边界：
+  - 手动结束的 `endedAt` 当前来自浏览器时间；生产端必须由服务端鉴权并写入服务器时间，命令需要幂等处理。
+  - 照片评论当前仍随 photo JSON 保存；生产端应使用独立评论实体、分页查询、限流和删除策略。
+- 验证：
+  - `npm run check` 与 `npm run build` 通过。
+  - 已在 390 × 844、320 × 700 验证照片详情、评论提交、无横向溢出、16px 输入框、Duration 滑块和手动模式切换。
+
+### TASK-016 - 创建恢复、Board 视觉选择与房间延时闭环
+
+- 日期：2026-07-20
+- 状态：已完成当前轮。
+- 完成内容：
+  - `/rooms/new` 编辑草稿会写入独立的 `localStorage` 键 `eventspace:create-room-draft:v1`，刷新后恢复；成功创建后清除，条款同意不会跨会话沿用。
+  - 创建成功页的 `Save card` 已通过浏览器 Canvas 导出 PNG；邀请码可用于展示，QR 仍是视觉 mock，不是可扫描的真实邀请链接。
+  - Camera / Photos 读取图片后先进入横滑相框选择，不再立即 pin 到 Board；提供 Pin、Gallery、Instant、Tape、Dark 五种样式，选中样式和原图比例同步进入 Board、Sequence 与 Rooms snapshot。
+  - Board 背景扩展为 Stone、Linen、Night、Herbarium、Clover、Bluebell 六套，后三套使用本地静态纹理，并同步到 Rooms 卡片。
+  - Room options 的直接延时和延时投票改为 5 分钟步进选择，提供常用时长并受房间总时长上限约束。
+  - 用户投票后，投票卡在当前访问中保留并立即显示结果；离开房间后再次进入，已经投过的内联卡才隐藏，Votes 历史仍可查看。
+- 后端边界：
+  - 创建草稿和完成页邀请信息仍是客户端数据；生产创建接口必须重新校验全部字段、条款版本、身份、配额和服务器时间。
+  - 相框与背景属于可持久化展示元数据，后端需要稳定枚举、默认值和版本兼容；媒体本体仍应迁移为 asset id / Storage object。
+  - 延时与投票需要服务端事务、幂等键、固定投票分母和服务器时间裁决，不能信任客户端滑块值或本地结果。
+- 验证：
+  - `npm run check` 通过，ESLint 与 TypeScript 无报错。
+  - `npm run build` 通过，Next.js 16.2.10 生产构建成功。
 
 ### TASK-015 - Rooms 浏览控制与横滑动效重构
 
@@ -132,8 +246,8 @@
   - 自己发送的消息改为右侧展示，并在发送后自动滚动到最新消息；其他用户新消息不强制抢滚动。
   - 输入栏支持语音模式切换，语音按钮内置在输入框右侧，语音条显示 `hold to record`。
   - 原语音入口改为加号工具按钮，底部托盘承载搜索、Poll、Votes 等工具。
-  - Poll 创建器支持 yes/no、选项投票、行程投票；支持 open minutes、匿名/公开、负责人、行程时间、地点和容量。
-  - 聊天区投票卡支持投票后进度条百分比展示；已投过票的当前投票不再作为内联卡片重复显示。
+  - Poll 创建器支持 yes/no、选项投票、行程投票；支持 open minutes、匿名/公开、负责人、行程时间和地点。
+  - 聊天区投票卡支持投票后进度条百分比展示；当前访问中投票后仍保留结果卡，再次进入房间时隐藏已经投过的内联卡。
   - 新增全屏 Poll History / Votes 覆盖层，最新投票排在顶部，卡片样式跟随聊天室投票卡。
   - Room 顶部房间信息显示倒计时，不再显示冗余结束时间文本。
   - Board 改为移动端优先的无限画布体验：单指平移、双指缩放、进入时自动 fit 到当前全部画板内容。
@@ -169,9 +283,9 @@
   - 邀请信息改为邀请卡片：左上角显示房间名，中央根据邀请方式显示 mock QR 或邀请码，底部展示时长、结束时间、人数。
   - 邀请卡片外左下角提供 `Save card`，右下角提供 `Open this room`。
   - 创建完成后通过 `CREATE_ROOM` 命令写入本地 session，并拿到新房间 public id 供打开。
-- 遗留：
-  - `Save card` 当前是视觉按钮，尚未实现真实导出图片。
-  - 真实 QR 生成、邀请链接发送、后端 room id 与 invite revision 仍待后端阶段实现。
+- 后续补充：
+  - `Save card` 已在后续任务中实现本地 PNG 导出。
+  - 真实可扫描 QR、邀请链接发送、后端 room id 与 invite revision 仍待后端阶段实现。
 
 ### TASK-007 - 代码规范与后端接入准备度审查
 
@@ -222,7 +336,7 @@
 
 - 本地创建房间、进入房间、Rooms 列表展示、筛选、收藏、删除个人入口。
 - 本地聊天、回复、反应、撤回、置顶、搜索，以及真实浏览器本地照片、位置和录音消息。
-- Chat/Board 媒体仍以 data URL 存入本地 session，不是生产媒体方案。
+- Chat/Board 媒体 Blob 已存入 IndexedDB，会话只保存 asset reference；它仍是单设备本地方案，不是生产媒体存储。
 - 本地投票创建、投票、结果进度、投票历史、行程型投票通过后添加行程。
 - 本地画板照片上传、压缩、拖动、缩放、删除、评论弹幕、文本标注、涂鸦。
 - Board 与 Rooms 卡片共享画板 item 的真实位置/大小预览逻辑。
@@ -235,14 +349,14 @@
 - Supabase Auth、匿名身份认领、真实 session、RLS、RPC、Realtime。
 - Postgres schema、迁移、唯一约束、事务、幂等键、服务端时间。
 - 私有 Storage、图片 Blob 上传、EXIF 清理、转码、缩略图、签名 URL。
-- 真实语音录制、音频上传、音频转码和麦克风权限处理。
+- 浏览器本地录音已经可用；真实音频上传、服务端转码、恶意文件检查和跨设备授权访问尚未实现。
 - Stripe Checkout、webhook、退款、永久归档权益。
 - PWA 安装、离线缓存、推送通知、邮件、Google Places / Maps API。
 - 真实限流、设备封禁、审计日志、备份、数据清理任务和正式法律文本。
 
 ## 后端接入前必须解决
 
-- 把 `imageDataUrl` 媒体存储迁移为本地 asset id / 未来 storage object key，而不是把大对象塞进房间 JSON。
+- 把本地 asset repository 映射为私有 Storage 与服务端 asset 表，并设计上传授权、衍生图、引用提交和废弃对象清理协议。
 - 把客户端 reducer 中的权限、投票、归档、成员资格校验映射为服务端事务和数据库约束。
 - 为每类命令定义稳定 DTO：创建房间、发消息、创建投票、投票、上传媒体、移动画板 item、改行程、成员治理、归档。
 - 明确 server time 规则，所有到期、投票关闭、撤回窗口、归档状态推进都不能信任客户端时间。
@@ -256,7 +370,7 @@
 ## 下一步建议
 
 1. 做移动端真机回归：iOS Safari / Android Chromium 的照片、录音、定位、键盘、Board 双指手势和全屏 Portal。
-2. 把 Chat / Board 的 image、voice、drawing data URL 抽象为 asset 引用，为 IndexedDB 和未来 Storage 做准备。
+2. 为 Chat / Board 的 asset reference 定义后端上传 DTO、私有读取授权、缩略图与删除/回收状态机。
 3. 拆分 `chat-panel.tsx` 的媒体控制、消息列表、附件托盘和 Poll 编排。
 4. 为 `POST_MESSAGE`、`ADD_BOARD_COMMENT`、`SET_BOARD_BACKGROUND` 等命令建立服务端 DTO 和运行时 schema；当前 reducer 对新消息 content 的写入校验仍主要依赖 TypeScript/UI。
 5. 补充 reducer、媒体结构恢复、Board 手势/fit、Poll 和房间到期的最小测试。

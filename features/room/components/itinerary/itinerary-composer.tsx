@@ -1,4 +1,4 @@
-import { useMemo, useState, type FormEvent } from "react";
+import { useMemo, useState, type CSSProperties, type FormEvent } from "react";
 import { Icon } from "@/components/ui/icon";
 import type { ActorId } from "@/core/domain/ids";
 import type { ItineraryItem, PersonSummary } from "@/core/domain/room";
@@ -19,20 +19,24 @@ function getDefaultStart() {
 }
 
 export function ItineraryComposer({ item, items, members, viewerActorId, roomEndsAt, communityProposal, onClose, onSave, onDelete }: { readonly item: ItineraryItem | null; readonly items: readonly ItineraryItem[]; readonly members: readonly PersonSummary[]; readonly viewerActorId: ActorId; readonly roomEndsAt: string | null; readonly communityProposal: boolean; readonly onClose: () => void; readonly onSave: (item: ItineraryItem) => void; readonly onDelete: (itemId: string) => void }) {
-  const initialDuration = item ? Math.max(5, Math.round((Date.parse(item.endsAt) - Date.parse(item.startsAt)) / 60_000 / 5) * 5) : 60;
+  const initialDuration = item?.endsAt ? Math.max(5, Math.round((Date.parse(item.endsAt) - Date.parse(item.startsAt)) / 60_000 / 5) * 5) : 60;
   const [title, setTitle] = useState(item?.title ?? "");
   const [description, setDescription] = useState(item?.description ?? "");
   const [location, setLocation] = useState(item?.locationLabel ?? "");
   const [startsAt, setStartsAt] = useState(item ? toLocalInput(item.startsAt) : getDefaultStart());
+  const [endMode, setEndMode] = useState(item?.endMode ?? "scheduled");
   const [durationMinutes, setDurationMinutes] = useState(initialDuration);
   const [responsibleId, setResponsibleId] = useState<ActorId>(item?.responsible.actorId ?? viewerActorId);
   const [deleteArmed, setDeleteArmed] = useState(false);
   const responsible = members.find((member) => member.actorId === responsibleId) ?? members[0];
   const startMs = Date.parse(startsAt);
-  const endMs = startMs + durationMinutes * 60_000;
-  const draft = useMemo(() => ({ id: item?.id ?? "new", startsAt: new Date(startMs || 0).toISOString(), endsAt: new Date(endMs || 0).toISOString() }), [endMs, item?.id, startMs]);
-  const conflict = Number.isFinite(startMs) && overlapsItinerary(draft, items);
-  const invalid = !title.trim() || !responsible || !Number.isFinite(startMs) || endMs <= startMs || Boolean(roomEndsAt && endMs > Date.parse(roomEndsAt));
+  const availableMinutes = roomEndsAt && Number.isFinite(startMs) ? Math.floor((Date.parse(roomEndsAt) - startMs) / 60_000 / 5) * 5 : 720;
+  const maxDuration = Math.max(5, Math.min(720, availableMinutes));
+  const safeDuration = Math.min(durationMinutes, maxDuration);
+  const endMs = endMode === "scheduled" ? startMs + safeDuration * 60_000 : null;
+  const draft = useMemo(() => ({ id: item?.id ?? "new", startsAt: new Date(startMs || 0).toISOString(), endsAt: endMs ? new Date(endMs).toISOString() : null, endedAt: item?.endedAt ?? null }), [endMs, item?.endedAt, item?.id, startMs]);
+  const conflict = Number.isFinite(startMs) && overlapsItinerary(draft, items, roomEndsAt);
+  const invalid = !title.trim() || !responsible || !Number.isFinite(startMs) || Boolean(roomEndsAt && (startMs >= Date.parse(roomEndsAt) || endMs && endMs > Date.parse(roomEndsAt)));
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -43,7 +47,9 @@ export function ItineraryComposer({ item, items, members, viewerActorId, roomEnd
       title: title.trim().slice(0, 80),
       description: description.trim().slice(0, 500),
       startsAt: new Date(startMs).toISOString(),
-      endsAt: new Date(endMs).toISOString(),
+      endMode,
+      endsAt: endMs ? new Date(endMs).toISOString() : null,
+      endedAt: item?.endedAt ?? null,
       locationLabel: location.trim().slice(0, 120) || null,
       mapsUrl: location.trim() ? `https://maps.google.com/?q=${encodeURIComponent(location.trim().slice(0, 120))}` : null,
       responsible,
@@ -59,9 +65,18 @@ export function ItineraryComposer({ item, items, members, viewerActorId, roomEnd
         <header><span>{item ? "Edit plan" : communityProposal ? "Plan proposal" : "New plan"}</span><button type="button" onClick={onClose} aria-label="Close"><Icon name="close" /></button></header>
         <div className={styles.composerPreview}>
           <label className={styles.titleField}><span>Plan</span><input value={title} onChange={(event) => setTitle(event.target.value.slice(0, 80))} placeholder="Dinner by the river" /></label>
-          <div className={styles.timingRow}>
-            <label><span>Starts</span><input type="datetime-local" value={startsAt} max={roomEndsAt ? toLocalInput(roomEndsAt) : undefined} onChange={(event) => setStartsAt(event.target.value)} /></label>
-            <div className={styles.durationControl}><span>Duration</span><div><button type="button" onClick={() => setDurationMinutes((value) => Math.max(5, value - 5))} aria-label="Reduce duration"><Icon name="minus" size={15} /></button><strong>{durationMinutes < 60 ? `${durationMinutes} min` : `${Math.floor(durationMinutes / 60)}h ${durationMinutes % 60 ? `${durationMinutes % 60}m` : ""}`}</strong><button type="button" onClick={() => setDurationMinutes((value) => Math.min(720, value + 5))} aria-label="Increase duration"><Icon name="plus" size={15} /></button></div></div>
+          <label><span>Starts</span><input type="datetime-local" value={startsAt} max={roomEndsAt ? toLocalInput(roomEndsAt) : undefined} onChange={(event) => setStartsAt(event.target.value)} /></label>
+          <div className={styles.durationControl}>
+            <div className={styles.endModeSwitch} aria-label="Choose how this plan ends">
+              <button type="button" className={endMode === "scheduled" ? styles.endModeActive : ""} onClick={() => setEndMode("scheduled")} disabled={Boolean(item?.endedAt)}>Set duration</button>
+              <button type="button" className={endMode === "manual" ? styles.endModeActive : ""} onClick={() => setEndMode("manual")} disabled={Boolean(item?.endedAt)}>End manually</button>
+            </div>
+            <div className={`${styles.durationSlider} ${endMode === "manual" ? styles.durationSliderHidden : ""}`} aria-hidden={endMode === "manual"}>
+              <header><span>Duration</span><strong>{safeDuration < 60 ? `${safeDuration} min` : `${Math.floor(safeDuration / 60)}h${safeDuration % 60 ? ` ${safeDuration % 60}m` : ""}`}</strong></header>
+              <input type="range" min="5" max={maxDuration} step="5" value={safeDuration} onChange={(event) => setDurationMinutes(Number(event.target.value))} aria-label="Plan duration in minutes" disabled={endMode === "manual"} style={{ "--duration-progress": `${(safeDuration - 5) / Math.max(1, maxDuration - 5) * 100}%` } as CSSProperties} />
+              <div><span>5 min</span><span>{maxDuration < 60 ? `${maxDuration} min` : `${Math.floor(maxDuration / 60)}h${maxDuration % 60 ? ` ${maxDuration % 60}m` : ""}`}</span></div>
+            </div>
+            {endMode === "manual" ? <div className={styles.manualEndNote}><Icon name="check" size={15} /><span>The leader or a moderator will end this plan from its card.</span></div> : null}
           </div>
           <label><span>Location</span><input value={location} onChange={(event) => setLocation(event.target.value.slice(0, 120))} placeholder="Optional" /></label>
           <label><span>Notes</span><textarea value={description} onChange={(event) => setDescription(event.target.value.slice(0, 500))} placeholder="Meeting point, what to bring, or anything useful." rows={3} /></label>

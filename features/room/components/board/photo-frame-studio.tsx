@@ -9,7 +9,7 @@ import type { CompressedImage } from "./image-upload";
 import { useCenteredCardSelection } from "./use-centered-card-selection";
 import styles from "./board.module.css";
 
-export type PendingBoardPhoto = CompressedImage & { readonly name: string };
+export type PendingBoardPhoto = CompressedImage & { readonly name: string; readonly previewUrl: string };
 
 const frames: readonly { readonly value: BoardFrameVariant; readonly label: string }[] = [
   { value: "pin", label: "Pin" },
@@ -29,7 +29,7 @@ export function PhotoFrameStudio({ photo, onClose, onAdd }: { readonly photo: Pe
       <div ref={railRef} className={styles.frameCardRail} onScroll={onScroll}>
         {frames.map((item) => <article key={item.value} data-carousel-value={item.value} className={`${styles.frameStyleCard} ${frame === item.value ? styles.frameStyleSelected : ""}`} style={{ aspectRatio: String(getBoardPhotoFramePreviewAspectRatio(photo.aspectRatio, item.value)) }}>
           <button type="button" onClick={() => select(item.value)} aria-label={`Use ${item.label} frame`}>
-            <PinnedPhoto variant="one" frameVariant={item.value} imageDataUrl={photo.dataUrl} imageName={photo.name} className={styles.framePreviewPhoto} />
+            <PinnedPhoto variant="one" frameVariant={item.value} previewUrl={photo.previewUrl} imageName={photo.name} className={styles.framePreviewPhoto} />
           </button>
         </article>)}
       </div>

@@ -27,7 +27,7 @@ function paintStroke(context: CanvasRenderingContext2D, stroke: Stroke) {
   context.restore();
 }
 
-export function DoodleStudio({ backgroundClass, onClose, onAdd }: { readonly backgroundClass: string; readonly onClose: () => void; readonly onAdd: (dataUrl: string) => void }) {
+export function DoodleStudio({ backgroundClass, onClose, onAdd }: { readonly backgroundClass: string; readonly onClose: () => void; readonly onAdd: (blob: Blob) => void }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const pointersRef = useRef(new Map<number, Point>());
   const activeStrokeRef = useRef<{ pointerId: number; stroke: Stroke } | null>(null);
@@ -142,7 +142,7 @@ export function DoodleStudio({ backgroundClass, onClose, onAdd }: { readonly bac
     context.fillStyle = "#f7f3ed";
     context.fillRect(0, 0, output.width, output.height);
     context.drawImage(source, 0, 0);
-    onAdd(output.toDataURL("image/png"));
+    output.toBlob((blob) => { if (blob) onAdd(blob); }, "image/png");
   }
 
   if (!mounted) return null;

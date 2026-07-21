@@ -135,12 +135,15 @@ Service role key 只在服务端环境使用，绝不发送到浏览器。涉及
 
 - 本地状态主入口为 `MockSessionProvider`，通过 `localStorage` 保存 `eventspace:local-session:v1`，兼容旧 `sessionStorage`。
 - `MockSession` command reducer 已经覆盖大部分写操作，后端接入时可以把 command 逐步映射为 Server Action / RPC / repository mutation。
-- 媒体目前是浏览器 canvas 压缩后的 `imageDataUrl`，尚未建立 IndexedDB asset layer；后端前建议先抽象 asset id，避免直接迁移大 JSON。
+- 图片、语音和涂鸦已从会话 JSON 中抽离为 `AssetReference`；Blob 通过 `AssetRepository` 存入 IndexedDB 的 `eventspace-local-assets`，界面只在展示期创建 object URL。旧 data URL 会在恢复会话时迁移。
 - Board 和 Rooms 的画板预览共用 `core/domain/board-layout.ts`，这类纯领域计算应继续保留在无 React 依赖的 core 层。
 - Board 已拆分编排、手势、展示与 Studio；`features/room/components/chat-panel.tsx` 仍承载较多媒体权限、录音、定位、Poll 和滚动状态，接后端前应继续拆分。
 - 字体已改为本地 `public/fonts` + `@font-face`，生产构建不应再依赖构建期远程字体下载。
 
 ### 后端接入优先技术事项
+
+- 保持 `AssetReference` 与 `AssetRepository` 作为 UI/领域层稳定契约，把当前 IndexedDB 实现替换为私有 Storage 上传 adapter；服务端返回 asset id、object key、MIME、大小和衍生图信息。
+- 媒体元数据写入、房间内容关联和废弃对象清理需要服务端事务/后台任务，不能照搬浏览器端引用扫描。
 
 1. 先定义 DTO 与命令边界，而不是让 UI 直接调用 Supabase 表。
 2. 投票、成员治理、行程提案、归档推进必须使用服务端事务和数据库约束。
@@ -150,7 +153,7 @@ Service role key 只在服务端环境使用，绝不发送到浏览器。涉及
 
 ## 2026-07-19 当前同步：媒体消息与 Board 数据契约
 
-- `ChatMessage.content` 已形成 image / location / voice 联合类型；生产 schema 不应沿用 data URL 字段，而应改为 asset reference 或结构化 location DTO。
+- `ChatMessage.content` 已形成 image / location / voice 联合类型并使用 asset reference；生产 schema 应将其映射为服务端 asset id，并继续使用结构化 location DTO。
 - 本地图片使用 canvas 解码和 JPEG 压缩；本地语音使用 `MediaRecorder`；这些是采集端实现，不等于生产上传流水线。
 - 生产媒体流程必须采用“申请上传 → 私有 Storage → 服务端校验/转码 → 消息提交 asset id → Realtime 广播”的两阶段或受控事务流程。
 - Board comment 已进入本地命令。生产端建议使用独立 `board_comments` mutation/table，而不是更新整个 `board_items.comments` JSON 数组。
@@ -162,3 +165,19 @@ Service role key 只在服务端环境使用，绝不发送到浏览器。涉及
 1. `POST_MESSAGE` 本地 reducer 尚未对 content 调用与恢复解析相同的运行时 schema；服务端 DTO 必须独立校验 discriminant、asset、坐标、MIME、时长和文本。
 2. 精确位置需要显式用户动作、最小精度和保留策略，不能默认持续采集。
 3. Safari 可能产生 MP4/AAC，Chromium 常见 WebM/Opus；后端必须转码为统一播放格式并保留可信 metadata。
+
+## 2026-07-20 当前同步：创建草稿、Board 元数据与延时命令
+
+- `/rooms/new` 当前用独立 `localStorage` 键保存轻量草稿，和共享 `MockSession` 分离。后端接入时应保留“UI draft / create command DTO / persisted room”三层边界，不把浏览器恢复数据直接写入数据库。
+- 条款同意在草稿恢复时重置为 `false`；生产端仍需在创建事务中记录条款版本、用户和服务器时间。
+- 邀请卡 PNG 由客户端 Canvas 生成，不依赖后端；真实 QR 必须编码带 invite revision 的受控 URL，并考虑轮换、作废和分享后的缓存边界。
+- `frameVariant` 与 Board background 是展示元数据，适合进入带默认值和版本兼容的枚举字段；背景静态资源应通过稳定 asset key/CDN 路径发布，不能持久化构建产物 URL。
+- Room extension 的 5 分钟步进属于 UI/产品约束。生产 mutation 必须根据套餐上限、房间当前状态、服务器时间和并发更新重新计算 `endsAt`，并使用幂等键或乐观锁避免重复延长。
+
+## 2026-07-20 当前同步：Board 评论数据边界
+
+- `MockSession` 升级到 v6，`BoardPhoto` 不再持有评论数组；`MockRoom.boardComments` 作为独立集合，以 `photoId` 和 `actorId` 建立关联。
+- 恢复层兼容 v3/v4/v5：旧照片内嵌评论会被抽取到独立集合，照片对象中的旧 `comments` 字段会移除。
+- 本地 `ADD_BOARD_COMMENT` 已具备目标存在校验与 comment id 幂等保护；删除照片会清理关联评论。
+- 后端映射建议使用独立 `board_comments` 表、照片外键、作者外键、服务端生成时间、稳定游标分页和受控删除事务。客户端只提交 photo id 与正文，不提交可信作者或创建时间。
+- Itinerary 手动结束必须是独立 mutation：服务端校验负责人/管理权限、房间状态和开始时间，以数据库时间写入 `ended_at`，并对重复请求返回同一结果；普通编辑接口不得接受客户端任意覆盖实际结束时间。

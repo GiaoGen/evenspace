@@ -88,21 +88,22 @@ const roomFixtures = [
       { id: "board_photo_4", kind: "photo", ownerActorId: leah.actorId, variant: "four", note: null, x: 31, y: 59, rotation: -3, width: 20 },
       { id: "board_note_1", kind: "note", ownerActorId: maya.actorId, text: "Don’t rush\nthis part.", x: 10, y: 65, rotation: 2 },
     ],
+    boardComments: [],
     itinerary: [
-      { id: "itinerary_entrance", title: "Meet by the lower entrance", description: "Come down the riverside steps. Maya will wait by the stone wall.", startsAt: "2026-07-14T19:00:00+08:00", endsAt: "2026-07-14T19:45:00+08:00", locationLabel: "Riverside Walk", mapsUrl: "https://maps.google.com/?q=Riverside+Walk", responsible: maya, createdByActorId: maya.actorId, createdAt: "2026-07-14T18:25:00+08:00", updatedAt: "2026-07-14T18:25:00+08:00" },
-      { id: "itinerary_dinner", title: "Dinner, wherever we land", description: "We’ll choose the place together after the walk.", startsAt: "2026-07-14T20:00:00+08:00", endsAt: "2026-07-14T21:30:00+08:00", locationLabel: "Place to be decided", mapsUrl: null, responsible: jon, createdByActorId: avery.actorId, createdAt: "2026-07-14T18:30:00+08:00", updatedAt: "2026-07-14T18:30:00+08:00" },
-      { id: "itinerary_walk", title: "One last walk", description: "No fixed route. We’ll follow the river lights.", startsAt: "2026-07-14T22:00:00+08:00", endsAt: "2026-07-14T22:30:00+08:00", locationLabel: null, mapsUrl: null, responsible: avery, createdByActorId: avery.actorId, createdAt: "2026-07-14T18:35:00+08:00", updatedAt: "2026-07-14T18:35:00+08:00" },
+      { id: "itinerary_entrance", title: "Meet by the lower entrance", description: "Come down the riverside steps. Maya will wait by the stone wall.", startsAt: "2026-07-14T19:00:00+08:00", endMode: "scheduled", endsAt: "2026-07-14T19:45:00+08:00", endedAt: null, locationLabel: "Riverside Walk", mapsUrl: "https://maps.google.com/?q=Riverside+Walk", responsible: maya, createdByActorId: maya.actorId, createdAt: "2026-07-14T18:25:00+08:00", updatedAt: "2026-07-14T18:25:00+08:00" },
+      { id: "itinerary_dinner", title: "Dinner, wherever we land", description: "We’ll choose the place together after the walk.", startsAt: "2026-07-14T20:00:00+08:00", endMode: "scheduled", endsAt: "2026-07-14T21:30:00+08:00", endedAt: null, locationLabel: "Place to be decided", mapsUrl: null, responsible: jon, createdByActorId: avery.actorId, createdAt: "2026-07-14T18:30:00+08:00", updatedAt: "2026-07-14T18:30:00+08:00" },
+      { id: "itinerary_walk", title: "One last walk", description: "No fixed route. We’ll follow the river lights.", startsAt: "2026-07-14T22:00:00+08:00", endMode: "scheduled", endsAt: "2026-07-14T22:30:00+08:00", endedAt: null, locationLabel: null, mapsUrl: null, responsible: avery, createdByActorId: avery.actorId, createdAt: "2026-07-14T18:35:00+08:00", updatedAt: "2026-07-14T18:35:00+08:00" },
     ],
   },
   {
     id: roomId("22222222-2222-4222-8222-222222222222"), publicId: roomPublicId("room_sunday_slowly"), name: "Sunday, slowly", description: "A long lunch that became an evening.", mode: "community-led", status: "archived", timeZone: "Asia/Taipei", endsAt: null, archivedAt: "2026-07-12T21:10:00+08:00", memberCount: 6, photoCount: 14, boardPreview: ["two", "one"], boardNote: "stay a little longer", boardBackground: "linen", isFavorite: false, memberListVisibility: "members",
     members: [avery, maya, jon], messages: [], activePoll: null,
-    boardItems: [{ id: "board_sunday_1", kind: "photo", ownerActorId: maya.actorId, variant: "two", note: "one more coffee", x: 25, y: 20, rotation: -3, width: 27 }], itinerary: [],
+    boardItems: [{ id: "board_sunday_1", kind: "photo", ownerActorId: maya.actorId, variant: "two", note: "one more coffee", x: 25, y: 20, rotation: -3, width: 27 }], boardComments: [], itinerary: [],
   },
   {
     id: roomId("33333333-3333-4333-8333-333333333333"), publicId: roomPublicId("room_long_table"), name: "A very long table", description: "Everyone brought one more person.", mode: "host-led", status: "archived", timeZone: "Asia/Taipei", endsAt: null, archivedAt: "2026-06-28T23:40:00+08:00", memberCount: 9, photoCount: 25, boardPreview: ["three", "four", "one"], boardNote: "one very long table", boardBackground: "charcoal", isFavorite: true, memberListVisibility: "members",
     members: [avery, maya, jon, leah], messages: [], activePoll: null,
-    boardItems: [{ id: "board_table_1", kind: "photo", ownerActorId: jon.actorId, variant: "three", note: "all together", x: 33, y: 25, rotation: 4, width: 28 }], itinerary: [],
+    boardItems: [{ id: "board_table_1", kind: "photo", ownerActorId: jon.actorId, variant: "three", note: "all together", x: 33, y: 25, rotation: 4, width: 28 }], boardComments: [], itinerary: [],
   },
 ] satisfies readonly RoomDetail[];
 
@@ -134,16 +135,21 @@ function assertBoardItem(value: unknown) {
   } else if (value.kind === "note") {
     if (typeof value.text !== "string") throw new Error("Room fixture has an invalid note");
   } else if (value.kind === "drawing") {
-    if (typeof value.imageDataUrl !== "string" || !isFiniteNumber(value.width) || !isFiniteNumber(value.height)) throw new Error("Room fixture has an invalid drawing");
+    if (!isRecord(value.asset) || typeof value.asset.id !== "string" || !isFiniteNumber(value.width) || !isFiniteNumber(value.height)) throw new Error("Room fixture has an invalid drawing");
   } else throw new Error("Room fixture has an invalid board item kind");
 }
 
 function assertItinerary(value: unknown) {
   if (!isRecord(value) || typeof value.id !== "string" || typeof value.title !== "string" || !isValidDate(value.startsAt)) throw new Error("Room fixture has an invalid itinerary item");
-  if (!isValidDate(value.endsAt) || Date.parse(value.endsAt) <= Date.parse(value.startsAt) || !isRecord(value.responsible)) throw new Error("Room fixture has invalid itinerary timing");
+  if (value.endMode !== "scheduled" && value.endMode !== "manual" || value.endMode === "scheduled" && (!isValidDate(value.endsAt) || Date.parse(value.endsAt) <= Date.parse(value.startsAt)) || value.endMode === "manual" && value.endsAt !== null || value.endedAt !== null && !isValidDate(value.endedAt) || !isRecord(value.responsible)) throw new Error("Room fixture has invalid itinerary timing");
   if (typeof value.createdByActorId !== "string" || !isValidDate(value.createdAt) || !isValidDate(value.updatedAt)) throw new Error("Room fixture has invalid itinerary ownership");
   if (value.mapsUrl !== null && typeof value.mapsUrl !== "string") throw new Error("Room fixture has an invalid maps value");
   assertPerson(value.responsible);
+}
+
+function assertBoardComment(value: unknown, photoIds: ReadonlySet<string>, actorIds: ReadonlySet<string>) {
+  if (!isRecord(value) || typeof value.id !== "string" || typeof value.photoId !== "string" || !photoIds.has(value.photoId)) throw new Error("Room fixture has an invalid board comment target");
+  if (typeof value.actorId !== "string" || !actorIds.has(value.actorId) || typeof value.body !== "string" || !value.body.trim() || !isValidDate(value.createdAt)) throw new Error("Room fixture has an invalid board comment");
 }
 
 function assertRoomFixture(value: unknown): asserts value is RoomDetail {
@@ -154,7 +160,7 @@ function assertRoomFixture(value: unknown): asserts value is RoomDetail {
   if (value.status !== "active" && value.status !== "archived") throw new Error("Room fixture has an invalid status");
   if (value.mode !== "host-led" && value.mode !== "community-led") throw new Error("Room fixture has an invalid mode");
   if (typeof value.timeZone !== "string" || value.timeZone.length > 64) throw new Error("Room fixture has an invalid time zone");
-  if (!Array.isArray(value.members) || !Array.isArray(value.messages) || !Array.isArray(value.boardItems) || !Array.isArray(value.itinerary)) throw new Error("Room fixture collections are invalid");
+  if (!Array.isArray(value.members) || !Array.isArray(value.messages) || !Array.isArray(value.boardItems) || !Array.isArray(value.boardComments) || !Array.isArray(value.itinerary)) throw new Error("Room fixture collections are invalid");
   if (!Array.isArray(value.boardPreview) || value.boardPreview.length === 0) throw new Error("Room fixture needs a board preview");
   if (!["stone", "linen", "charcoal"].includes(String(value.boardBackground ?? "stone"))) throw new Error("Room fixture has invalid board background");
   if (!isFiniteNumber(value.memberCount) || !isFiniteNumber(value.photoCount)) throw new Error("Room fixture counts are invalid");
@@ -163,6 +169,9 @@ function assertRoomFixture(value: unknown): asserts value is RoomDetail {
   if (value.memberListVisibility !== "members" && value.memberListVisibility !== "moderators") throw new Error("Room fixture has invalid member visibility");
   value.members.forEach(assertPerson);
   value.boardItems.forEach(assertBoardItem);
+  const photoIds = new Set(value.boardItems.filter((item) => isRecord(item) && item.kind === "photo").map((item) => String((item as Record<string, unknown>).id)));
+  const actorIds = new Set(value.members.filter(isRecord).map((member) => String(member.actorId)));
+  value.boardComments.forEach((comment) => assertBoardComment(comment, photoIds, actorIds));
   value.itinerary.forEach(assertItinerary);
   value.messages.forEach((message) => {
     if (!isRecord(message) || typeof message.id !== "string" || typeof message.body !== "string" || !isValidDate(message.sentAt)) throw new Error("Room fixture has an invalid message");

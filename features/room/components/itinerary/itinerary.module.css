@@ -74,8 +74,10 @@
 .cardDetailsInner { min-height: 0; overflow: hidden; }
 .cardDetailsOpen { grid-template-rows: 1fr; padding-bottom: 17px; opacity: 1; }
 .cardDetails p { margin: 0; padding-top: 15px; border-top: 1px solid color-mix(in srgb, currentColor 20%, transparent); font-size: 8px; line-height: 1.55; }
-.cardDetailsInner > div { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 14px; }
+.cardActions { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 14px; }
 .cardDetails a, .cardDetails button { min-height: 34px; display: inline-flex; align-items: center; gap: 7px; padding: 0 10px; border: 1px solid color-mix(in srgb, currentColor 24%, transparent); border-radius: 8px; background: transparent; color: inherit; font-size: 7px; font-weight: 700; text-decoration: none; }
+.manualEndAction { display: flex; justify-content: flex-end; gap: 7px; margin-top: 9px; padding-top: 10px; border-top: 1px solid color-mix(in srgb,currentColor 18%,transparent); }
+.manualEndAction button:last-child { background: color-mix(in srgb,currentColor 13%,transparent); }
 
 .empty { min-height: min(470px, 64dvh); display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 32px; text-align: center; }
 .empty > svg { margin-bottom: 20px; color: var(--muted); }
@@ -96,11 +98,27 @@
 .composerPreview textarea { min-height: 60px; padding: 7px 0; line-height: 1.45; }
 .composerPreview input:focus, .composerPreview textarea:focus, .composerPreview select:focus { border-bottom-color: currentColor; }
 .titleField input { height: 48px; font-family: var(--font-bodoni), Georgia, serif; font-size: 27px; font-weight: 600; }
-.timingRow { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(130px, .75fr); gap: 16px; }
-.durationControl { display: grid; gap: 5px; }
-.durationControl > div { height: 34px; display: grid; grid-template-columns: 30px 1fr 30px; align-items: center; border-bottom: 1px solid color-mix(in srgb, currentColor 23%, transparent); }
-.durationControl button { display: grid; place-items: center; width: 28px; height: 28px; padding: 0; border: 0; border-radius: 50%; background: color-mix(in srgb, currentColor 10%, transparent); color: inherit; }
-.durationControl strong { font-size: 8px; text-align: center; white-space: nowrap; }
+.durationControl { display: grid; gap: 12px; padding-top: 2px; }
+.endModeSwitch { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px; border-radius: 8px; background: color-mix(in srgb,currentColor 9%,transparent); }
+.endModeSwitch button { min-height: 36px; padding: 0 10px; border: 0; border-radius: 5px; background: transparent; color: inherit; font-size: 8px; font-weight: 700; transition: background 170ms ease,color 170ms ease,transform 150ms ease; }
+.endModeSwitch button:active { transform: scale(.97); }
+.endModeSwitch button:disabled { opacity: .5; }
+.endModeSwitch .endModeActive { background: var(--ink); color: var(--canvas); box-shadow: 0 5px 14px rgba(30,28,24,.14); }
+.durationSlider { display: grid; gap: 8px; opacity: 1; transform: translateY(0); transition: opacity 170ms ease,transform 170ms ease; }
+.durationSliderHidden { position: absolute; opacity: 0; transform: translateY(-5px); pointer-events: none; }
+.durationSlider header,.durationSlider > div { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.durationSlider header span { opacity: .62; font-size: 7px; font-weight: 750; text-transform: uppercase; }
+.durationSlider header strong { font-family: var(--font-bodoni),Georgia,serif; font-size: 19px; font-weight: 600; }
+.durationSlider > div { opacity: .56; font-size: 7px; }
+.durationSlider input { width: 100%; height: 30px; margin: 0; padding: 0; border: 0; appearance: none; background: transparent; touch-action: pan-y; }
+.durationSlider input::-webkit-slider-runnable-track { height: 5px; border-radius: 3px; background: linear-gradient(to right,currentColor 0 var(--duration-progress),color-mix(in srgb,currentColor 22%,transparent) var(--duration-progress) 100%); }
+.durationSlider input::-webkit-slider-thumb { width: 24px; height: 24px; margin-top: -9.5px; border: 5px solid var(--itinerary-upcoming); border-radius: 50%; appearance: none; background: currentColor; box-shadow: 0 3px 10px rgba(30,28,24,.2); }
+.durationSlider input::-moz-range-track { height: 5px; border-radius: 3px; background: color-mix(in srgb,currentColor 22%,transparent); }
+.durationSlider input::-moz-range-progress { height: 5px; border-radius: 3px; background: currentColor; }
+.durationSlider input::-moz-range-thumb { width: 15px; height: 15px; border: 5px solid var(--itinerary-upcoming); border-radius: 50%; background: currentColor; box-shadow: 0 3px 10px rgba(30,28,24,.2); }
+.manualEndNote { min-height: 58px; display: flex; align-items: center; gap: 10px; padding: 12px; border-radius: 6px; background: color-mix(in srgb,currentColor 8%,transparent); animation: itineraryModeIn 180ms ease-out both; }
+.manualEndNote svg { flex: 0 0 auto; }
+.manualEndNote span { font-size: 8px; line-height: 1.45; }
 .conflict { display: flex; align-items: center; gap: 7px; margin: 0; padding-top: 3px; font-size: 7px; font-weight: 650; }
 .composer > footer { display: grid; grid-template-columns: auto 1fr; gap: 9px; align-items: center; margin-top: 14px; }
 .composer > footer > span { min-width: 0; }
@@ -115,6 +133,7 @@
 @keyframes itineraryPulse { 50% { opacity: .35; transform: scale(.82); } }
 @keyframes itineraryFadeIn { from { opacity: 0; } }
 @keyframes itinerarySheetIn { from { opacity: 0; transform: translateY(24px); } }
+@keyframes itineraryModeIn { from { opacity: 0; transform: translateY(-5px); } }
 
 @media (prefers-color-scheme: dark) {
   .panel {
@@ -161,7 +180,6 @@
   .composerBackdrop { padding: 0; }
   .composer { width: 100%; max-height: calc(100dvh - 112px); padding: 14px 12px max(14px, env(safe-area-inset-bottom)); border-radius: 8px 8px 0 0; }
   .composerPreview { padding: 15px; }
-  .timingRow { grid-template-columns: 1fr; gap: 12px; }
   .composer > footer { position: sticky; bottom: 0; padding-top: 4px; background: var(--surface); }
   .deleteConfirm { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 1fr; order: 2; }
   .deleteConfirm + .saveButton { display: none; }

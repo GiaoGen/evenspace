@@ -1,10 +1,10 @@
-import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { PinnedPhoto } from "@/components/pinboard/pinned-photo";
 import { Icon } from "@/components/ui/icon";
 import { BOARD_UNIT, computeBoardFit, getBoardItemPixelSize } from "@/core/domain/board-layout";
 import type { BoardBackground, BoardItem, RoomSummary } from "@/core/domain/room";
+import { LocalAssetImage } from "@/features/local-assets/components/local-asset-image";
 import styles from "./rooms-page.module.css";
 
 const boardPreviewBackgroundClasses: Record<BoardBackground, string> = {
@@ -45,7 +45,7 @@ function BoardSnapshot({ items, background }: { readonly items: readonly BoardIt
   return (
     <div ref={previewRef} className={`${styles.boardPreview} ${boardPreviewBackgroundClasses[background]}`}>
       <div className={styles.boardWorld} style={{ transform: `translate3d(${fit.x}px, ${fit.y}px, 0) scale(${fit.scale})` }}>
-        {items.map((item) => item.kind === "photo" ? <div key={item.id} className={styles.boardSnapshotItem} style={itemStyle(item)}><PinnedPhoto variant={item.variant} frameVariant={item.frameVariant} imageDataUrl={item.imageDataUrl} imageName={item.imageName} note={item.imageDataUrl ? null : item.note} className={styles.boardSnapshotPhoto} /></div> : item.kind === "drawing" ? <div key={item.id} className={styles.boardSnapshotDrawing} style={itemStyle(item)}><Image src={item.imageDataUrl} alt="Board drawing" fill sizes="220px" unoptimized /></div> : <div key={item.id} className={`${styles.boardSnapshotNote} ${styles[`boardSnapshotNote${item.variant ?? "paper"}`]}`} style={itemStyle(item)}>{item.text}</div>)}
+        {items.map((item) => item.kind === "photo" ? <div key={item.id} className={styles.boardSnapshotItem} style={itemStyle(item)}><PinnedPhoto variant={item.variant} frameVariant={item.frameVariant} asset={item.asset} imageName={item.imageName} note={item.asset ? null : item.note} className={styles.boardSnapshotPhoto} /></div> : item.kind === "drawing" ? <div key={item.id} className={styles.boardSnapshotDrawing} style={itemStyle(item)}><LocalAssetImage asset={item.asset} alt="Board drawing" fill sizes="220px" /></div> : <div key={item.id} className={`${styles.boardSnapshotNote} ${styles[`boardSnapshotNote${item.variant ?? "paper"}`]}`} style={itemStyle(item)}>{item.text}</div>)}
       </div>
       {items.length === 0 ? <span className={styles.emptyBoard}>No board items yet.</span> : null}
     </div>

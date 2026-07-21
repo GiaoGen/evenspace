@@ -1,12 +1,11 @@
 "use client";
 
-import Image from "next/image";
 import { useEffect, useState, type CSSProperties, type MouseEvent, type PointerEvent } from "react";
 import { PinnedPhoto } from "@/components/pinboard/pinned-photo";
 import { BOARD_UNIT, getBoardItemPixelSize } from "@/core/domain/board-layout";
 import type { ActorId } from "@/core/domain/ids";
-import type { BoardItem, PersonSummary } from "@/core/domain/room";
-import { PhotoConversation } from "./photo-conversation";
+import type { BoardItem } from "@/core/domain/room";
+import { LocalAssetImage } from "@/features/local-assets/components/local-asset-image";
 import { useBoardInteraction } from "./use-board-interaction";
 import styles from "./board.module.css";
 
@@ -14,16 +13,14 @@ type ResizeState = { readonly itemId: string; readonly pointerId: number; readon
 
 const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
 
-export function BoardCanvas({ items, members, viewerActorId, selectedItemId, onSelect, onClear, onMove, onResize, onComment, onFitReady }: {
+export function BoardCanvas({ items, viewerActorId, selectedItemId, onSelect, onClear, onMove, onResize, onFitReady }: {
   readonly items: readonly BoardItem[];
-  readonly members: readonly PersonSummary[];
   readonly viewerActorId: ActorId;
   readonly selectedItemId: string | null;
   readonly onSelect: (item: BoardItem) => void;
   readonly onClear: () => void;
   readonly onMove: (item: BoardItem, dx: number, dy: number) => void;
   readonly onResize: (itemId: string, width: number, height: number) => void;
-  readonly onComment: (itemId: string, body: string) => void;
   readonly onFitReady: (fit: () => void) => void;
 }) {
   const [resize, setResize] = useState<ResizeState | null>(null);
@@ -63,10 +60,6 @@ export function BoardCanvas({ items, members, viewerActorId, selectedItemId, onS
     setResize(null);
   }
 
-  function ownerFor(item: BoardItem) {
-    return members.find((member) => member.actorId === item.ownerActorId) ?? null;
-  }
-
   return <div ref={viewportRef} className={styles.canvasViewport} {...canvasHandlers}>
     <div className={styles.canvasWorld} style={{ transform: `translate3d(${pan.x}px,${pan.y}px,0) scale(${scale})` }}>
       {items.map((item) => {
@@ -80,11 +73,10 @@ export function BoardCanvas({ items, members, viewerActorId, selectedItemId, onS
           onContextMenu: (event: MouseEvent<HTMLElement>) => event.preventDefault(),
         };
         if (item.kind === "photo") return <article key={item.id} className={`${styles.canvasItem} ${styles.canvasPhoto} ${selected ? styles.itemSelected : ""} ${drag?.itemId === item.id ? styles.itemDragging : ""}`} style={itemStyle(item)} {...pointerProps}>
-          <PinnedPhoto variant={item.variant} frameVariant={item.frameVariant} note={item.imageDataUrl ? null : item.note} imageDataUrl={item.imageDataUrl} imageName={item.imageName} className={styles.pinnedPhoto} />
-          {selected ? <PhotoConversation photo={item} owner={ownerFor(item)} onComment={(body) => onComment(item.id, body)} /> : null}
+          <PinnedPhoto variant={item.variant} frameVariant={item.frameVariant} note={item.asset ? null : item.note} asset={item.asset} imageName={item.imageName} className={styles.pinnedPhoto} />
         </article>;
         if (item.kind === "drawing") return <article key={item.id} className={`${styles.canvasItem} ${styles.canvasDrawing} ${selected ? styles.itemSelected : ""} ${drag?.itemId === item.id ? styles.itemDragging : ""}`} style={itemStyle(item)} {...pointerProps}>
-          <Image src={item.imageDataUrl} alt="Board drawing" fill sizes="280px" unoptimized />
+          <LocalAssetImage asset={item.asset} alt="Board drawing" fill sizes="280px" />
           {selected && movable ? <button type="button" className={styles.resizeHandle} aria-label="Resize drawing" onPointerDown={(event) => beginResize(event, item)} onPointerMove={moveResize} onPointerUp={endResize} onPointerCancel={endResize} /> : null}
         </article>;
         return <article key={item.id} className={`${styles.canvasItem} ${styles.canvasNote} ${styles[`note${item.variant ?? "paper"}`]} ${selected ? styles.itemSelected : ""} ${drag?.itemId === item.id ? styles.itemDragging : ""}`} style={itemStyle(item)} {...pointerProps}>

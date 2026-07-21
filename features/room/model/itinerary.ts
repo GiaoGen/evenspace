@@ -5,19 +5,20 @@ export type ItineraryVisualStatus = "ended" | "current" | "upcoming";
 export interface ItineraryGroup {
   readonly key: string;
   readonly label: string;
+  readonly status: ItineraryVisualStatus;
   readonly items: readonly ItineraryItem[];
 }
 
 export function getItineraryStatus(item: ItineraryItem, now: number): ItineraryVisualStatus {
-  if (now >= Date.parse(item.endsAt)) return "ended";
+  if (item.endedAt || item.endMode === "scheduled" && item.endsAt && now >= Date.parse(item.endsAt)) return "ended";
   if (now >= Date.parse(item.startsAt)) return "current";
   return "upcoming";
 }
 
 export function getItineraryScrollTarget(items: readonly ItineraryItem[], now: number) {
   return items.find((item) => getItineraryStatus(item, now) === "current")
-    ?? items.find((item) => getItineraryStatus(item, now) === "upcoming")
-    ?? items.at(-1)
+    ?? items.filter((item) => getItineraryStatus(item, now) === "upcoming").sort((left, right) => Date.parse(left.startsAt) - Date.parse(right.startsAt))[0]
+    ?? items.filter((item) => getItineraryStatus(item, now) === "ended").sort((left, right) => getItineraryEndTime(right) - getItineraryEndTime(left))[0]
     ?? null;
 }
 
@@ -26,28 +27,48 @@ export function groupItinerary(items: readonly ItineraryItem[], timeZone: string
   const today = dayKey.format(new Date(now));
   const tomorrow = dayKey.format(new Date(now + 24 * 60 * 60_000));
   const label = new Intl.DateTimeFormat("en-US", { weekday: "long", month: "short", day: "numeric", timeZone });
-  const groups = new Map<string, ItineraryItem[]>();
+  const groups = new Map<string, { status: ItineraryVisualStatus; items: ItineraryItem[] }>();
+  const statusOrder: Record<ItineraryVisualStatus, number> = { upcoming: 0, current: 1, ended: 2 };
 
-  [...items].sort((left, right) => Date.parse(left.startsAt) - Date.parse(right.startsAt)).forEach((item) => {
-    const key = dayKey.format(new Date(item.startsAt));
-    groups.set(key, [...(groups.get(key) ?? []), item]);
+  [...items].sort((left, right) => {
+    const leftStatus = getItineraryStatus(left, now);
+    const rightStatus = getItineraryStatus(right, now);
+    const statusDifference = statusOrder[leftStatus] - statusOrder[rightStatus];
+    if (statusDifference) return statusDifference;
+    if (leftStatus === "upcoming") return Date.parse(right.startsAt) - Date.parse(left.startsAt);
+    if (leftStatus === "ended") return getItineraryEndTime(right) - getItineraryEndTime(left);
+    return Date.parse(left.startsAt) - Date.parse(right.startsAt);
+  }).forEach((item) => {
+    const status = getItineraryStatus(item, now);
+    const day = dayKey.format(new Date(item.startsAt));
+    const key = `${status}:${day}`;
+    groups.set(key, { status, items: [...(groups.get(key)?.items ?? []), item] });
   });
 
-  return [...groups].map(([key, groupedItems]) => ({
+  const statusLabel: Record<ItineraryVisualStatus, string> = { upcoming: "Upcoming", current: "Happening now", ended: "Ended" };
+  return [...groups].map(([key, group]) => ({
     key,
-    label: key === today ? "Today" : key === tomorrow ? "Tomorrow" : label.format(new Date(groupedItems[0].startsAt)),
-    items: groupedItems,
+    status: group.status,
+    label: `${statusLabel[group.status]} · ${key.endsWith(today) ? "Today" : key.endsWith(tomorrow) ? "Tomorrow" : label.format(new Date(group.items[0].startsAt))}`,
+    items: group.items,
   }));
 }
 
 export function formatItineraryTimeRange(item: ItineraryItem, timeZone: string) {
   const formatter = new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit", timeZone });
-  return `${formatter.format(new Date(item.startsAt))} - ${formatter.format(new Date(item.endsAt))}`;
+  const end = item.endedAt ?? item.endsAt;
+  return end ? `${formatter.format(new Date(item.startsAt))} - ${formatter.format(new Date(end))}` : `${formatter.format(new Date(item.startsAt))} · Ends manually`;
+}
+
+export function getItineraryEndTime(item: ItineraryItem) {
+  const value = item.endedAt ?? item.endsAt;
+  return value ? Date.parse(value) : Number.POSITIVE_INFINITY;
 }
 
 export function formatItineraryDistance(item: ItineraryItem, now: number) {
   const status = getItineraryStatus(item, now);
-  const boundary = status === "current" ? Date.parse(item.endsAt) : Date.parse(item.startsAt);
+  if (status === "current" && item.endMode === "manual") return "Ends manually";
+  const boundary = status === "current" || status === "ended" ? getItineraryEndTime(item) : Date.parse(item.startsAt);
   const minutes = Math.max(0, Math.ceil(Math.abs(boundary - now) / 60_000));
   const value = minutes < 60 ? `${minutes} min` : minutes < 24 * 60 ? `${Math.floor(minutes / 60)}h ${minutes % 60}m` : `${Math.floor(minutes / 1440)}d`;
   return status === "ended" ? `Ended ${value} ago` : status === "current" ? `${value} left` : `Starts in ${value}`;
@@ -62,10 +83,13 @@ export function getItinerarySummary(items: readonly ItineraryItem[], now: number
   return { label: "All wrapped up", detail: `${items.length} ${items.length === 1 ? "plan" : "plans"} completed.` };
 }
 
-export function overlapsItinerary(candidate: Pick<ItineraryItem, "id" | "startsAt" | "endsAt">, items: readonly ItineraryItem[]) {
+export function overlapsItinerary(candidate: Pick<ItineraryItem, "id" | "startsAt" | "endsAt" | "endedAt">, items: readonly ItineraryItem[], fallbackEndsAt: string | null) {
   const start = Date.parse(candidate.startsAt);
-  const end = Date.parse(candidate.endsAt);
-  return items.some((item) => item.id !== candidate.id && start < Date.parse(item.endsAt) && end > Date.parse(item.startsAt));
+  const end = candidate.endedAt ? Date.parse(candidate.endedAt) : candidate.endsAt ? Date.parse(candidate.endsAt) : Date.parse(fallbackEndsAt ?? "");
+  return Number.isFinite(end) && items.some((item) => {
+    const itemEnd = item.endedAt ? Date.parse(item.endedAt) : item.endsAt ? Date.parse(item.endsAt) : Date.parse(fallbackEndsAt ?? "");
+    return item.id !== candidate.id && Number.isFinite(itemEnd) && start < itemEnd && end > Date.parse(item.startsAt);
+  });
 }
 
 export function getSafeItineraryMapsUrl(value: string | null) {

@@ -1,4 +1,5 @@
 import type { ActorId, RoomId, RoomPublicId } from "./ids";
+import type { AssetReference } from "./asset";
 
 export type RoomMode = "host-led" | "community-led";
 export type RoomStatus = "active" | "archived";
@@ -8,9 +9,11 @@ export type ArtVariant = "one" | "two" | "three" | "four";
 export type BoardBackground = "stone" | "linen" | "charcoal" | "herbarium" | "clover" | "bluebell";
 export type BoardNoteVariant = "paper" | "ink" | "sage";
 export type BoardFrameVariant = "pin" | "gallery" | "instant" | "tape" | "dark";
+export type ItineraryEndMode = "scheduled" | "manual";
 
 export interface BoardComment {
   readonly id: string;
+  readonly photoId: string;
   readonly actorId: ActorId;
   readonly body: string;
   readonly createdAt: string;
@@ -52,9 +55,9 @@ export interface ChatMessage {
   readonly reactions: readonly { readonly emoji: string; readonly count: number }[];
   readonly replyToId?: string;
   readonly content?:
-    | { readonly type: "image"; readonly dataUrl: string; readonly name: string; readonly aspectRatio: number }
+    | { readonly type: "image"; readonly asset: AssetReference; readonly name: string; readonly aspectRatio: number }
     | { readonly type: "location"; readonly latitude: number; readonly longitude: number; readonly label: string }
-    | { readonly type: "voice"; readonly durationSeconds: number; readonly dataUrl: string; readonly mimeType: string };
+    | { readonly type: "voice"; readonly durationSeconds: number; readonly asset: AssetReference };
 }
 
 export interface PollPreview {
@@ -72,7 +75,7 @@ export interface BoardPhoto {
   readonly kind: "photo";
   readonly ownerActorId: ActorId;
   readonly variant: ArtVariant;
-  readonly imageDataUrl?: string;
+  readonly asset?: AssetReference;
   readonly imageName?: string;
   readonly aspectRatio?: number;
   readonly frameVariant?: BoardFrameVariant;
@@ -81,7 +84,6 @@ export interface BoardPhoto {
   readonly y: number;
   readonly rotation: number;
   readonly width: number;
-  readonly comments?: readonly BoardComment[];
 }
 
 export interface BoardNote {
@@ -101,7 +103,7 @@ export interface BoardDrawing {
   readonly id: string;
   readonly kind: "drawing";
   readonly ownerActorId: ActorId;
-  readonly imageDataUrl: string;
+  readonly asset: AssetReference;
   readonly x: number;
   readonly y: number;
   readonly rotation: number;
@@ -116,7 +118,9 @@ export interface ItineraryItem {
   readonly title: string;
   readonly description: string;
   readonly startsAt: string;
-  readonly endsAt: string;
+  readonly endMode: ItineraryEndMode;
+  readonly endsAt: string | null;
+  readonly endedAt: string | null;
   readonly locationLabel: string | null;
   readonly mapsUrl: string | null;
   readonly responsible: PersonSummary;
@@ -131,6 +135,7 @@ export interface RoomDetail extends RoomSummary {
   readonly messages: readonly ChatMessage[];
   readonly activePoll: PollPreview | null;
   readonly boardItems: readonly BoardItem[];
+  readonly boardComments: readonly BoardComment[];
   readonly itinerary: readonly ItineraryItem[];
 }
 

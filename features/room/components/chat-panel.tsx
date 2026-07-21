@@ -9,6 +9,8 @@ import type { ChatMessage, ItineraryItem, PersonSummary } from "@/core/domain/ro
 import { createUuid } from "@/core/domain/uuid";
 import { useMockSession } from "@/features/mock-session/components/mock-session-provider";
 import type { MockPoll } from "@/features/mock-session/model/mock-session";
+import { useLocalAssetUrl } from "@/features/local-assets/components/use-local-asset-url";
+import { getLocalAssetBlob, saveLocalAsset } from "@/features/local-assets/model/local-asset-repository";
 import { ChatMessageItem } from "./chat-message";
 import { usePollClock } from "../model/use-poll-clock";
 import { useInlinePollVisibility } from "../model/use-inline-poll-visibility";
@@ -30,13 +32,13 @@ interface ChatPanelProps {
 }
 
 type PollKind = "yes-no" | "options" | "itinerary";
-type PendingImage = { readonly dataUrl: string; readonly name: string; readonly aspectRatio: number };
+type PendingImage = { readonly blob: Blob; readonly previewUrl: string; readonly name: string; readonly aspectRatio: number };
 type ToolId = "camera" | "album" | "location" | "poll" | "votes" | "search";
 type Tool = { readonly id: ToolId; readonly label: string; readonly icon: IconName };
 
 const LONG_PRESS_MS = 380;
-const MAX_CHAT_IMAGE_LENGTH = 1_200_000;
-const MAX_VOICE_LENGTH = 1_200_000;
+const MAX_CHAT_IMAGE_BYTES = 900_000;
+const MAX_VOICE_BYTES = 900_000;
 const pollKinds: readonly { readonly kind: PollKind; readonly label: string; readonly summary: string }[] = [
   { kind: "yes-no", label: "Yes / No", summary: "A fast binary vote for simple decisions." },
   { kind: "options", label: "Options", summary: "Let the room choose between up to five answers." },
@@ -54,12 +56,7 @@ const chatTools: readonly Tool[] = [
 const formatDay = (value: string, timeZone: string) => new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone }).format(new Date(value));
 const dayKey = (value: string, timeZone: string) => new Intl.DateTimeFormat("en-CA", { year: "numeric", month: "2-digit", day: "2-digit", timeZone }).format(new Date(value));
 const messageLabel = (message?: ChatMessage) => message?.body || (message?.content?.type === "image" ? "Photo" : message?.content?.type === "location" ? message.content.label : message?.content?.type === "voice" ? "Voice message" : "Message");
-const readAsDataUrl = (blob: Blob) => new Promise<string>((resolve, reject) => {
-  const reader = new FileReader();
-  reader.onload = () => typeof reader.result === "string" ? resolve(reader.result) : reject(new Error("File could not be read."));
-  reader.onerror = () => reject(new Error("File could not be read."));
-  reader.readAsDataURL(blob);
-});
+const canvasBlob = (canvas: HTMLCanvasElement, quality: number) => new Promise<Blob>((resolve, reject) => canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error("Image could not be compressed.")), "image/jpeg", quality));
 
 function decodeImage(file: File) {
   return new Promise<HTMLImageElement>((resolve, reject) => {
@@ -84,8 +81,8 @@ async function prepareImage(file: File): Promise<PendingImage> {
     const context = canvas.getContext("2d");
     if (!context) throw new Error("Image processing is unavailable.");
     context.drawImage(image, 0, 0, canvas.width, canvas.height);
-    const dataUrl = canvas.toDataURL("image/jpeg", attempt.quality);
-    if (dataUrl.length <= MAX_CHAT_IMAGE_LENGTH) return { dataUrl, name: file.name.slice(0, 120), aspectRatio };
+    const blob = await canvasBlob(canvas, attempt.quality);
+    if (blob.size <= MAX_CHAT_IMAGE_BYTES) return { blob, previewUrl: URL.createObjectURL(blob), name: file.name.slice(0, 120), aspectRatio };
   }
   throw new Error("This image is too large for local chat storage.");
 }
@@ -148,6 +145,7 @@ export function ChatPanel({ roomPublicId, messages, poll, pinnedMessageId, membe
   const pinned = messages.find((message) => message.id === pinnedMessageId);
   const selectedMessage = messages.find((message) => message.id === selectedMessageId) ?? null;
   const viewerImage = messages.find((message) => message.id === imageViewerId && message.content?.type === "image") ?? null;
+  const viewerImageUrl = useLocalAssetUrl(viewerImage?.content?.type === "image" ? viewerImage.content.asset : null);
   const visibleMessages = useMemo(() => query.trim() ? messages.filter((message) => `${messageLabel(message)} ${message.author?.displayName ?? ""}`.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase())) : messages, [messages, query]);
   const room = useMemo(() => session.rooms.find((item) => item.publicId === roomPublicId) ?? null, [roomPublicId, session.rooms]);
   const voteCards = useMemo(() => {
@@ -296,17 +294,21 @@ export function ChatPanel({ roomPublicId, messages, poll, pinnedMessageId, membe
 
   function addImageToBoard(message: ChatMessage) {
     if (message.content?.type !== "image") return;
-    dispatch({ type: "COMMAND", command: { type: "ADD_BOARD_ITEM", ...commandBase(), item: { id: `board_photo_${createUuid()}`, kind: "photo", ownerActorId: session.viewer.actorId, variant: "one", imageDataUrl: message.content.dataUrl, imageName: message.content.name, aspectRatio: message.content.aspectRatio, note: message.body || null, x: 36, y: 28, rotation: -2, width: 25 } } });
+    dispatch({ type: "COMMAND", command: { type: "ADD_BOARD_ITEM", ...commandBase(), item: { id: `board_photo_${createUuid()}`, kind: "photo", ownerActorId: session.viewer.actorId, variant: "one", asset: message.content.asset, imageName: message.content.name, aspectRatio: message.content.aspectRatio, note: message.body || null, x: 36, y: 28, rotation: -2, width: 25 } } });
     setSelectedMessageId(null);
     setNotice("Added to board");
   }
 
-  function downloadImage(message: ChatMessage) {
+  async function downloadImage(message: ChatMessage) {
     if (message.content?.type !== "image") return;
+    const blob = await getLocalAssetBlob(message.content.asset);
+    if (!blob) { setNotice("This photo is no longer available locally."); return; }
+    const url = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
-    anchor.href = message.content.dataUrl;
+    anchor.href = url;
     anchor.download = message.content.name || "eventspace-photo.jpg";
     anchor.click();
+    window.setTimeout(() => URL.revokeObjectURL(url), 0);
     setSelectedMessageId(null);
   }
 
@@ -319,11 +321,15 @@ export function ChatPanel({ roomPublicId, messages, poll, pinnedMessageId, membe
     catch (error) { setNotice(error instanceof Error ? error.message : "This image cannot be read."); }
   }
 
-  function sendPendingImage() {
+  async function sendPendingImage() {
     if (!pendingImage) return;
-    postMessage(imageCaption, { type: "image", ...pendingImage });
-    setPendingImage(null);
-    setImageCaption("");
+    try {
+      const asset = await saveLocalAsset(pendingImage.blob, "image");
+      postMessage(imageCaption, { type: "image", asset, name: pendingImage.name, aspectRatio: pendingImage.aspectRatio });
+      URL.revokeObjectURL(pendingImage.previewUrl);
+      setPendingImage(null);
+      setImageCaption("");
+    } catch { setNotice("This photo could not be saved locally."); }
   }
 
   function shareCurrentLocation() {
@@ -372,9 +378,9 @@ export function ChatPanel({ roomPublicId, messages, poll, pinnedMessageId, membe
         setRecordingSeconds(0);
         if (canceled) return;
         try {
-          const dataUrl = await readAsDataUrl(blob);
-          if (dataUrl.length > MAX_VOICE_LENGTH) throw new Error("This recording is too large for local chat storage.");
-          postMessage("", { type: "voice", durationSeconds, dataUrl, mimeType: blob.type || "audio/webm" });
+          if (blob.size > MAX_VOICE_BYTES) throw new Error("This recording is too large for local chat storage.");
+          const asset = await saveLocalAsset(blob, "audio");
+          postMessage("", { type: "voice", durationSeconds, asset });
         } catch (error) { setNotice(error instanceof Error ? error.message : "Voice message could not be saved."); }
       };
       recorder.start(250);
@@ -411,7 +417,7 @@ export function ChatPanel({ roomPublicId, messages, poll, pinnedMessageId, membe
     const durationMinutes = Math.min(Math.max(Math.round(Number(itineraryDuration) / 5) * 5, 5), 720);
     const endsAt = startsAt + durationMinutes * 60_000;
     const itineraryItem: ItineraryItem | null = pollKind === "itinerary" && itineraryTitle.trim() && Number.isFinite(startsAt) && pollResponsible
-      ? { id: `itinerary_${createUuid()}`, title: itineraryTitle.trim().slice(0, 80), description: "Created from a chat vote.", startsAt: new Date(startsAt).toISOString(), endsAt: new Date(endsAt).toISOString(), locationLabel: itineraryLocation.trim() || null, mapsUrl: null, responsible: pollResponsible, createdByActorId: viewer.actorId, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }
+      ? { id: `itinerary_${createUuid()}`, title: itineraryTitle.trim().slice(0, 80), description: "Created from a chat vote.", startsAt: new Date(startsAt).toISOString(), endMode: "scheduled", endsAt: new Date(endsAt).toISOString(), endedAt: null, locationLabel: itineraryLocation.trim() || null, mapsUrl: null, responsible: pollResponsible, createdByActorId: viewer.actorId, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }
       : null;
     if (pollKind === "yes-no" && !pollQuestion.trim() || pollKind === "options" && (!pollQuestion.trim() || optionLabels.length < 2) || pollKind === "itinerary" && !itineraryItem) return;
     const newPoll: MockPoll = {
@@ -529,9 +535,9 @@ export function ChatPanel({ roomPublicId, messages, poll, pinnedMessageId, membe
       {selectedMessage.author?.actorId === session.viewer.actorId ? <button type="button" className={styles.dangerAction} onClick={() => messageCommand("DELETE_OWN_MESSAGE", selectedMessage.id)}><Icon name="trash" />Delete</button> : canModerate ? <button type="button" className={styles.dangerAction} onClick={() => messageCommand("DELETE_MESSAGE", selectedMessage.id)}><Icon name="trash" />Delete for room</button> : null}
     </div></section></div>, document.body) : null}
 
-    {typeof document !== "undefined" && pendingImage ? createPortal(<div className={styles.mediaComposer}><header><button type="button" onClick={() => setPendingImage(null)} aria-label="Close photo preview"><Icon name="close" /></button><span>Photo</span><button type="button" onClick={sendPendingImage} aria-label="Send photo"><Icon name="send" /></button></header><div className={styles.mediaPreview} style={{ aspectRatio: pendingImage.aspectRatio }}><NextImage src={pendingImage.dataUrl} alt="Photo preview" fill sizes="100vw" unoptimized /></div><input value={imageCaption} onChange={(event) => setImageCaption(event.target.value.slice(0, 500))} placeholder="Add a caption…" aria-label="Photo caption" /></div>, document.body) : null}
+    {typeof document !== "undefined" && pendingImage ? createPortal(<div className={styles.mediaComposer}><header><button type="button" onClick={() => { URL.revokeObjectURL(pendingImage.previewUrl); setPendingImage(null); }} aria-label="Close photo preview"><Icon name="close" /></button><span>Photo</span><button type="button" onClick={() => void sendPendingImage()} aria-label="Send photo"><Icon name="send" /></button></header><div className={styles.mediaPreview} style={{ aspectRatio: pendingImage.aspectRatio }}><NextImage src={pendingImage.previewUrl} alt="Photo preview" fill sizes="100vw" unoptimized /></div><input value={imageCaption} onChange={(event) => setImageCaption(event.target.value.slice(0, 500))} placeholder="Add a caption…" aria-label="Photo caption" /></div>, document.body) : null}
 
-    {typeof document !== "undefined" && viewerImage?.content?.type === "image" ? createPortal(<div className={styles.imageViewer} onClick={() => setImageViewerId(null)}><button type="button" onClick={() => setImageViewerId(null)} aria-label="Close photo"><Icon name="close" /></button><NextImage src={viewerImage.content.dataUrl} alt={viewerImage.body || viewerImage.content.name || "Shared photo"} width={1600} height={1600} sizes="100vw" unoptimized onClick={(event) => event.stopPropagation()} /></div>, document.body) : null}
+    {typeof document !== "undefined" && viewerImage?.content?.type === "image" && viewerImageUrl ? createPortal(<div className={styles.imageViewer} onClick={() => setImageViewerId(null)}><button type="button" onClick={() => setImageViewerId(null)} aria-label="Close photo"><Icon name="close" /></button><NextImage src={viewerImageUrl} alt={viewerImage.body || viewerImage.content.name || "Shared photo"} width={1600} height={1600} sizes="100vw" unoptimized onClick={(event) => event.stopPropagation()} /></div>, document.body) : null}
 
     {typeof document !== "undefined" && voteArchiveOpen ? createPortal(<div className={roomStyles.voteOverlay} role="dialog" aria-modal="true" aria-label="All vote cards"><header><div><p>Votes</p><h2>Room decisions</h2></div><button type="button" aria-label="Close vote cards" onClick={() => setVoteArchiveOpen(false)}><Icon name="close" size={16} /></button></header><div className={roomStyles.voteGrid}>{voteCards.length ? voteCards.map((item) => renderVoteCard(item)) : <div className={roomStyles.panelEmpty}><p>No vote cards yet.</p></div>}</div></div>, document.body) : null}
 

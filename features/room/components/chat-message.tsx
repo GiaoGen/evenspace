@@ -1,9 +1,10 @@
 "use client";
 
-import NextImage from "next/image";
 import { useEffect, useRef, useState, type MouseEvent, type PointerEvent } from "react";
 import { Icon } from "@/components/ui/icon";
 import type { ChatMessage } from "@/core/domain/room";
+import { LocalAssetImage } from "@/features/local-assets/components/local-asset-image";
+import { useLocalAssetUrl } from "@/features/local-assets/components/use-local-asset-url";
 import styles from "./chat-panel.module.css";
 
 interface ChatMessageItemProps {
@@ -26,6 +27,7 @@ function VoiceMessage({ message }: { readonly message: ChatMessage }) {
   const [playing, setPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
   const voice = message.content?.type === "voice" ? message.content : null;
+  const voiceUrl = useLocalAssetUrl(voice?.asset);
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -53,7 +55,7 @@ function VoiceMessage({ message }: { readonly message: ChatMessage }) {
   };
 
   return <div className={styles.voiceMessage}>
-    <audio ref={audioRef} src={voice.dataUrl} preload="metadata" />
+    <audio ref={audioRef} src={voiceUrl ?? undefined} preload="metadata" />
     <button type="button" onClick={toggle} aria-label={playing ? "Pause voice message" : "Play voice message"}><Icon name={playing ? "pause" : "arrow"} size={14} /></button>
     <span className={styles.voiceTrack}><i style={{ transform: `scaleX(${progress})` }} /></span>
     <time>0:{String(voice.durationSeconds).padStart(2, "0")}</time>
@@ -78,7 +80,7 @@ export function ChatMessageItem({ message, own, grouped, timeZone, replyBody, on
       <div className={`${styles.bubble} ${content ? styles.mediaBubble : ""}`}>
         {replyBody ? <span className={styles.replyQuote}>Replying to {replyBody}</span> : null}
         {content?.type === "image" ? <button type="button" className={styles.chatImage} style={{ aspectRatio: content.aspectRatio }} onClick={() => onOpenImage(message)} aria-label={`Open ${content.name || "photo"}`}>
-          <NextImage src={content.dataUrl} alt={message.body || "Shared photo"} fill sizes="(max-width: 600px) 78vw, 420px" unoptimized />
+          <LocalAssetImage asset={content.asset} alt={message.body || "Shared photo"} fill sizes="(max-width: 600px) 78vw, 420px" />
         </button> : null}
         {content?.type === "location" ? <a className={styles.locationMessage} href={`https://www.openstreetmap.org/?mlat=${content.latitude}&mlon=${content.longitude}#map=16/${content.latitude}/${content.longitude}`} target="_blank" rel="noreferrer">
           <span><Icon name="location" size={19} /></span><strong>{content.label}</strong><small>{content.latitude.toFixed(4)}, {content.longitude.toFixed(4)}</small>

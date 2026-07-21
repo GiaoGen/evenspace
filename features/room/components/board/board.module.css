@@ -31,17 +31,44 @@
 .emptyBoard strong { font-family: var(--font-bodoni), Georgia, serif; font-size: 30px; font-weight: 400; }
 .emptyBoard small { color: rgba(247,243,237,.7); font-size: 9px; }
 
-.photoConversation { position: absolute; z-index: 8; inset: 18px 8px 8px; overflow: hidden; pointer-events: auto; animation: conversationIn 220ms ease-out both; }
-.photoAuthor { position: absolute; z-index: 4; top: 9px; left: 9px; display: flex; align-items: center; gap: 7px; max-width: calc(100% - 18px); color: #fff; text-shadow: 0 1px 7px rgba(0,0,0,.45); }
-.photoAuthor b { display: grid; flex: 0 0 25px; height: 25px; place-items: center; border: 1px solid rgba(255,255,255,.62); border-radius: 50%; background: #555f53; font: 700 8px/1 Arial,sans-serif; text-shadow: none; }
-.photoAuthor span { overflow: hidden; font-size: 8px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
-.commentBarrage { position: absolute; z-index: 3; inset: 0; overflow: hidden; pointer-events: none; }
-.commentBarrage span { position: absolute; left: 100%; width: max-content; max-width: 90%; overflow: hidden; color: #fff; font-size: 8px; font-weight: 650; text-overflow: ellipsis; text-shadow: 0 1px 5px rgba(0,0,0,.78); white-space: nowrap; animation: barrage 7s linear infinite; }
-.photoCommentComposer { position: absolute; z-index: 5; right: 7px; bottom: 7px; left: 7px; display: flex; align-items: center; gap: 5px; min-height: 31px; padding: 4px 4px 4px 10px; border: 0; border-radius: 6px; background: #788477; box-shadow: 0 6px 16px rgba(24,23,20,.18); }
-.photoCommentComposer input { min-width: 0; flex: 1; border: 0; outline: 0; background: transparent; color: #fff; font: 600 8px/1 Arial,sans-serif; }
-.photoCommentComposer input::placeholder { color: rgba(255,255,255,.68); }
-.photoCommentComposer button { min-width: 43px; align-self: stretch; border: 0; border-radius: 4px; background: #f3eee5; color: #24231f; font-size: 7px; font-weight: 800; }
-.photoCommentComposer button:disabled { opacity: .45; }
+.photoDetailBackdrop { position: fixed; z-index: 320; inset: 0; display: grid; place-items: end center; padding: max(12px,env(safe-area-inset-top)) 12px max(12px,env(safe-area-inset-bottom)); background: rgba(20,19,17,.72); animation: fadeIn 180ms ease-out both; }
+.photoDetail { position: relative; width: min(620px,100%); height: min(860px,calc(100dvh - max(24px,env(safe-area-inset-top)) - max(24px,env(safe-area-inset-bottom)))); min-height: 0; display: grid; overflow: hidden; grid-template-rows: minmax(260px,52%) minmax(0,1fr); border-radius: 8px; background: #292824; box-shadow: 0 28px 76px rgba(0,0,0,.38); animation: studioUp 300ms cubic-bezier(.2,.8,.22,1) both; }
+.photoDetailToolbar { position: absolute; z-index: 4; top: 10px; right: 10px; left: 10px; display: grid; grid-template-columns: 42px minmax(0,1fr) 42px; align-items: center; gap: 8px; pointer-events: none; }
+.photoDetailToolbar button { display: grid; width: 42px; height: 42px; place-items: center; border: 0; border-radius: 14px; background: rgba(31,30,27,.94); color: #f7f2ea; box-shadow: 0 8px 22px rgba(0,0,0,.2); pointer-events: auto; }
+.photoDetailToolbar .photoDetailDelete { background: #974b44; }
+.photoDetailPosition { justify-self: center; padding: 6px 10px; border-radius: 12px; background: rgba(31,30,27,.76); color: rgba(247,242,234,.82); font-size: 9px; font-variant-numeric: tabular-nums; }
+.photoDetailMedia { position: relative; min-height: 0; display: grid; overflow: hidden; place-items: center; padding: 56px 56px 18px; touch-action: pan-y; }
+.photoDetailMedia > div { height: min(100%,520px); width: auto; max-width: 100%; transform: translate3d(var(--photo-drag-x,0),0,0); transition: transform 210ms cubic-bezier(.2,.8,.22,1),opacity 180ms ease; will-change: transform; }
+.photoDetailImage { width: 100%; height: 100%; }
+.photoDetailArrow { position: absolute; z-index: 2; top: 50%; display: grid; width: 38px; height: 52px; place-items: center; border: 0; border-radius: 8px; background: rgba(31,30,27,.74); color: #f7f2ea; transform: translateY(-50%); transition: opacity 160ms ease,background 160ms ease,transform 160ms ease; }
+.photoDetailArrow:disabled { pointer-events: none; opacity: 0; }
+.photoDetailArrow:active { transform: translateY(-50%) scale(.92); }
+.photoDetailPrevious { left: 10px; }.photoDetailPrevious svg { transform: rotate(180deg); }
+.photoDetailNext { right: 10px; }
+.photoEnterFromLeft { animation: photoFromLeft 240ms cubic-bezier(.2,.8,.22,1) both; }
+.photoEnterFromRight { animation: photoFromRight 240ms cubic-bezier(.2,.8,.22,1) both; }
+.photoDetailConversation { min-height: 0; display: grid; grid-template-rows: auto minmax(0,1fr) auto; overflow: hidden; padding: 15px 16px max(12px,env(safe-area-inset-bottom)); background: #f3eee5; color: #24221e; }
+.photoDetailAuthor { display: flex; align-items: center; gap: 10px; padding-bottom: 13px; border-bottom: 1px solid rgba(36,34,30,.12); }
+.photoDetailAuthor > b,.photoCommentList article > b { display: grid; flex: 0 0 34px; height: 34px; place-items: center; border-radius: 50%; background: #7e8a7d; color: #fff; font-size: 9px; }
+.photoDetailAuthor span { min-width: 0; display: grid; gap: 2px; }
+.photoDetailAuthor strong { overflow: hidden; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.photoDetailAuthor small { color: rgba(36,34,30,.56); font-size: 8px; }
+.photoCommentList { min-height: 0; display: grid; align-content: start; gap: 14px; overflow-y: auto; padding: 15px 2px; overscroll-behavior: contain; scrollbar-width: none; }
+.photoCommentList::-webkit-scrollbar { display: none; }
+.photoCommentList article { display: grid; grid-template-columns: 34px minmax(0,1fr); gap: 10px; }
+.photoCommentList article > div { min-width: 0; }
+.photoCommentList article header { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.photoCommentList article strong { overflow: hidden; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.photoCommentList article time { flex: 0 0 auto; color: rgba(36,34,30,.48); font-size: 8px; }
+.photoCommentList article p { margin: 4px 0 0; overflow-wrap: anywhere; font-size: 12px; line-height: 1.42; }
+.photoCommentEmpty { align-self: center; display: grid; gap: 4px; color: rgba(36,34,30,.48); text-align: center; }
+.photoCommentEmpty strong { color: #24221e; font-family: var(--font-bodoni),Georgia,serif; font-size: 21px; font-weight: 600; }
+.photoCommentEmpty span { font-size: 9px; }
+.photoDetailComposer { display: grid; grid-template-columns: minmax(0,1fr) 42px; gap: 6px; padding: 5px; border-radius: 8px; background: #d9d4ca; }
+.photoDetailComposer input { min-width: 0; height: 38px; padding: 0 10px; border: 0; outline: 0; background: transparent; color: #24221e; font-size: 16px; }
+.photoDetailComposer input::placeholder { color: rgba(36,34,30,.48); }
+.photoDetailComposer button { display: grid; width: 42px; height: 38px; place-items: center; border: 0; border-radius: 6px; background: #758477; color: #fff; }
+.photoDetailComposer button:disabled { opacity: .36; }
 
 .boardDock { position: absolute; z-index: 42; right: max(14px,env(safe-area-inset-right)); bottom: max(14px,env(safe-area-inset-bottom)); display: flex; align-items: center; gap: 4px; padding: 4px; border-radius: 18px; background: rgba(31,30,27,.94); box-shadow: 0 13px 32px rgba(32,29,24,.24); animation: dockIn 360ms cubic-bezier(.2,.8,.25,1) both; backdrop-filter: blur(14px); }
 .boardDock button { display: grid; width: 40px; height: 40px; place-items: center; border: 0; border-radius: 14px; background: transparent; color: #f6f1e8; transition: background 160ms ease, color 160ms ease, transform 160ms ease; }
@@ -121,7 +148,6 @@
 .sequence > article { width: min(100%,520px); margin: 0 auto 15px; animation: sequenceIn 360ms cubic-bezier(.2,.8,.25,1) both; }
 .sequencePhoto { position: relative; }
 .sequencePinnedPhoto { width: 100%; height: 100%; }
-.sequencePhoto .photoConversation { inset: 18px 8px 8px; }
 .sequenceDrawing { padding: 8px; background: #f7f3ed; box-shadow: 0 13px 28px rgba(37,33,27,.16); }
 .sequenceDrawing img { display: block; width: 100%; height: auto; }
 .sequenceNote { box-sizing: border-box; min-height: 180px; display: grid; place-items: center; padding: 30px; font-family: var(--font-bodoni),Georgia,serif; font-size: 34px; line-height: 1.02; text-align: center; box-shadow: 0 13px 28px rgba(37,33,27,.16); white-space: pre-wrap; }
@@ -131,8 +157,6 @@
 
 @keyframes selectionIn { from { opacity: 0; transform: scale(.96); } }
 @keyframes emptyIn { from { opacity: 0; transform: translate(-50%,-45%); } }
-@keyframes conversationIn { from { opacity: 0; } }
-@keyframes barrage { 0% { transform: translateX(0); } 100% { transform: translateX(-230%); } }
 @keyframes dockIn { from { opacity: 0; transform: translateY(12px); } }
 @keyframes trayIn { from { opacity: 0; transform: translateY(10px) scale(.94); } }
 @keyframes fadeIn { from { opacity: 0; } }
@@ -142,6 +166,8 @@
 @keyframes studioReveal { from { opacity: 0; transform: scale(1.01); } }
 @keyframes previewIn { from { opacity: 0; transform: translate(-50%,-50%) scale(.6); } }
 @keyframes sequenceIn { from { opacity: 0; transform: translateY(15px); } }
+@keyframes photoFromLeft { from { opacity: .35; transform: translate3d(-34px,0,0) scale(.98); } }
+@keyframes photoFromRight { from { opacity: .35; transform: translate3d(34px,0,0) scale(.98); } }
 
 @media (min-width: 720px) {
   .createTray { grid-template-columns: repeat(4,108px); }
@@ -150,6 +176,14 @@
   .doodlePaper { width: min(70vw,760px); }
 }
 
+@media (max-width: 700px) {
+  .photoDetailBackdrop { padding-right: 0; padding-bottom: 0; padding-left: 0; }
+  .photoDetail { width: 100%; height: calc(100dvh - max(8px,env(safe-area-inset-top))); grid-template-rows: minmax(230px,48%) minmax(0,1fr); border-radius: 8px 8px 0 0; }
+  .photoDetailMedia { padding-right: 12px; padding-left: 12px; }
+  .photoDetailArrow { display: none; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .boardPanel *,.boardPanel *::before,.boardPanel *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+  .photoDetailBackdrop,.photoDetail,.photoDetailMedia > div,.photoDetailArrow { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
 }

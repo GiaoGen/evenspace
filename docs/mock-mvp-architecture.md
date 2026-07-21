@@ -1,6 +1,6 @@
 # EventSpace 类型化 Mock MVP 架构
 
-> 状态：2026-07-19 本地优先交互式 Mock。该实现用于验证产品结构、页面边界、响应式布局、领域命令和完整核心旅程，不连接 Supabase，也不代表真实身份、权限、实时同步或服务器数据持久化已经完成。
+> 状态：2026-07-20 本地优先交互式 Mock。该实现用于验证产品结构、页面边界、响应式布局、领域命令和完整核心旅程，不连接 Supabase，也不代表真实身份、权限、实时同步或服务器数据持久化已经完成。
 
 ## 1. 可运行范围
 
@@ -24,7 +24,7 @@ components/             无业务数据访问的共享 UI
 features/landing/       Landing 页面组合
 features/rooms/         房间列表与卡片交互
 features/room/          Room 外壳及 Chat/Board/Itinerary；Board 与 Itinerary 已拆分编排、模型和展示组件
-features/create-room/   创建草稿类型、纯 reducer 状态机与五步向导
+features/create-room/   创建草稿类型、独立草稿存储、纯 reducer 状态机、五步向导与邀请卡导出
 features/mock-session/  版本化浏览器会话、领域命令、selectors 与恢复校验
 features/join/          私密邀请与申请状态机
 features/account/       Mock 身份、主题、重置与法律入口
@@ -89,7 +89,7 @@ data/rooms.ts           server-only 数据访问入口和最小 View DTO
 
 - `MockSessionProvider` 负责从 `localStorage` 恢复 `eventspace:local-session:v1`，并兼容旧 `sessionStorage` 键。
 - `features/mock-session/model/mock-session.ts` 仍是主要状态转换中心，包含创建房间、发消息、投票、画板 item、行程、成员治理、归档等命令。
-- `core/domain/room.ts` 已包含 `BoardPhoto`、`BoardNote`、`BoardDrawing`，其中 photo/drawing 仍使用 `imageDataUrl` 表示本地媒体。
+- `core/domain/asset.ts` 定义稳定 `AssetReference` 及运行时校验；Chat image/voice 与 Board photo/drawing 只保存引用，Blob 由实现 `data/contracts/asset-repository.ts` 的 IndexedDB repository 管理。
 - `core/domain/board-layout.ts` 为 Board 与 Rooms 卡片共用画板 item 尺寸、边界和 fit 计算。
 - `features/room/components/chat-panel.tsx` 和 `features/room/components/board-panel.tsx` 承载了大量移动端交互逻辑，后续需要拆分 hooks / 子组件，避免接后端时继续膨胀。
 - `data/mock/mock-runtime.ts` 继续阻止正式生产环境默认运行固定 mock 身份；本地 build/start 可直接验证 mock。
@@ -99,6 +99,7 @@ data/rooms.ts           server-only 数据访问入口和最小 View DTO
 
 - 页面、feature、domain、data contract 的方向仍然清晰。
 - 主要写操作已收敛到 command/reducer，后续可以逐个映射到 Server Action、RPC 或 repository mutation。
+- `POST_MESSAGE` 与 `ADD_BOARD_ITEM` 在本地命令边界执行运行时结构校验，相关规则可迁移为后端 DTO schema；生产端仍必须独立校验所有不可信请求。
 - Board fit、照片比例、画板预览等逻辑已经开始进入 `core/domain`，不是完全散落在 UI。
 - Itinerary 已拆为纯时间模型、编排组件、日期时间线、状态卡片和移动端编辑器；状态由起止时间计算，命令仍可映射为后端 mutation。
 - Mock runtime 与生产环境保护边界仍存在。
@@ -107,14 +108,14 @@ data/rooms.ts           server-only 数据访问入口和最小 View DTO
 
 - `MockSession` 文件过大，已经混合权限判断、命令校验、状态转换、持久化解析和部分业务策略。
 - 权限派生在 `core/security/room-capabilities.ts` 和 mock session 中有重复趋势，后续可能规则漂移。
-- 媒体仍以 data URL 存在 session JSON 中，房间数据会随照片/涂鸦增长，很难直接迁移为后端数据模型。
+- 本地媒体已与 session JSON 分离，但 IndexedDB 仍是单设备存储；配额失败、浏览器清站点数据和跨设备同步都需要生产存储方案处理。
 - Poll、join request、archive lifecycle 等逻辑依赖客户端时间和本地数组更新，生产必须改为服务端事务。
 - UI 组件中包含大量手势、弹层和 command 调用，后端接入前需要拆出可测试的数据编排层。
 
 ### 后端接入前的架构门槛
 
 1. 定义稳定 command DTO，不直接复用客户端 draft 或完整 `MockSession`。
-2. 把媒体 item 的 `imageDataUrl` 替换为 asset reference，本地阶段可先落 IndexedDB，后端阶段映射 Storage。
+2. 将 `features/local-assets` repository 映射为私有 Storage 上传/读取协议，并为 asset 元数据、缩略图、清理状态定义服务端表结构。
 3. 统一 capability / policy 规则，形成服务端可复核的权限契约。
 4. 为投票、行程提案、成员治理、归档推进设计事务边界和幂等键。
 5. 为移动端文件上传、手势和键盘建立回归测试或手动验收表。
@@ -126,17 +127,33 @@ data/rooms.ts           server-only 数据访问入口和最小 View DTO
 - `features/room/components/board-panel.tsx` 现在只负责本地命令编排和少量页面级状态。
 - `features/room/components/board/` 分别承载 canvas 手势、内容渲染、Sequence、创建/背景卡、Note、Doodle、评论和图片压缩。
 - 画布手势通过 `use-board-interaction.ts` 隔离；Board 与 Rooms 继续共用 `core/domain/board-layout.ts`。
-- `BoardBackground`、`BoardNoteVariant`、`BoardComment` 已进入 domain；`SET_BOARD_BACKGROUND`、`ADD_BOARD_COMMENT` 已进入 `MockCommand`。
+- `BoardBackground`、`BoardNoteVariant`、`BoardComment` 已进入 domain；评论通过房间级 `boardComments` 集合引用 `photoId`，不再嵌入 `BoardPhoto`；`SET_BOARD_BACKGROUND`、`ADD_BOARD_COMMENT` 已进入 `MockCommand`。
 
 ### Chat 边界
 
 - `ChatMessage.content` 是 image / location / voice 的可辨识联合类型，`chat-message.tsx` 负责消息展示。
 - `chat-panel.tsx` 仍同时管理列表滚动、附件权限、图片处理、录音、定位、消息操作和 Poll，是当前主要超长组件风险。
-- 持久化恢复会校验消息 content 的类型、坐标范围、持续时间、MIME 和 data URL 长度；但 `POST_MESSAGE` reducer 写入路径尚未调用同等级运行时 schema，只检查房间能力和 author。
+- 持久化恢复会校验消息 content 的类型、asset reference、坐标范围、持续时间和 MIME；但 `POST_MESSAGE` reducer 写入路径尚未调用同等级运行时 schema，只检查房间能力和 author。
 
 ### 后端映射要求
 
-- image / voice 必须映射为 asset id 或 Storage object，不得把 data URL 放进消息 DTO。
+- image / voice 的 `AssetReference` 在生产 DTO 中必须映射为服务端 asset id / Storage object，不得接受客户端伪造的对象归属。
 - location DTO 应明确坐标精度、显示 label、用户确认和删除/保留规则。
 - Board comment 应成为独立实体或受控 mutation，服务端复核成员资格、目标 item、内容长度、限流和服务器时间。
 - Board background 属于房间级共享状态，生产写入需要版本或更新时间处理 Realtime 乱序。
+
+## 2026-07-20 当前同步：持久化版本与交互元数据
+
+- `MockSession` 当前版本为 v6；恢复层会把 v3/v4 行程补齐结束模式、计划/实际结束时间、所有者和时间戳，并把 v3/v4/v5 的照片内嵌评论迁移为房间级 `boardComments`。未来数据库迁移必须由正式 migration 完成，不能复用客户端补值逻辑作为权威数据修复。
+- 创建向导的进行中草稿使用独立键 `eventspace:create-room-draft:v1`，只保存轻量创建字段；读取时执行结构检查和范围收敛，创建成功后清理，并强制把 `acceptedTerms` 恢复为 `false`。
+- `create-room-wizard.tsx` 负责流程编排，草稿存储、创建服务和邀请卡展示/导出已拆到独立模块。Canvas 导出是客户端便利功能，QR 仍为视觉 mock。
+- Board photo 新增 `frameVariant`，由 `core/domain/board-layout.ts` 统一计算相框预览和实际比例；Board、Sequence、Rooms snapshot 消费同一元数据。
+- Board background 扩展到六个稳定枚举，Room extension 使用独立模型统一 5 分钟步进、格式化和最长时长计算。
+
+### Board 评论实体边界
+
+- `BoardComment` 现在拥有稳定 `id`、`photoId`、`actorId`、`body`、`createdAt`，可直接映射未来评论表和按照片分页查询。
+- `ADD_BOARD_COMMENT` 只接受已存在的照片目标并拒绝重复 comment id；删除照片会同步移除本地关联评论。
+- 当前本地集合仍随整个 `MockSession` JSON 保存。生产端需要数据库外键、事务或受控级联、服务端鉴权、限流、分页和审计，不能把本地 reducer 当作安全边界。
+- 内联 Poll 的“本次访问可见、再次进入后隐藏”由页面访问状态和本地投票记录共同决定；生产端仍需以唯一 voter 约束和权威查询结果返回卡片可见性。
+- `END_ITINERARY` 与普通更新分离，避免客户端通过编辑 DTO 伪造实际结束时间；当前 reducer 仍只提供本地规则演示。

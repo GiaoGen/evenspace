@@ -57,13 +57,17 @@ export function ItineraryPanel({ roomPublicId, items, timeZone, canCreate, canVo
     setEditor(null);
   }
 
+  function end(itemId: string) {
+    dispatch({ type: "COMMAND", command: { type: "END_ITINERARY", ...base(), itemId } });
+  }
+
   return (
     <div className={styles.panel} ref={scrollRef}>
       <header className={styles.panelHeader}>
         <div><span>{summary.label}</span><strong>{summary.detail}</strong></div>
         {canAdd ? <button type="button" onClick={() => setEditor("new")} aria-label={mode === "community-led" ? "Propose a plan" : "Add a plan"}><Icon name="plus" /></button> : null}
       </header>
-      {items.length ? <ItineraryTimeline items={items} now={now} timeZone={timeZone} viewerActorId={session.viewer.actorId} canModerate={canModerate} onEdit={setEditor} /> : <div className={styles.empty}><Icon name="calendar" size={26} /><strong>Give the day a shape.</strong><p>Start with one clear place and time.</p>{canAdd ? <button type="button" onClick={() => setEditor("new")}><Icon name="plus" size={16} />{mode === "community-led" ? "Propose a plan" : "Add the first plan"}</button> : null}</div>}
+      {items.length ? <ItineraryTimeline items={items} now={now} timeZone={timeZone} viewerActorId={session.viewer.actorId} canModerate={canModerate} onEdit={setEditor} onEnd={end} /> : <div className={styles.empty}><Icon name="calendar" size={26} /><strong>Give the day a shape.</strong><p>Start with one clear place and time.</p>{canAdd ? <button type="button" onClick={() => setEditor("new")}><Icon name="plus" size={16} />{mode === "community-led" ? "Propose a plan" : "Add the first plan"}</button> : null}</div>}
       {editor ? <ItineraryComposer key={editor === "new" ? "new" : editor.id} item={editor === "new" ? null : editor} items={items} members={members} viewerActorId={session.viewer.actorId} roomEndsAt={room?.endsAt ?? null} communityProposal={mode === "community-led"} onClose={() => setEditor(null)} onSave={save} onDelete={remove} /> : null}
     </div>
   );

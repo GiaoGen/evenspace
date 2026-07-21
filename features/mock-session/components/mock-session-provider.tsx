@@ -2,6 +2,9 @@
 
 import { createContext, useContext, useEffect, useMemo, useReducer, useRef, type Dispatch, type ReactNode } from "react";
 import { mockSessionReducer, parsePersistedMockSession, type MockSession, type MockSessionAction } from "../model/mock-session";
+import { collectAssetIds } from "@/features/local-assets/model/asset-references";
+import { clearLocalAssets, pruneLocalAssets } from "@/features/local-assets/model/local-asset-repository";
+import { migratePersistedLocalAssets } from "@/features/local-assets/model/migrate-local-assets";
 
 const STORAGE_KEY = "eventspace:local-session:v1";
 const LEGACY_STORAGE_KEY = "eventspace:mock-session:v3";
@@ -37,17 +40,28 @@ export function MockSessionProvider({ initialSession, children }: { readonly ini
 
   useEffect(() => {
     if (storageReady.current) return;
+    let active = true;
     const stored = readStoredSession();
-    const restored = stored ? parsePersistedMockSession(stored) : null;
-    runAfterHydration(() => {
-      if (restored) dispatch({ type: "HYDRATE", session: restored });
-      else writeStoredSession(initialSession);
-      storageReady.current = true;
-    });
+    void (async () => {
+      let restored: MockSession | null = null;
+      try { restored = stored ? parsePersistedMockSession(await migratePersistedLocalAssets(stored)) : null; }
+      catch { restored = null; }
+      if (!active) return;
+      runAfterHydration(() => {
+        if (!active) return;
+        if (restored) dispatch({ type: "HYDRATE", session: restored });
+        else if (!stored) writeStoredSession(initialSession);
+        storageReady.current = true;
+      });
+    })();
+    return () => { active = false; };
   }, [initialSession]);
 
   useEffect(() => {
-    if (storageReady.current) writeStoredSession(session);
+    if (storageReady.current) {
+      writeStoredSession(session);
+      void pruneLocalAssets(collectAssetIds(session)).catch(() => undefined);
+    }
   }, [session]);
 
   useEffect(() => {
@@ -60,6 +74,7 @@ export function MockSessionProvider({ initialSession, children }: { readonly ini
       window.localStorage.removeItem(STORAGE_KEY);
       window.sessionStorage.removeItem(LEGACY_STORAGE_KEY);
     } catch { /* In-memory reset still succeeds. */ }
+    void clearLocalAssets().catch(() => undefined);
     dispatch({ type: "RESET", session: initialSession });
   } }), [initialSession, session]);
 

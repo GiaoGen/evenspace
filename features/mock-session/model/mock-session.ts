@@ -1,9 +1,10 @@
 import { parseActorId, parseRoomId, parseRoomPublicId, type ActorId, type RoomPublicId } from "@/core/domain/ids";
+import { isAssetReference } from "@/core/domain/asset";
 import { getBoardItemUnitSize } from "@/core/domain/board-layout";
-import type { BoardBackground, BoardItem, ChatMessage, ItineraryItem, MembershipState, PersonSummary, PollPreview, RoomCapabilities, RoomDetail, RoomSummary } from "@/core/domain/room";
+import type { BoardBackground, BoardComment, BoardItem, ChatMessage, ItineraryItem, MembershipState, PersonSummary, PollPreview, RoomCapabilities, RoomDetail, RoomSummary } from "@/core/domain/room";
 import type { CreateRoomDraft } from "@/features/create-room/model/create-room-machine";
 
-export const MOCK_SESSION_VERSION = 4 as const;
+export const MOCK_SESSION_VERSION = 7 as const;
 export type MockRoomLifecycle = "active" | "freezing" | "archiving" | "archived";
 export type JoinRequestState = "pending" | "approved" | "rejected";
 
@@ -95,6 +96,7 @@ export type MockCommand =
   | ({ readonly type: "ADD_ITINERARY"; readonly item: ItineraryItem } & TimedRoomCommand)
   | ({ readonly type: "UPDATE_ITINERARY"; readonly item: ItineraryItem } & TimedRoomCommand)
   | ({ readonly type: "DELETE_ITINERARY"; readonly itemId: string } & TimedRoomCommand)
+  | ({ readonly type: "END_ITINERARY"; readonly itemId: string } & TimedRoomCommand)
   | ({ readonly type: "UPDATE_DURATION"; readonly endsAt: string } & TimedRoomCommand)
   | ({ readonly type: "ROTATE_INVITE"; readonly inviteCode: string } & TimedRoomCommand)
   | ({ readonly type: "REVIEW_JOIN"; readonly requestId: string; readonly decision: "approved" | "rejected" } & TimedRoomCommand)
@@ -118,8 +120,8 @@ const memberFor = (room: MockRoom, actorId: ActorId) => room.members.find((membe
 const activeMembership = (state: MembershipState | "banned" | undefined) => state !== "removed" && state !== "banned";
 const activeMemberCount = (room: MockRoom) => room.members.filter((member) => activeMembership(room.membershipStates[member.actorId])).length;
 const itineraryFitsRoom = (item: ItineraryItem, room: MockRoom) => asTime(item.startsAt) > 0
-  && asTime(item.endsAt) > asTime(item.startsAt)
-  && asTime(item.endsAt) <= asTime(room.endsAt ?? item.endsAt)
+  && (item.endMode === "manual" && item.endsAt === null || item.endMode === "scheduled" && asTime(item.endsAt ?? "") > asTime(item.startsAt) && asTime(item.endsAt ?? "") <= asTime(room.endsAt ?? item.endsAt ?? ""))
+  && (item.endedAt === null || item.endMode === "manual" && asTime(item.endedAt) >= asTime(item.startsAt) && asTime(item.endedAt) <= asTime(room.endsAt ?? item.endedAt))
   && room.members.some((member) => member.actorId === item.responsible.actorId)
   && room.members.some((member) => member.actorId === item.createdByActorId);
 const boardSize = getBoardItemUnitSize;
@@ -231,7 +233,7 @@ function applyCommand(session: MockSession, command: MockCommand): MockSession {
   const capabilities = deriveMockCapabilities(session, room, command.nowIso);
   const actor = memberFor(room, command.actorId);
   if (command.type === "TOGGLE_FAVORITE") return capabilities.canRead ? updateRoom(session, command.roomPublicId, (value) => ({ ...value, isFavorite: !value.isFavorite })) : session;
-  if (command.type === "POST_MESSAGE") return capabilities.canChat && actor && command.message.author?.actorId === actor.actorId ? updateRoom(session, command.roomPublicId, (value) => ({ ...value, messages: [...value.messages, command.message] })) : session;
+  if (command.type === "POST_MESSAGE") return capabilities.canChat && actor && command.message.author?.actorId === actor.actorId && isMessage(command.message) ? updateRoom(session, command.roomPublicId, (value) => ({ ...value, messages: [...value.messages, command.message] })) : session;
   if (command.type === "RECALL_MESSAGE") return capabilities.canChat ? updateRoom(session, command.roomPublicId, (value) => ({ ...value, messages: value.messages.filter((message) => message.id !== command.messageId || message.author?.actorId !== command.actorId || asTime(command.nowIso) - asTime(message.sentAt) > 120_000) })) : session;
   if (command.type === "DELETE_OWN_MESSAGE") return capabilities.canChat ? updateRoom(session, command.roomPublicId, (value) => ({ ...value, messages: value.messages.filter((message) => message.id !== command.messageId || message.author?.actorId !== command.actorId) })) : session;
   if (command.type === "DELETE_MESSAGE") return capabilities.canModerate ? updateRoom(session, command.roomPublicId, (value) => ({ ...value, messages: value.messages.filter((message) => message.id !== command.messageId) })) : session;
@@ -279,7 +281,7 @@ function applyCommand(session: MockSession, command: MockCommand): MockSession {
     }
     return next;
   }) : session;
-  if (command.type === "ADD_BOARD_ITEM") return capabilities.canAddBoardItem && command.item.ownerActorId === command.actorId && (command.item.kind !== "photo" || room.photoCount < room.maxPhotos) ? updateRoom(session, command.roomPublicId, (value) => {
+  if (command.type === "ADD_BOARD_ITEM") return capabilities.canAddBoardItem && isBoardItem(command.item) && command.item.ownerActorId === command.actorId && (command.item.kind !== "photo" || room.photoCount < room.maxPhotos) ? updateRoom(session, command.roomPublicId, (value) => {
     const placed = snapBoardItem(value.boardItems, command.item);
     return placed ? { ...value, boardItems: [...value.boardItems, placed], photoCount: value.photoCount + (placed.kind === "photo" ? 1 : 0) } : value;
   }) : session;
@@ -298,19 +300,30 @@ function applyCommand(session: MockSession, command: MockCommand): MockSession {
   if (command.type === "DELETE_BOARD_ITEM") return capabilities.canAddBoardItem || capabilities.canModerate ? updateRoom(session, command.roomPublicId, (value) => {
     const target = value.boardItems.find((item) => item.id === command.itemId);
     if (!target || target.ownerActorId !== command.actorId && !capabilities.canModerate) return value;
-    return { ...value, boardItems: value.boardItems.filter((item) => item.id !== command.itemId), photoCount: Math.max(0, value.photoCount - (target.kind === "photo" ? 1 : 0)) };
+    return { ...value, boardItems: value.boardItems.filter((item) => item.id !== command.itemId), boardComments: target.kind === "photo" ? value.boardComments.filter((comment) => comment.photoId !== target.id) : value.boardComments, photoCount: Math.max(0, value.photoCount - (target.kind === "photo" ? 1 : 0)) };
   }) : session;
-  if (command.type === "ADD_BOARD_COMMENT") return capabilities.canAddBoardItem && command.comment.body.trim() ? updateRoom(session, command.roomPublicId, (value) => ({ ...value, boardItems: value.boardItems.map((item) => item.id === command.itemId && item.kind === "photo" ? { ...item, comments: [...(item.comments ?? []), { id: command.comment.id, actorId: command.actorId, body: command.comment.body.trim().slice(0, 120), createdAt: command.nowIso }] } : item) })) : session;
+  if (command.type === "ADD_BOARD_COMMENT") return capabilities.canAddBoardItem && command.comment.body.trim() ? updateRoom(session, command.roomPublicId, (value) => {
+    const photoExists = value.boardItems.some((item) => item.id === command.itemId && item.kind === "photo");
+    if (!photoExists || value.boardComments.some((comment) => comment.id === command.comment.id)) return value;
+    const comment: BoardComment = { id: command.comment.id, photoId: command.itemId, actorId: command.actorId, body: command.comment.body.trim().slice(0, 120), createdAt: command.nowIso };
+    return { ...value, boardComments: [...value.boardComments, comment] };
+  }) : session;
   if (command.type === "ADD_ITINERARY") return capabilities.canCreateItinerary && itineraryFitsRoom(command.item, room) ? updateRoom(session, command.roomPublicId, (value) => ({ ...value, itinerary: [...value.itinerary, command.item].sort(compareItinerary) })) : session;
   if (command.type === "UPDATE_ITINERARY") return capabilities.canRead && itineraryFitsRoom(command.item, room) ? updateRoom(session, command.roomPublicId, (value) => {
     const current = value.itinerary.find((item) => item.id === command.item.id);
-    if (!current || current.createdByActorId !== command.item.createdByActorId || current.createdAt !== command.item.createdAt || current.responsible.actorId !== command.actorId && !capabilities.canModerate) return value;
+    if (!current || current.createdByActorId !== command.item.createdByActorId || current.createdAt !== command.item.createdAt || current.endedAt !== command.item.endedAt || current.responsible.actorId !== command.actorId && !capabilities.canModerate) return value;
     return { ...value, itinerary: value.itinerary.map((item) => item.id === command.item.id ? command.item : item).sort(compareItinerary) };
   }) : session;
   if (command.type === "DELETE_ITINERARY") return capabilities.canRead ? updateRoom(session, command.roomPublicId, (value) => {
     const current = value.itinerary.find((item) => item.id === command.itemId);
     if (!current || current.responsible.actorId !== command.actorId && !capabilities.canModerate) return value;
     return { ...value, itinerary: value.itinerary.filter((item) => item.id !== command.itemId) };
+  }) : session;
+  if (command.type === "END_ITINERARY") return capabilities.canRead && room.lifecycle === "active" && asTime(room.endsAt ?? "") > asTime(command.nowIso) ? updateRoom(session, command.roomPublicId, (value) => {
+    const current = value.itinerary.find((item) => item.id === command.itemId);
+    if (!current || current.endMode !== "manual" || current.endedAt || asTime(command.nowIso) < asTime(current.startsAt) || current.responsible.actorId !== command.actorId && !capabilities.canModerate) return value;
+    const itinerary = value.itinerary.map((item) => item.id === current.id ? { ...item, endedAt: command.nowIso, updatedAt: command.nowIso } : item);
+    return systemMessage({ ...value, itinerary }, `${current.title} ended.`, command.nowIso);
   }) : session;
   if (command.type === "UPDATE_DURATION") return capabilities.canChangeDuration && asTime(command.endsAt) > asTime(command.nowIso) && asTime(command.endsAt) <= asTime(command.nowIso) + 24 * 60 * 60_000 ? updateRoom(session, command.roomPublicId, (value) => ({ ...value, endsAt: command.endsAt })) : session;
   if (command.type === "ROTATE_INVITE") return capabilities.canModerate ? updateRoom(session, command.roomPublicId, (value) => ({ ...value, inviteCode: command.inviteCode, inviteRevision: value.inviteRevision + 1 })) : session;
@@ -352,14 +365,14 @@ const isInt = (value: unknown, min: number, max: number) => Number.isInteger(val
 const isActor = (value: unknown) => typeof value === "string" && Boolean(parseActorId(value));
 const isPerson = (value: unknown) => isRecord(value) && isActor(value.actorId) && isText(value.displayName, 60, false) && isText(value.initials, 3, false) && ["host", "admin", "member"].includes(String(value.role)) && typeof value.isGuest === "boolean";
 const isMessageContent = (value: unknown) => value === undefined || isRecord(value) && (
-  value.type === "image" && typeof value.dataUrl === "string" && value.dataUrl.startsWith("data:image/") && value.dataUrl.length <= 1_200_000 && isText(value.name, 120) && Number.isFinite(value.aspectRatio) && Number(value.aspectRatio) > 0
+  value.type === "image" && isAssetReference(value.asset, "image") && isText(value.name, 120) && Number.isFinite(value.aspectRatio) && Number(value.aspectRatio) > 0
   || value.type === "location" && Number.isFinite(value.latitude) && Number.isFinite(value.longitude) && Number(value.latitude) >= -90 && Number(value.latitude) <= 90 && Number(value.longitude) >= -180 && Number(value.longitude) <= 180 && isText(value.label, 120, false)
-  || value.type === "voice" && isInt(value.durationSeconds, 1, 60) && typeof value.dataUrl === "string" && value.dataUrl.startsWith("data:audio/") && value.dataUrl.length <= 1_200_000 && isText(value.mimeType, 80, false)
+  || value.type === "voice" && isInt(value.durationSeconds, 1, 60) && isAssetReference(value.asset, "audio")
 );
 const isMessage = (value: unknown) => isRecord(value) && isText(value.id, 100, false) && ["message", "system"].includes(String(value.kind)) && (value.author === null || isPerson(value.author)) && isText(value.body, 2000) && isIso(value.sentAt) && isMessageContent(value.content) && Array.isArray(value.reactions) && value.reactions.length <= 24 && value.reactions.every((reaction) => isRecord(reaction) && isText(reaction.emoji, 16, false) && isInt(reaction.count, 0, 100000));
-const isBoardComment = (value: unknown) => isRecord(value) && isText(value.id, 100, false) && isActor(value.actorId) && isText(value.body, 120, false) && isIso(value.createdAt);
-const isBoardItem = (value: unknown) => isRecord(value) && isText(value.id, 100, false) && isActor(value.ownerActorId) && Number.isFinite(value.x) && Number.isFinite(value.y) && Number.isFinite(value.rotation) && (value.kind === "note" ? isText(value.text, 500, false) && (value.width === undefined || Number.isFinite(value.width)) && (value.height === undefined || Number.isFinite(value.height)) && (value.variant === undefined || ["paper", "ink", "sage"].includes(String(value.variant))) : value.kind === "drawing" ? typeof value.imageDataUrl === "string" && value.imageDataUrl.startsWith("data:image/") && value.imageDataUrl.length <= 1_200_000 && Number.isFinite(value.width) && Number.isFinite(value.height) : value.kind === "photo" && ["one", "two", "three", "four"].includes(String(value.variant)) && (value.frameVariant === undefined || ["pin", "gallery", "instant", "tape", "dark"].includes(String(value.frameVariant))) && (value.note === null || isText(value.note, 500)) && (value.imageDataUrl === undefined || typeof value.imageDataUrl === "string" && value.imageDataUrl.startsWith("data:image/") && value.imageDataUrl.length <= 3_200_000) && (value.imageName === undefined || isText(value.imageName, 120)) && (value.aspectRatio === undefined || Number.isFinite(value.aspectRatio) && Number(value.aspectRatio) > 0) && Number.isFinite(value.width) && (value.comments === undefined || Array.isArray(value.comments) && value.comments.length <= 1000 && value.comments.every(isBoardComment)));
-const isItinerary = (value: unknown) => isRecord(value) && isText(value.id, 100, false) && isText(value.title, 80, false) && isText(value.description, 500) && isIso(value.startsAt) && isIso(value.endsAt) && asTime(String(value.endsAt)) > asTime(String(value.startsAt)) && (value.locationLabel === null || isText(value.locationLabel, 120)) && (value.mapsUrl === null || isText(value.mapsUrl, 500)) && isPerson(value.responsible) && isActor(value.createdByActorId) && isIso(value.createdAt) && isIso(value.updatedAt);
+const isBoardComment = (value: unknown) => isRecord(value) && isText(value.id, 100, false) && isText(value.photoId, 100, false) && isActor(value.actorId) && isText(value.body, 120, false) && isIso(value.createdAt);
+const isBoardItem = (value: unknown) => isRecord(value) && isText(value.id, 100, false) && isActor(value.ownerActorId) && Number.isFinite(value.x) && Number.isFinite(value.y) && Number.isFinite(value.rotation) && (value.kind === "note" ? isText(value.text, 500, false) && (value.width === undefined || Number.isFinite(value.width)) && (value.height === undefined || Number.isFinite(value.height)) && (value.variant === undefined || ["paper", "ink", "sage"].includes(String(value.variant))) : value.kind === "drawing" ? isAssetReference(value.asset, "image") && Number.isFinite(value.width) && Number.isFinite(value.height) : value.kind === "photo" && ["one", "two", "three", "four"].includes(String(value.variant)) && (value.frameVariant === undefined || ["pin", "gallery", "instant", "tape", "dark"].includes(String(value.frameVariant))) && (value.note === null || isText(value.note, 500)) && (value.asset === undefined || isAssetReference(value.asset, "image")) && (value.imageName === undefined || isText(value.imageName, 120)) && (value.aspectRatio === undefined || Number.isFinite(value.aspectRatio) && Number(value.aspectRatio) > 0) && Number.isFinite(value.width));
+const isItinerary = (value: unknown) => isRecord(value) && isText(value.id, 100, false) && isText(value.title, 80, false) && isText(value.description, 500) && isIso(value.startsAt) && ["scheduled", "manual"].includes(String(value.endMode)) && (value.endMode === "scheduled" && isIso(value.endsAt) && asTime(String(value.endsAt)) > asTime(String(value.startsAt)) || value.endMode === "manual" && value.endsAt === null) && isIso(value.endedAt, true) && (value.endedAt === null || value.endMode === "manual" && asTime(String(value.endedAt)) >= asTime(String(value.startsAt))) && (value.locationLabel === null || isText(value.locationLabel, 120)) && (value.mapsUrl === null || isText(value.mapsUrl, 500)) && isPerson(value.responsible) && isActor(value.createdByActorId) && isIso(value.createdAt) && isIso(value.updatedAt);
 const isJoinRequest = (value: unknown) => isRecord(value) && isText(value.id, 100, false) && isActor(value.actorId) && isText(value.displayName, 60, false) && isText(value.initials, 3, false) && isText(value.note, 240) && isIso(value.requestedAt) && ["pending", "approved", "rejected"].includes(String(value.state));
 const isReport = (value: unknown) => isRecord(value) && isText(value.id, 100, false) && isActor(value.reporterActorId) && isText(value.description, 1000, false) && isIso(value.createdAt) && (value.hostReply === null || isText(value.hostReply, 500, false));
 const isProposal = (value: unknown) => value === undefined || isRecord(value) && (value.kind === "itinerary" && isItinerary(value.item) || value.kind === "extend-room" && isIso(value.endsAt) || value.kind === "end-room" || value.kind === "remove-member" && isActor(value.targetActorId));
@@ -369,7 +382,10 @@ function isMockRoom(value: unknown) {
   if (!isRecord(value) || typeof value.id !== "string" || !parseRoomId(value.id) || typeof value.publicId !== "string" || !parseRoomPublicId(value.publicId)) return false;
   if (!isText(value.name, 80, false) || !isText(value.description, 500) || !["host-led", "community-led"].includes(String(value.mode)) || !["active", "archived"].includes(String(value.status)) || !["active", "freezing", "archiving", "archived"].includes(String(value.lifecycle))) return false;
   if (!isText(value.timeZone, 80, false) || !["stone", "linen", "charcoal", "herbarium", "clover", "bluebell"].includes(String(value.boardBackground ?? "stone")) || !isIso(value.endsAt, true) || !isIso(value.archivedAt, true) || !isIso(value.createdAt) || !isInt(value.memberCount, 0, 100) || !isInt(value.memberLimit, 2, 100) || !isInt(value.photoCount, 0, 500) || !isInt(value.maxPhotos, 1, 500) || !isInt(value.mediaLimitMb, 1, 100000)) return false;
-  if (!Array.isArray(value.members) || value.members.length > 100 || !value.members.every(isPerson) || !Array.isArray(value.messages) || value.messages.length > 5000 || !value.messages.every(isMessage) || !Array.isArray(value.boardItems) || value.boardItems.length > 500 || !value.boardItems.every(isBoardItem) || !Array.isArray(value.itinerary) || value.itinerary.length > 500 || !value.itinerary.every(isItinerary)) return false;
+  if (!Array.isArray(value.members) || value.members.length > 100 || !value.members.every(isPerson) || !Array.isArray(value.messages) || value.messages.length > 5000 || !value.messages.every(isMessage) || !Array.isArray(value.boardItems) || value.boardItems.length > 500 || !value.boardItems.every(isBoardItem) || !Array.isArray(value.boardComments) || value.boardComments.length > 5000 || !value.boardComments.every(isBoardComment) || !Array.isArray(value.itinerary) || value.itinerary.length > 500 || !value.itinerary.every(isItinerary)) return false;
+  const photoIds = new Set(value.boardItems.filter((item) => isRecord(item) && item.kind === "photo").map((item) => String(item.id)));
+  const actorIds = new Set(value.members.filter(isRecord).map((member) => String(member.actorId)));
+  if (new Set(value.boardComments.map((comment) => isRecord(comment) ? comment.id : null)).size !== value.boardComments.length || !value.boardComments.every((comment) => isRecord(comment) && photoIds.has(String(comment.photoId)) && actorIds.has(String(comment.actorId)))) return false;
   if (!isPoll(value.activePoll) || value.pollHistory !== undefined && (!Array.isArray(value.pollHistory) || value.pollHistory.length > 500 || !value.pollHistory.every((item) => item !== null && isPoll(item))) || !Array.isArray(value.joinRequests) || value.joinRequests.length > 500 || !value.joinRequests.every(isJoinRequest) || !Array.isArray(value.reports) || value.reports.length > 500 || !value.reports.every(isReport)) return false;
   if (!Array.isArray(value.archiveActorIds) || !value.archiveActorIds.every(isActor) || !Array.isArray(value.archiveRemovedBy) || !value.archiveRemovedBy.every(isActor) || !isRecord(value.membershipStates) || !Object.entries(value.membershipStates).every(([id, state]) => isActor(id) && ["active", "muted", "removed", "banned"].includes(String(state)))) return false;
   return isText(value.inviteCode, 40, false) && isInt(value.inviteRevision, 1, 1000000) && typeof value.requiresApproval === "boolean" && (value.pinnedMessageId === null || isText(value.pinnedMessageId, 100, false));
@@ -380,9 +396,12 @@ function migrateItineraryItem(value: unknown): unknown {
   if (!isPerson(value.responsible)) return value;
   const responsible = value.responsible as PersonSummary;
   const startsAt = String(value.startsAt);
+  const endMode = value.endMode === "manual" ? "manual" : "scheduled";
   return {
     ...value,
-    endsAt: isIso(value.endsAt) && asTime(String(value.endsAt)) > asTime(startsAt) ? value.endsAt : new Date(asTime(startsAt) + 60 * 60_000).toISOString(),
+    endMode,
+    endsAt: endMode === "manual" ? null : isIso(value.endsAt) && asTime(String(value.endsAt)) > asTime(startsAt) ? value.endsAt : new Date(asTime(startsAt) + 60 * 60_000).toISOString(),
+    endedAt: endMode === "manual" && isIso(value.endedAt) && asTime(String(value.endedAt)) >= asTime(startsAt) ? value.endedAt : null,
     createdByActorId: isActor(value.createdByActorId) ? value.createdByActorId : responsible.actorId,
     createdAt: isIso(value.createdAt) ? value.createdAt : startsAt,
     updatedAt: isIso(value.updatedAt) ? value.updatedAt : startsAt,
@@ -394,17 +413,34 @@ function migratePoll(value: unknown): unknown {
   return { ...value, proposal: { ...value.proposal, item: migrateItineraryItem(value.proposal.item) } };
 }
 
+function migrateBoardData(room: Record<string, unknown>) {
+  if (!Array.isArray(room.boardItems)) return room;
+  const boardComments = Array.isArray(room.boardComments) ? room.boardComments : [];
+  const migratedComments = room.boardItems.flatMap((item) => {
+    if (!isRecord(item) || item.kind !== "photo" || !Array.isArray(item.comments)) return [];
+    return item.comments.filter(isRecord).map((comment) => ({ ...comment, photoId: item.id }));
+  });
+  const boardItems = room.boardItems.map((item) => {
+    if (!isRecord(item) || !("comments" in item)) return item;
+    const boardItem = { ...item };
+    delete boardItem.comments;
+    return boardItem;
+  });
+  return { ...room, boardItems, boardComments: [...boardComments, ...migratedComments] };
+}
+
 function migratePersistedSession(value: unknown): unknown {
-  if (!isRecord(value) || value.version !== 3 || !Array.isArray(value.rooms)) return value;
+  if (!isRecord(value) || ![3, 4, 5, 6].includes(Number(value.version)) || !Array.isArray(value.rooms)) return value;
+  const migrateItinerary = value.version === 3 || value.version === 4;
   return {
     ...value,
     version: MOCK_SESSION_VERSION,
-    rooms: value.rooms.map((room) => isRecord(room) ? {
+    rooms: value.rooms.map((room) => isRecord(room) ? migrateBoardData(migrateItinerary ? {
       ...room,
       itinerary: Array.isArray(room.itinerary) ? room.itinerary.map(migrateItineraryItem) : room.itinerary,
       activePoll: migratePoll(room.activePoll),
       pollHistory: Array.isArray(room.pollHistory) ? room.pollHistory.map(migratePoll) : room.pollHistory,
-    } : room),
+    } : room) : room),
   };
 }
 
@@ -421,5 +457,5 @@ export function parsePersistedMockSession(value: string): MockSession | null {
 export function createRoomFromDraft(draft: CreateRoomDraft, viewer: MockViewer, ids: Pick<MockRoom, "id" | "publicId">, nowIso: string): MockRoom {
   const now = asTime(nowIso);
   const creator: PersonSummary = { actorId: viewer.actorId, displayName: viewer.displayName, initials: viewer.initials, role: draft.leadership === "host-led" ? "host" : "member", isGuest: false };
-  return { id: ids.id, publicId: ids.publicId, name: draft.name.trim(), description: draft.description.trim(), mode: draft.leadership, status: "active", lifecycle: "active", timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC", endsAt: new Date(now + draft.durationMinutes * 60_000).toISOString(), archivedAt: null, memberCount: 1, photoCount: 0, boardPreview: ["one"], boardNote: draft.name.trim().toLocaleLowerCase(), boardBackground: "stone", isFavorite: false, memberListVisibility: draft.leadership === "community-led" ? "members" : draft.memberListVisibility, members: [creator], messages: [{ id: `system_created_${now}`, kind: "system", author: null, body: `${viewer.displayName} created the room.`, sentAt: nowIso, isOwn: false, reactions: [] }], activePoll: null, pollHistory: [], boardItems: [], itinerary: [], createdAt: nowIso, inviteCode: `E${Math.floor(now / 1000).toString(36).slice(-5).toUpperCase()}`, inviteRevision: 1, requiresApproval: draft.requiresApproval, membershipStates: { [viewer.actorId]: "active" }, archiveActorIds: [viewer.actorId], archiveRemovedBy: [], joinRequests: [], pinnedMessageId: null, memberLimit: draft.memberLimit, maxPhotos: 25, mediaLimitMb: 250, reports: [] };
+  return { id: ids.id, publicId: ids.publicId, name: draft.name.trim(), description: draft.description.trim(), mode: draft.leadership, status: "active", lifecycle: "active", timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC", endsAt: new Date(now + draft.durationMinutes * 60_000).toISOString(), archivedAt: null, memberCount: 1, photoCount: 0, boardPreview: ["one"], boardNote: draft.name.trim().toLocaleLowerCase(), boardBackground: "stone", isFavorite: false, memberListVisibility: draft.leadership === "community-led" ? "members" : draft.memberListVisibility, members: [creator], messages: [{ id: `system_created_${now}`, kind: "system", author: null, body: `${viewer.displayName} created the room.`, sentAt: nowIso, isOwn: false, reactions: [] }], activePoll: null, pollHistory: [], boardItems: [], boardComments: [], itinerary: [], createdAt: nowIso, inviteCode: `E${Math.floor(now / 1000).toString(36).slice(-5).toUpperCase()}`, inviteRevision: 1, requiresApproval: draft.requiresApproval, membershipStates: { [viewer.actorId]: "active" }, archiveActorIds: [viewer.actorId], archiveRemovedBy: [], joinRequests: [], pinnedMessageId: null, memberLimit: draft.memberLimit, maxPhotos: 25, mediaLimitMb: 250, reports: [] };
 }
