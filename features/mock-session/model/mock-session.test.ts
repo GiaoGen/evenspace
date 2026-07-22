@@ -294,6 +294,44 @@ describe("backend-facing command validation", () => {
     expect(result.rooms[0].boardItems).toContainEqual(expect.objectContaining({ id: "note_test", text: "Saved locally" }));
   });
 
+  it("persists memoir page placement and paper style independently", () => {
+    const session = createTestSession();
+    const withPage = mockSessionReducer(session, {
+      type: "COMMAND",
+      command: { type: "ADD_MEMOIR_SPREAD", roomPublicId: session.rooms[0].publicId, actorId: session.viewer.actorId, nowIso: TEST_NOW_ISO },
+    });
+    const withNote = mockSessionReducer(withPage, {
+      type: "COMMAND",
+      command: {
+        type: "ADD_BOARD_ITEM",
+        roomPublicId: session.rooms[0].publicId,
+        actorId: session.viewer.actorId,
+        nowIso: TEST_NOW_ISO,
+        item: { id: "memoir_note", kind: "note", ownerActorId: session.viewer.actorId, text: "Page two", x: 0, y: 0, rotation: 0, memoirPage: 2 },
+      },
+    });
+    const result = mockSessionReducer(withNote, {
+      type: "COMMAND",
+      command: { type: "SET_MEMOIR_PAGE_STYLE", roomPublicId: session.rooms[0].publicId, actorId: session.viewer.actorId, nowIso: TEST_NOW_ISO, pageNumber: 2, style: "sage" },
+    });
+
+    expect(result.rooms[0].boardItems).toContainEqual(expect.objectContaining({ id: "memoir_note", memoirPage: 2 }));
+    expect(result.rooms[0].memoirPageStyles).toEqual({ "2": "sage" });
+    expect(result.rooms[0].memoirPageCount).toBe(4);
+  });
+
+  it("saves a memoir photo and its pinned caption atomically", () => {
+    const session = createTestSession();
+    const photo = { id: "memoir_photo", kind: "photo" as const, ownerActorId: session.viewer.actorId, variant: "one" as const, note: null, x: 0, y: 0, rotation: 0, width: 24, memoirPage: 1 };
+    const result = mockSessionReducer(session, {
+      type: "COMMAND",
+      command: { type: "ADD_MEMOIR_PHOTO", roomPublicId: session.rooms[0].publicId, actorId: session.viewer.actorId, nowIso: TEST_NOW_ISO, item: photo, caption: { id: "caption_one", body: "A pinned memory" } },
+    });
+
+    expect(result.rooms[0].boardItems).toContainEqual(photo);
+    expect(result.rooms[0].boardComments).toContainEqual(expect.objectContaining({ id: "caption_one", photoId: photo.id, kind: "caption" }));
+  });
+
   it("rejects malformed media content at the command boundary", () => {
     const session = createTestSession();
     const malformedMessage = {

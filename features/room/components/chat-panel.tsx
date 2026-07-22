@@ -296,7 +296,7 @@ export function ChatPanel({ roomPublicId, messages, poll, pinnedMessageId, membe
     if (message.content?.type !== "image") return;
     dispatch({ type: "COMMAND", command: { type: "ADD_BOARD_ITEM", ...commandBase(), item: { id: `board_photo_${createUuid()}`, kind: "photo", ownerActorId: session.viewer.actorId, variant: "one", asset: message.content.asset, imageName: message.content.name, aspectRatio: message.content.aspectRatio, note: message.body || null, x: 36, y: 28, rotation: -2, width: 25 } } });
     setSelectedMessageId(null);
-    setNotice("Added to board");
+    setNotice("Added to photos");
   }
 
   async function downloadImage(message: ChatMessage) {
@@ -530,7 +530,7 @@ export function ChatPanel({ roomPublicId, messages, poll, pinnedMessageId, membe
     {typeof document !== "undefined" && selectedMessage ? createPortal(<div className={styles.sheetBackdrop} onPointerDown={() => setSelectedMessageId(null)}><section className={styles.messageSheet} aria-label="Message actions" onPointerDown={(event) => event.stopPropagation()}><div className={styles.quickReactions}>{["♥", "👍", "✨"].map((emoji) => <button key={emoji} type="button" onClick={() => messageCommand("REACT_MESSAGE", selectedMessage.id, emoji)}>{emoji}</button>)}</div><div className={styles.actionList}>
       <button type="button" onClick={() => { setReplyTo(selectedMessage.id); setSelectedMessageId(null); textareaRef.current?.focus(); }}><Icon name="reply" />Reply</button>
       <button type="button" onClick={() => void copyMessage(selectedMessage)}><Icon name="copy" />Copy</button>
-      {selectedMessage.content?.type === "image" ? <><button type="button" onClick={() => addImageToBoard(selectedMessage)}><Icon name="board" />Add to board</button><button type="button" onClick={() => downloadImage(selectedMessage)}><Icon name="image" />Save photo</button></> : null}
+      {selectedMessage.content?.type === "image" ? <><button type="button" onClick={() => addImageToBoard(selectedMessage)}><Icon name="image" />Add to photos</button><button type="button" onClick={() => downloadImage(selectedMessage)}><Icon name="image" />Save photo</button></> : null}
       {canModerate ? <button type="button" onClick={() => messageCommand("PIN_MESSAGE", selectedMessage.id)}><Icon name="pin" />Pin message</button> : null}
       {selectedMessage.author?.actorId === session.viewer.actorId ? <button type="button" className={styles.dangerAction} onClick={() => messageCommand("DELETE_OWN_MESSAGE", selectedMessage.id)}><Icon name="trash" />Delete</button> : canModerate ? <button type="button" className={styles.dangerAction} onClick={() => messageCommand("DELETE_MESSAGE", selectedMessage.id)}><Icon name="trash" />Delete for room</button> : null}
     </div></section></div>, document.body) : null}

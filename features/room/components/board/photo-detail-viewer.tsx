@@ -4,8 +4,8 @@ import { useCallback, useEffect, useRef, useState, type FormEvent } from "react"
 import { createPortal } from "react-dom";
 import { PinnedPhoto } from "@/components/pinboard/pinned-photo";
 import { Icon } from "@/components/ui/icon";
-import { getBoardPhotoFrameAspectRatio } from "@/core/domain/board-layout";
 import type { BoardComment, BoardPhoto, PersonSummary } from "@/core/domain/room";
+import { LocalAssetImage } from "@/features/local-assets/components/local-asset-image";
 import { type PhotoNavigationDirection, usePhotoSwipe } from "./use-photo-swipe";
 import styles from "./board.module.css";
 
@@ -28,7 +28,7 @@ export function PhotoDetailViewer({ photo, photos, comments, members, canDelete,
   const [mounted, setMounted] = useState(false);
   const [motionDirection, setMotionDirection] = useState<PhotoNavigationDirection | null>(null);
   const composerInputRef = useRef<HTMLInputElement | null>(null);
-  const owner = members.find((member) => member.actorId === photo.ownerActorId) ?? null;
+  const owner = members.find((member) => member.actorId === (photo.sourceActorId ?? photo.ownerActorId)) ?? null;
   const photoIndex = photos.findIndex((item) => item.id === photo.id);
   const previousPhoto = photoIndex > 0 ? photos[photoIndex - 1] : null;
   const nextPhoto = photoIndex >= 0 && photoIndex < photos.length - 1 ? photos[photoIndex + 1] : null;
@@ -73,8 +73,10 @@ export function PhotoDetailViewer({ photo, photos, comments, members, canDelete,
         </div>
         <div className={styles.photoDetailMedia} {...mediaProps}>
           <button type="button" className={`${styles.photoDetailArrow} ${styles.photoDetailPrevious}`} disabled={!previousPhoto} onClick={() => navigate(-1)} aria-label="Previous photo"><Icon name="chevron" /></button>
-          <div key={photo.id} className={motionDirection === -1 ? styles.photoEnterFromLeft : motionDirection === 1 ? styles.photoEnterFromRight : undefined} style={{ ...photoStyle, aspectRatio: String(getBoardPhotoFrameAspectRatio(photo)) }}>
-            <PinnedPhoto variant={photo.variant} frameVariant={photo.frameVariant} note={photo.asset ? null : photo.note} asset={photo.asset} imageName={photo.imageName} className={styles.photoDetailImage} />
+          <div key={photo.id} className={motionDirection === -1 ? styles.photoEnterFromLeft : motionDirection === 1 ? styles.photoEnterFromRight : undefined} style={photoStyle}>
+            <div className={styles.photoDetailCanvas}>
+              {photo.asset ? <LocalAssetImage asset={photo.asset} alt={photo.imageName ? `Photo: ${photo.imageName}` : "Room photo"} fill sizes="(max-width: 700px) 100vw, 620px" className={styles.photoDetailObject} /> : <PinnedPhoto variant={photo.variant} note={null} bare className={styles.photoDetailImage} />}
+            </div>
           </div>
           <button type="button" className={`${styles.photoDetailArrow} ${styles.photoDetailNext}`} disabled={!nextPhoto} onClick={() => navigate(1)} aria-label="Next photo"><Icon name="chevron" /></button>
         </div>
@@ -83,7 +85,7 @@ export function PhotoDetailViewer({ photo, photos, comments, members, canDelete,
           <div className={styles.photoCommentList} aria-label="Photo comments">
             {comments.length ? comments.map((comment) => {
               const author = members.find((member) => member.actorId === comment.actorId) ?? null;
-              return <article key={comment.id}><b>{author?.initials ?? "?"}</b><div><header><strong>{author?.displayName ?? "Member"}</strong><time>{formatCommentTime(comment.createdAt)}</time></header><p>{comment.body}</p></div></article>;
+              return <article key={comment.id} className={comment.kind === "caption" ? styles.pinnedCaption : undefined}><b>{author?.initials ?? "?"}</b><div><header><strong>{author?.displayName ?? "Member"}</strong><time>{comment.kind === "caption" ? "Caption" : formatCommentTime(comment.createdAt)}</time></header><p>{comment.body}</p></div></article>;
             }) : <div className={styles.photoCommentEmpty}><strong>No comments yet.</strong><span>Leave the first note below.</span></div>}
           </div>
           <form className={styles.photoDetailComposer} onSubmit={submit}>
