@@ -1,11 +1,11 @@
 # EventSpace 交互式 Mock 覆盖与边界
 
-> 状态：2026-07-20。正式产品路由已经从静态高保真原型进入本地优先可操作 Mock。本文用于防止把“界面存在”“浏览器本地可操作”和“生产后端已安全实现”混为一谈。
+> 状态：2026-07-26。正式产品路由已经从静态高保真原型进入本地优先可操作 Mock。本文用于防止把“界面存在”“浏览器本地可操作”和“生产后端已安全实现”混为一谈。
 
 ## 1. Mock 会话模型
 
 - 所有正式产品路由共享同一套类型化 `MockSession` 和纯 reducer 命令。
-- fixture 只用于首次初始化；后续创建、消息、投票、画板、行程、成员与归档操作写入 `localStorage` 键 `eventspace:local-session:v1`，并兼容读取旧 `sessionStorage` 数据。
+- fixture 只用于首次初始化；后续创建、消息、投票、回忆录、行程、成员与归档操作写入 `localStorage` 键 `eventspace:local-session:v1`，媒体 Blob 写入 IndexedDB，并兼容旧会话迁移。
 - 刷新、关闭标签页和重新打开浏览器通常会恢复状态；清除站点数据或执行 `Reset Mock session` 会恢复 fixture。
 - 从存储恢复前进行版本和基本结构检查；无效或旧版本数据被丢弃。
 - Mock 数据不会写入服务器、数据库、Storage、支付或真实身份系统。
@@ -17,8 +17,8 @@
 | --- | --- |
 | `/` | Landing、创建入口、样例邀请、账户与法律入口 |
 | `/rooms` | All/Active/Achieved/Favorite、原位搜索、Magazine/Grid、真实横滑进度、编辑收藏/删除确认、真实 Board snapshot、打开新创建房间 |
-| `/rooms/new` | 登录门槛、五步创建状态机、草稿恢复、完整校验、创建到列表/房间闭环和邀请卡 PNG 导出 |
-| `/rooms/[roomId]` | Chat / Board / Itinerary、Share / Members / More、归档与访问终止状态 |
+| `/rooms/new` | 登录门槛、三步创建状态机、草稿恢复、校验、创建到列表/房间闭环和邀请卡 PNG 导出 |
+| `/rooms/[roomId]` | Chat / Photos / Itinerary、Share / Members / More、照片上传/详情评论、归档与访问终止状态 |
 | `/join` | 邀请码解析、失效反馈、跳转到当前有效邀请 |
 | `/join/[roomId]` | 私密邀请、唯一昵称、头像选择、申请备注、免审核直入、Host 审核或 Community 多数表决闭环 |
 | `/account` | 卡片内昵称编辑、头像缩写、访客/登录 Mock、主题预览、本地房间摘要、会话重置、法律入口 |
@@ -30,17 +30,16 @@
 
 - 文字发送、房内搜索、回复、表情回应、两分钟撤回；管理员删除与置顶。
 - 按住录制、左滑取消、松开发送且最多 60 秒的真实浏览器本地录音；调用麦克风并把音频 Blob 存入 IndexedDB，但不上传服务器。
-- Camera / Photos、当前位置、图片预览/大图、图片添加到 Board，以及消息分组、长按操作和未读跳转。
-- 公开/匿名 yes-no 投票创建、固定分母、票数显示、单人单票与过半即时决议。
-- Community-led 的入房、行程、延时、结束与移除成员提案可在多数票通过后落地到对应状态；Host-led 的 Host/Admin 也可发起治理投票。
+- 工具托盘当前只提供房内搜索；不提供 Camera、Photos 或当前位置发送。既有图片消息仍可查看、下载或加入 Photos。
+- 每条普通消息以稳定随机色卡片呈现；支持回复、反应、两分钟撤回、管理员删除与置顶、长按操作和未读跳转。
+- reducer 中保留投票与 Community-led 兼容命令，但 `RoomExperience` 当前传入 `canVote=false` 且不渲染聊天投票入口，不能宣称投票为当前 Room 可操作能力。
 
-### Board
+### Photos
 
-- Board / Sequence 切换；添加真实本地照片、便签或涂鸦。照片读取后先横滑选择五种相框，再写入画板。
-- 短点击照片打开全屏大图与纵向评论详情；作者、评论者和底部输入栏位于独立详情层，不再叠加弹幕。
-- 发布者移动与删除；Host/管理员只可删除他人内容。
-- 新元素从共享区域开始，命令层执行世界边界、照片最多 20% 重叠、注释不遮挡与邻近距离检查；冲突位置自动吸附到最近可用位置，照片数量配额生效。
-- 图片读取真实文件并在浏览器 canvas 压缩；这不构成可验证 EXIF 清理或私有上传。
+- 以照片网格浏览现有 `BoardPhoto`；可从本机多选图片，浏览器压缩后写入 IndexedDB，并受 `maxPhotos` 配额限制。
+- 短点击照片打开全屏详情与纵向评论；本人或管理员可删除，评论仍通过 `ADD_BOARD_COMMENT` 写入本地 session。
+- 没有 Book、双页 spread、caption 提交层、相机入口、Chat 内容导入、纸张样式或复杂自由排版。
+- `MockSession` v7 的 `boardItems` / `boardComments` 是当前本地兼容存储，而不是未来生产 API 的推荐命名。
 
 ### Itinerary
 
@@ -76,7 +75,9 @@
 2. 为服务端建立独立 DTO/schema，不复用可信度不足的客户端 draft 或 session 数据。
 3. Mock reducer 负责演示和交互回归；生产授权以数据库事务、RLS、RPC 和服务器时间为准。
 4. 每替换一个 Mock 命令，都先补无权限、过期、重复、乱序和失败路径测试，再移除对应 Mock 边界文案。
-## 2026-07-18 当前同步：本地优先 Mock 覆盖
+## 2026-07-18 历史同步：旧本地优先 Mock 覆盖
+
+> 本节保留当时的 Board 覆盖记录；当前正式入口以本文开头和 2026-07-23 同步为准。
 
 本文件仍用于区分“界面存在”“浏览器本地 Mock 可操作”和“生产后端已安全实现”。当前代码已经从早期 `sessionStorage` 单标签 mock 推进到 `localStorage` 本地优先 session：主键为 `eventspace:local-session:v1`，同时兼容读取旧键 `eventspace:mock-session:v3`。这提升了刷新和重新打开浏览器后的恢复能力，但仍不是多设备、多人实时或服务端持久化。
 
@@ -84,7 +85,7 @@
 
 - `/`：正式 Landing、创建入口、邀请/加入入口、账号与法律入口。
 - `/rooms`：All / Active / Achieved / Favorite 筛选、搜索、单列横滑/双列网格、编辑模式、收藏、删除个人入口、真实画板快照预览、到期房间展示层归档。
-- `/rooms/new`：本地账号门槛、五步创建、小时/分钟纵向滚轮、独立本地草稿恢复、创建后写入本地 session、邀请卡片 PNG 导出、mock QR / 邀请码、Open this room。
+- `/rooms/new`：本地账号门槛、三步创建、小时/分钟纵向滚轮、独立本地草稿恢复、创建后写入本地 session、邀请卡片 PNG 导出、mock QR / 邀请码、Open this room。
 - `/rooms/[roomId]`：Chat / Board / Itinerary 主体验，Board/Sequence 由顶部 Board tab 的下拉切换承载。
 - `/join` 与 `/join/[roomId]`：邀请码解析、私密邀请、昵称唯一性、头像/备注、审核等待、Host 审核或 Community 多数准入。
 - `/account`：本地身份、卡片内昵称编辑、头像缩写、三态主题、本地房间/画板摘要、Mock 登录状态、二次确认后重置本地 session。
@@ -125,7 +126,9 @@
 - `Save card` 可在浏览器本地导出 PNG；其中 QR 图案仍是视觉 mock，不保证可扫描或对应真实邀请链接。
 - 到期归档在 Rooms 展示层可见，但生产仍需要服务端定时任务或查询层统一裁决。
 
-## 2026-07-19 当前同步：Chat 媒体与 Board 重构
+## 2026-07-19 历史同步：Chat 媒体与旧 Board 重构
+
+> 旧 Board 能力保留为历史实现记录；当前正式 Room 覆盖以本文开头和 2026-07-26 同步为准。
 
 ### Chat 新增本地可操作能力
 
@@ -150,3 +153,17 @@
 - Geolocation 是精确敏感数据，当前没有后端同意记录、坐标降精度、保留策略或成员级下载审计。
 - `MediaRecorder` 编码取决于浏览器，尚未进行转码、恶意文件检查和跨浏览器播放保证。
 - Board 尚未以 100/200 张真实图片进行性能和存储压力验收。
+
+## 2026-07-23 历史同步：Photos/Book 回忆录
+
+- 正式 Room 已隐藏旧 Board/Sequence 入口，但旧组件和底层 `boardItems` 数据仍存在，供现有资产、评论和 Rooms snapshot 过渡复用。
+- `ADD_MEMOIR_PHOTO` 原子写入照片与可选 caption；`ADD_MEMOIR_SPREAD` 固定增加双页；`SET_MEMOIR_PAGE_STYLE` 只允许修改存在页且校验稳定枚举。
+- Book 的 StPageFlip 实例只在客户端初始化，等待字体和稳定尺寸后再揭示；ResizeObserver/visualViewport 更新尺寸，并在卸载时清理实例。
+- 已验证 390 x 844 的封面、单双页视角和翻页侧规则；尚未完成 iOS Safari/Android Chromium 真机长时间翻页、横竖屏切换与大书页压力测试。
+- Rooms 仍展示旧 Board snapshot/background；这不是最终回忆录卡片设计。
+
+## 2026-07-26 当前实现优先级
+
+- 本文之前标记为“当前同步”的 Photos/Book、Chat Camera/Location 与五步创建描述已被代码删除或收敛；以本文第 2、3 节为准。
+- Chat 的图片、位置和投票联合类型可因旧 session 留存而被渲染，但新 UI 不创建这些内容。兼容读取不等于继续支持发送。
+- Board/回忆录兼容字段仍会出现在 session 和 Rooms 摘要中；它们不是正式编辑画布，也没有跨端协作语义。

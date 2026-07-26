@@ -1,7 +1,7 @@
 "use client";
 
 import NextImage from "next/image";
-import { useEffect, useMemo, useRef, useState, type ChangeEvent, type CSSProperties, type FormEvent, type PointerEvent, type UIEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type FormEvent, type PointerEvent, type UIEvent } from "react";
 import { createPortal } from "react-dom";
 import { Icon, type IconName } from "@/components/ui/icon";
 import type { ActorId, RoomPublicId } from "@/core/domain/ids";
@@ -32,12 +32,10 @@ interface ChatPanelProps {
 }
 
 type PollKind = "yes-no" | "options" | "itinerary";
-type PendingImage = { readonly blob: Blob; readonly previewUrl: string; readonly name: string; readonly aspectRatio: number };
-type ToolId = "camera" | "album" | "location" | "poll" | "votes" | "search";
+type ToolId = "search";
 type Tool = { readonly id: ToolId; readonly label: string; readonly icon: IconName };
 
 const LONG_PRESS_MS = 380;
-const MAX_CHAT_IMAGE_BYTES = 900_000;
 const MAX_VOICE_BYTES = 900_000;
 const pollKinds: readonly { readonly kind: PollKind; readonly label: string; readonly summary: string }[] = [
   { kind: "yes-no", label: "Yes / No", summary: "A fast binary vote for simple decisions." },
@@ -45,48 +43,12 @@ const pollKinds: readonly { readonly kind: PollKind; readonly label: string; rea
   { kind: "itinerary", label: "Itinerary", summary: "Approve a plan and add it to the schedule." },
 ];
 const chatTools: readonly Tool[] = [
-  { id: "camera", label: "Camera", icon: "camera" },
-  { id: "album", label: "Photos", icon: "image" },
-  { id: "location", label: "Location", icon: "location" },
-  { id: "poll", label: "Poll", icon: "check" },
-  { id: "votes", label: "Votes", icon: "list" },
   { id: "search", label: "Search", icon: "search" },
 ];
 
 const formatDay = (value: string, timeZone: string) => new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone }).format(new Date(value));
 const dayKey = (value: string, timeZone: string) => new Intl.DateTimeFormat("en-CA", { year: "numeric", month: "2-digit", day: "2-digit", timeZone }).format(new Date(value));
 const messageLabel = (message?: ChatMessage) => message?.body || (message?.content?.type === "image" ? "Photo" : message?.content?.type === "location" ? message.content.label : message?.content?.type === "voice" ? "Voice message" : "Message");
-const canvasBlob = (canvas: HTMLCanvasElement, quality: number) => new Promise<Blob>((resolve, reject) => canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error("Image could not be compressed.")), "image/jpeg", quality));
-
-function decodeImage(file: File) {
-  return new Promise<HTMLImageElement>((resolve, reject) => {
-    const image = new Image();
-    const url = URL.createObjectURL(file);
-    image.onload = () => { URL.revokeObjectURL(url); resolve(image); };
-    image.onerror = () => { URL.revokeObjectURL(url); reject(new Error("This image cannot be read.")); };
-    image.src = url;
-  });
-}
-
-async function prepareImage(file: File): Promise<PendingImage> {
-  if (!file.type.startsWith("image/") && !/\.(avif|gif|heic|heif|jpe?g|png|webp)$/i.test(file.name)) throw new Error("Choose an image file.");
-  const image = await decodeImage(file);
-  const aspectRatio = image.naturalWidth / image.naturalHeight;
-  if (!Number.isFinite(aspectRatio) || aspectRatio <= 0) throw new Error("This image has no readable size.");
-  for (const attempt of [{ side: 1200, quality: .76 }, { side: 900, quality: .7 }, { side: 720, quality: .66 }]) {
-    const scale = Math.min(1, attempt.side / Math.max(image.naturalWidth, image.naturalHeight));
-    const canvas = document.createElement("canvas");
-    canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
-    canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
-    const context = canvas.getContext("2d");
-    if (!context) throw new Error("Image processing is unavailable.");
-    context.drawImage(image, 0, 0, canvas.width, canvas.height);
-    const blob = await canvasBlob(canvas, attempt.quality);
-    if (blob.size <= MAX_CHAT_IMAGE_BYTES) return { blob, previewUrl: URL.createObjectURL(blob), name: file.name.slice(0, 120), aspectRatio };
-  }
-  throw new Error("This image is too large for local chat storage.");
-}
-
 function preferredAudioMimeType() {
   if (typeof MediaRecorder === "undefined") return "";
   return ["audio/webm;codecs=opus", "audio/mp4", "audio/webm"].find((type) => MediaRecorder.isTypeSupported(type)) ?? "";
@@ -100,8 +62,6 @@ export function ChatPanel({ roomPublicId, messages, poll, pinnedMessageId, membe
   const [toolTrayOpen, setToolTrayOpen] = useState(false);
   const [replyTo, setReplyTo] = useState<string | null>(null);
   const [selectedMessageId, setSelectedMessageId] = useState<string | null>(null);
-  const [pendingImage, setPendingImage] = useState<PendingImage | null>(null);
-  const [imageCaption, setImageCaption] = useState("");
   const [imageViewerId, setImageViewerId] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [atBottom, setAtBottom] = useState(true);
@@ -124,8 +84,6 @@ export function ChatPanel({ roomPublicId, messages, poll, pinnedMessageId, membe
 
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
-  const cameraInputRef = useRef<HTMLInputElement | null>(null);
-  const albumInputRef = useRef<HTMLInputElement | null>(null);
   const pendingOwnScrollRef = useRef(false);
   const previousMessageCountRef = useRef(messages.length);
   const mountedRef = useRef(false);
@@ -148,11 +106,7 @@ export function ChatPanel({ roomPublicId, messages, poll, pinnedMessageId, membe
   const viewerImageUrl = useLocalAssetUrl(viewerImage?.content?.type === "image" ? viewerImage.content.asset : null);
   const visibleMessages = useMemo(() => query.trim() ? messages.filter((message) => `${messageLabel(message)} ${message.author?.displayName ?? ""}`.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase())) : messages, [messages, query]);
   const room = useMemo(() => session.rooms.find((item) => item.publicId === roomPublicId) ?? null, [roomPublicId, session.rooms]);
-  const voteCards = useMemo(() => {
-    const history = room?.pollHistory ?? [];
-    const cards = !poll ? history : history.some((item) => item.id === poll.id) ? history.map((item) => item.id === poll.id ? poll : item) : [...history, poll];
-    return [...cards].reverse();
-  }, [poll, room]);
+  const voteCards = useMemo(() => [], []);
   const { showInlinePoll, markVoteSubmitted } = useInlinePollVisibility(poll, session.viewer.actorId);
 
   const scrollToLatest = (smooth = true) => {
@@ -312,36 +266,6 @@ export function ChatPanel({ roomPublicId, messages, poll, pinnedMessageId, membe
     setSelectedMessageId(null);
   }
 
-  async function chooseImage(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    event.target.value = "";
-    if (!file) return;
-    setToolTrayOpen(false);
-    try { setPendingImage(await prepareImage(file)); setImageCaption(""); }
-    catch (error) { setNotice(error instanceof Error ? error.message : "This image cannot be read."); }
-  }
-
-  async function sendPendingImage() {
-    if (!pendingImage) return;
-    try {
-      const asset = await saveLocalAsset(pendingImage.blob, "image");
-      postMessage(imageCaption, { type: "image", asset, name: pendingImage.name, aspectRatio: pendingImage.aspectRatio });
-      URL.revokeObjectURL(pendingImage.previewUrl);
-      setPendingImage(null);
-      setImageCaption("");
-    } catch { setNotice("This photo could not be saved locally."); }
-  }
-
-  function shareCurrentLocation() {
-    setToolTrayOpen(false);
-    if (!navigator.geolocation) { setNotice("Location is unavailable in this browser."); return; }
-    setNotice("Finding your location…");
-    navigator.geolocation.getCurrentPosition((position) => {
-      setNotice(null);
-      postMessage("", { type: "location", latitude: position.coords.latitude, longitude: position.coords.longitude, label: "Current location" });
-    }, () => setNotice(window.isSecureContext ? "Location permission was not granted." : "Location requires HTTPS on mobile devices."), { enableHighAccuracy: true, timeout: 10_000, maximumAge: 30_000 });
-  }
-
   async function beginRecording(event: PointerEvent<HTMLButtonElement>) {
     if (!canChat || draft.trim() || recordingIntentRef.current) return;
     event.preventDefault();
@@ -464,29 +388,18 @@ export function ChatPanel({ roomPublicId, messages, poll, pinnedMessageId, membe
     })}<p>{targetPoll.memberSnapshot} members · {targetPoll.requiredVotes} votes needed{voted ? " · Your vote is counted" : ""}</p></article>;
   }
 
-  function openPoll() { setPollOpen(true); setSearching(false); setToolTrayOpen(false); }
-  function openVotes() { setVoteArchiveOpen(true); setSearching(false); setPollOpen(false); setToolTrayOpen(false); }
-  function openSearch() { setSearching(true); setPollOpen(false); setToolTrayOpen(false); }
-  function toolDisabled(id: ToolId) {
-    if (id === "poll") return !canVote || Boolean(poll && !poll.resolvedChoiceId && Date.parse(poll.closesAt) > pollNow);
-    return id === "votes" && !voteCards.length;
+  function openSearch() { setSearching(true); setToolTrayOpen(false); }
+  function toolDisabled() {
+    return false;
   }
   function activateTool(id: ToolId) {
-    if (id === "camera") cameraInputRef.current?.click();
-    else if (id === "album") albumInputRef.current?.click();
-    else if (id === "location") shareCurrentLocation();
-    else if (id === "poll") openPoll();
-    else if (id === "votes") openVotes();
-    else openSearch();
+    openSearch();
   }
 
   return <div className={styles.chatPanel}>
-    <input ref={cameraInputRef} className={styles.hiddenInput} type="file" accept="image/*" capture="environment" onChange={chooseImage} />
-    <input ref={albumInputRef} className={styles.hiddenInput} type="file" accept="image/*" onChange={chooseImage} />
-
     {searching ? <div className={styles.roomSearch}><Icon name="search" size={15} /><input autoFocus value={query} onChange={(event) => setQuery(event.target.value.slice(0, 80))} placeholder="Search this room" /><button type="button" onClick={() => { setQuery(""); setSearching(false); }} aria-label="Close search"><Icon name="close" size={15} /></button></div> : null}
 
-    {pollOpen ? <form className={roomStyles.pollComposer} onSubmit={createPoll} noValidate>
+    {false ? <form className="" onSubmit={createPoll} noValidate>
       <div className={roomStyles.pollTypeRail} aria-label="Poll type">
         {pollKinds.map((item) => <section key={item.kind} className={`${roomStyles.pollTypeCard} ${pollKind === item.kind ? roomStyles.pollTypeSelected : ""}`} onClick={() => setPollKind(item.kind)}>
           <header><span>{item.label}</span><button type="button" aria-label="Close poll composer" onClick={(event) => { event.stopPropagation(); setPollOpen(false); }}><Icon name="close" size={15} /></button></header>
@@ -511,7 +424,6 @@ export function ChatPanel({ roomPublicId, messages, poll, pinnedMessageId, membe
           {message.kind === "system" ? <p className={styles.systemMessage}>{message.body}</p> : <ChatMessageItem message={message} own={own} grouped={grouped} timeZone={timeZone} replyBody={message.replyToId ? messageLabel(messages.find((item) => item.id === message.replyToId) ?? message) : null} onPointerDown={beginMessagePress} onPointerMove={moveMessagePress} onPointerEnd={endMessagePress} onContextMenu={(event, target) => { event.preventDefault(); setSelectedMessageId(target.id); }} onOpenImage={openImage} />}
         </div>;
       }) : <div className={styles.empty}><p>{query ? "No messages found." : "No messages yet."}</p></div>}
-      {poll && showInlinePoll ? renderVoteCard(poll) : null}
     </div>
 
     {!atBottom ? <button type="button" className={styles.latestButton} onClick={() => scrollToLatest(true)} aria-label="Jump to latest messages"><Icon name="chevron" size={15} />{unreadCount ? <b>{unreadCount}</b> : null}</button> : null}
@@ -525,7 +437,7 @@ export function ChatPanel({ roomPublicId, messages, poll, pinnedMessageId, membe
       {draft.trim() ? <button className={styles.sendButton} type="submit" disabled={!canChat} aria-label="Send message"><Icon name="send" size={16} /></button> : <button type="button" className={`${styles.voiceButton} ${recording ? styles.voiceButtonRecording : ""}`} disabled={!canChat} aria-label="Hold to record" onPointerDown={beginRecording} onPointerMove={moveRecording} onPointerUp={endRecording} onPointerCancel={() => { recordingCanceledRef.current = true; endRecording(); }} onContextMenu={(event) => event.preventDefault()}><Icon name="voice" size={17} /></button>}
     </form>}
 
-    {typeof document !== "undefined" && toolTrayOpen ? createPortal(<div className={styles.sheetBackdrop} onPointerDown={() => setToolTrayOpen(false)}><section className={styles.toolSheet} aria-label="Chat attachments" onPointerDown={(event) => event.stopPropagation()}><i className={styles.sheetHandle} /><div>{chatTools.map((tool) => <button type="button" key={tool.id} onClick={() => activateTool(tool.id)} disabled={toolDisabled(tool.id)}><span><Icon name={tool.icon} size={21} /></span><b>{tool.label}</b></button>)}</div></section></div>, document.body) : null}
+    {typeof document !== "undefined" && toolTrayOpen ? createPortal(<div className={styles.sheetBackdrop} onPointerDown={() => setToolTrayOpen(false)}><section className={styles.toolSheet} aria-label="Chat attachments" onPointerDown={(event) => event.stopPropagation()}><i className={styles.sheetHandle} /><div>{chatTools.map((tool) => <button type="button" key={tool.id} onClick={() => activateTool(tool.id)} disabled={toolDisabled()}><span><Icon name={tool.icon} size={21} /></span><b>{tool.label}</b></button>)}</div></section></div>, document.body) : null}
 
     {typeof document !== "undefined" && selectedMessage ? createPortal(<div className={styles.sheetBackdrop} onPointerDown={() => setSelectedMessageId(null)}><section className={styles.messageSheet} aria-label="Message actions" onPointerDown={(event) => event.stopPropagation()}><div className={styles.quickReactions}>{["♥", "👍", "✨"].map((emoji) => <button key={emoji} type="button" onClick={() => messageCommand("REACT_MESSAGE", selectedMessage.id, emoji)}>{emoji}</button>)}</div><div className={styles.actionList}>
       <button type="button" onClick={() => { setReplyTo(selectedMessage.id); setSelectedMessageId(null); textareaRef.current?.focus(); }}><Icon name="reply" />Reply</button>
@@ -535,11 +447,8 @@ export function ChatPanel({ roomPublicId, messages, poll, pinnedMessageId, membe
       {selectedMessage.author?.actorId === session.viewer.actorId ? <button type="button" className={styles.dangerAction} onClick={() => messageCommand("DELETE_OWN_MESSAGE", selectedMessage.id)}><Icon name="trash" />Delete</button> : canModerate ? <button type="button" className={styles.dangerAction} onClick={() => messageCommand("DELETE_MESSAGE", selectedMessage.id)}><Icon name="trash" />Delete for room</button> : null}
     </div></section></div>, document.body) : null}
 
-    {typeof document !== "undefined" && pendingImage ? createPortal(<div className={styles.mediaComposer}><header><button type="button" onClick={() => { URL.revokeObjectURL(pendingImage.previewUrl); setPendingImage(null); }} aria-label="Close photo preview"><Icon name="close" /></button><span>Photo</span><button type="button" onClick={() => void sendPendingImage()} aria-label="Send photo"><Icon name="send" /></button></header><div className={styles.mediaPreview} style={{ aspectRatio: pendingImage.aspectRatio }}><NextImage src={pendingImage.previewUrl} alt="Photo preview" fill sizes="100vw" unoptimized /></div><input value={imageCaption} onChange={(event) => setImageCaption(event.target.value.slice(0, 500))} placeholder="Add a caption…" aria-label="Photo caption" /></div>, document.body) : null}
-
     {typeof document !== "undefined" && viewerImage?.content?.type === "image" && viewerImageUrl ? createPortal(<div className={styles.imageViewer} onClick={() => setImageViewerId(null)}><button type="button" onClick={() => setImageViewerId(null)} aria-label="Close photo"><Icon name="close" /></button><NextImage src={viewerImageUrl} alt={viewerImage.body || viewerImage.content.name || "Shared photo"} width={1600} height={1600} sizes="100vw" unoptimized onClick={(event) => event.stopPropagation()} /></div>, document.body) : null}
 
-    {typeof document !== "undefined" && voteArchiveOpen ? createPortal(<div className={roomStyles.voteOverlay} role="dialog" aria-modal="true" aria-label="All vote cards"><header><div><p>Votes</p><h2>Room decisions</h2></div><button type="button" aria-label="Close vote cards" onClick={() => setVoteArchiveOpen(false)}><Icon name="close" size={16} /></button></header><div className={roomStyles.voteGrid}>{voteCards.length ? voteCards.map((item) => renderVoteCard(item)) : <div className={roomStyles.panelEmpty}><p>No vote cards yet.</p></div>}</div></div>, document.body) : null}
 
     {notice ? <button type="button" className={styles.notice} onClick={() => setNotice(null)}>{notice}</button> : null}
   </div>;

@@ -21,7 +21,7 @@ export function LandingPage() {
             <p className={styles.eyebrow}>Private rooms for shared moments</p>
             <h1>Make the moment<br />live <em>longer.</em></h1>
             <p className={styles.lead}>A temporary place to talk, pin photos, and keep the plan moving—then preserve it when the moment is over.</p>
-            <div className={styles.actions}><Link className={styles.primary} href="/rooms/new">Create a room <Icon name="arrow" /></Link><Link className={styles.secondary} href="/join">Enter an invite code</Link></div>
+            <div className={styles.actions}><Link className={styles.primary} href="/rooms/new">Create a room <Icon name="arrow" /></Link><Link className={styles.secondary} href="/join">Open an invitation</Link></div>
           </div>
           <div className={styles.scrollCue}><i />Built for the moment</div>
         </section>

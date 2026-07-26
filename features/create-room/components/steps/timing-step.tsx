@@ -21,7 +21,7 @@ export function TimingStep({ draft, durationError, memberError, setDuration, set
   const zone = Intl.DateTimeFormat().resolvedOptions().timeZone || "Local time";
 
   return <section className={styles.stepContent} aria-labelledby="timing-title">
-    <header className={styles.stepIntro}><span>Time and capacity</span><h1 id="timing-title">When should it end?</h1><p>Rooms are temporary. You can still end yours early.</p></header>
+    <header className={styles.stepIntro}><span>Activity time</span><h1 id="timing-title">When should it end?</h1></header>
     <div className={styles.durationCard}>
       <div className={styles.durationSummary}><span>Duration</span><strong>{formatDuration(draft.durationMinutes)}</strong></div>
       <div className={styles.durationWheels}>
@@ -32,7 +32,7 @@ export function TimingStep({ draft, durationError, memberError, setDuration, set
     </div>
     {durationError ? <p className={styles.error}>{durationError}</p> : null}
     <div className={styles.capacityCard}>
-      <span><strong>Maximum people</strong><small>Free local rooms support up to 10.</small></span>
+      <span><strong>Maximum people</strong><small>Up to 10 people.</small></span>
       <div><button type="button" onClick={() => setLimit(draft.memberLimit - 1)} disabled={draft.memberLimit <= 2} aria-label="Remove one person"><Icon name="minus" /></button><strong>{draft.memberLimit}</strong><button type="button" onClick={() => setLimit(draft.memberLimit + 1)} disabled={draft.memberLimit >= 10} aria-label="Add one person"><Icon name="plus" /></button></div>
     </div>
     {memberError ? <p className={styles.error}>{memberError}</p> : null}

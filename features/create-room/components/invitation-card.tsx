@@ -13,18 +13,15 @@ export function formatDuration(minutes: number) {
   return `${hours}h ${rest}m`;
 }
 
-export function InvitationCard({ name, draft, inviteCode, endTime, compact = false }: { readonly name: string; readonly draft: CreateRoomDraft; readonly inviteCode?: string; readonly endTime: string; readonly compact?: boolean }) {
+export function InvitationCard({ name, draft, endTime, compact = false }: { readonly name: string; readonly draft: CreateRoomDraft; readonly endTime: string; readonly compact?: boolean }) {
   return <article className={`${styles.inviteCard} ${compact ? styles.inviteCardCompact : ""}`}>
-    <header><strong>{name || "Untitled room"}</strong><span>{draft.leadership === "host-led" ? "Host-led" : "Community-led"}</span></header>
-    <div className={styles.inviteCenter}>{draft.entryPolicy === "link"
-      ? <div className={styles.fakeQr} aria-label="Invitation QR preview">{qrCells.map((filled, index) => <i key={index} className={filled ? styles.qrFilled : ""} />)}</div>
-      : <strong className={styles.inviteCode}>{inviteCode ?? "7K2P"}</strong>}
-    </div>
+    <header><strong>{name || "Untitled room"}</strong><span>Host-led</span></header>
+    <div className={styles.inviteCenter}><div className={styles.fakeQr} aria-label="Invitation QR preview">{qrCells.map((filled, index) => <i key={index} className={filled ? styles.qrFilled : ""} />)}</div></div>
     <footer><span><small>Duration</small>{formatDuration(draft.durationMinutes)}</span><span><small>Ends</small>{endTime}</span><span><small>People</small>Up to {draft.memberLimit}</span></footer>
   </article>;
 }
 
-export function downloadInvitationCard(name: string, draft: CreateRoomDraft, inviteCode: string, endTime: string) {
+export function downloadInvitationCard(name: string, draft: CreateRoomDraft, endTime: string) {
   const canvas = document.createElement("canvas");
   canvas.width = 1080;
   canvas.height = 1350;
@@ -39,15 +36,7 @@ export function downloadInvitationCard(name: string, draft: CreateRoomDraft, inv
   context.font = "600 72px Georgia, serif";
   context.fillText(name.slice(0, 24), 76, 130, 760);
   context.font = "600 24px Arial, sans-serif";
-  context.fillText(draft.leadership === "host-led" ? "HOST-LED" : "COMMUNITY-LED", 790, 116, 220);
-  if (draft.entryPolicy === "invite-code") {
-    context.fillStyle = "#f8f3eb";
-    context.fillRect(250, 430, 580, 250);
-    context.fillStyle = "#201d19";
-    context.font = "600 110px Georgia, serif";
-    context.textAlign = "center";
-    context.fillText(inviteCode, 540, 590);
-  } else {
+  context.fillText("HOST-LED", 790, 116, 220);
     const cell = 42;
     const startX = 351;
     const startY = 370;
@@ -55,7 +44,6 @@ export function downloadInvitationCard(name: string, draft: CreateRoomDraft, inv
     context.fillRect(startX - 35, startY - 35, cell * 9 + 70, cell * 9 + 70);
     context.fillStyle = "#201d19";
     qrCells.forEach((filled, index) => { if (filled) context.fillRect(startX + index % 9 * cell, startY + Math.floor(index / 9) * cell, cell - 7, cell - 7); });
-  }
   context.textAlign = "left";
   context.font = "600 22px Arial, sans-serif";
   context.fillText(`DURATION  ${formatDuration(draft.durationMinutes)}`, 76, 1170);

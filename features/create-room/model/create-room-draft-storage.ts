@@ -1,18 +1,15 @@
 import { initialCreateRoomDraft, type CreateRoomDraft } from "./create-room-machine";
 
-const STORAGE_KEY = "eventspace:create-room-draft:v1";
+const STORAGE_KEY = "eventspace:create-room-draft:v2";
 
 function isDraft(value: unknown): value is CreateRoomDraft {
   if (!value || typeof value !== "object") return false;
   const draft = value as Partial<CreateRoomDraft>;
   return typeof draft.name === "string"
     && typeof draft.description === "string"
-    && (draft.leadership === "host-led" || draft.leadership === "community-led")
     && Number.isInteger(draft.durationMinutes)
     && Number.isInteger(draft.memberLimit)
-    && (draft.entryPolicy === "link" || draft.entryPolicy === "invite-code")
-    && typeof draft.requiresApproval === "boolean"
-    && (draft.memberListVisibility === "members" || draft.memberListVisibility === "moderators");
+    && typeof draft.acceptedTerms === "boolean";
 }
 
 export function loadCreateRoomDraft(): CreateRoomDraft | null {
@@ -28,7 +25,6 @@ export function loadCreateRoomDraft(): CreateRoomDraft | null {
       description: value.description.slice(0, 500),
       durationMinutes: Math.min(1440, Math.max(15, value.durationMinutes)),
       memberLimit: Math.min(10, Math.max(2, value.memberLimit)),
-      memberListVisibility: value.leadership === "community-led" ? "members" : value.memberListVisibility,
       acceptedTerms: false,
     };
   } catch {

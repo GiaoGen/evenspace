@@ -18,7 +18,7 @@ function getDefaultStart() {
   return toLocalInput(date.toISOString());
 }
 
-export function ItineraryComposer({ item, items, members, viewerActorId, roomEndsAt, communityProposal, onClose, onSave, onDelete }: { readonly item: ItineraryItem | null; readonly items: readonly ItineraryItem[]; readonly members: readonly PersonSummary[]; readonly viewerActorId: ActorId; readonly roomEndsAt: string | null; readonly communityProposal: boolean; readonly onClose: () => void; readonly onSave: (item: ItineraryItem) => void; readonly onDelete: (itemId: string) => void }) {
+export function ItineraryComposer({ item, items, members, viewerActorId, roomEndsAt, onClose, onSave, onDelete }: { readonly item: ItineraryItem | null; readonly items: readonly ItineraryItem[]; readonly members: readonly PersonSummary[]; readonly viewerActorId: ActorId; readonly roomEndsAt: string | null; readonly onClose: () => void; readonly onSave: (item: ItineraryItem) => void; readonly onDelete: (itemId: string) => void }) {
   const initialDuration = item?.endsAt ? Math.max(5, Math.round((Date.parse(item.endsAt) - Date.parse(item.startsAt)) / 60_000 / 5) * 5) : 60;
   const [title, setTitle] = useState(item?.title ?? "");
   const [description, setDescription] = useState(item?.description ?? "");
@@ -62,7 +62,7 @@ export function ItineraryComposer({ item, items, members, viewerActorId, roomEnd
   return (
     <div className={styles.composerBackdrop} role="presentation" onPointerDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
       <form className={styles.composer} onSubmit={submit} role="dialog" aria-modal="true" aria-label={item ? "Edit itinerary plan" : "Add itinerary plan"}>
-        <header><span>{item ? "Edit plan" : communityProposal ? "Plan proposal" : "New plan"}</span><button type="button" onClick={onClose} aria-label="Close"><Icon name="close" /></button></header>
+        <header><span>{item ? "Edit plan" : "New plan"}</span><button type="button" onClick={onClose} aria-label="Close"><Icon name="close" /></button></header>
         <div className={styles.composerPreview}>
           <label className={styles.titleField}><span>Plan</span><input value={title} onChange={(event) => setTitle(event.target.value.slice(0, 80))} placeholder="Dinner by the river" /></label>
           <label><span>Starts</span><input type="datetime-local" value={startsAt} max={roomEndsAt ? toLocalInput(roomEndsAt) : undefined} onChange={(event) => setStartsAt(event.target.value)} /></label>
@@ -85,7 +85,7 @@ export function ItineraryComposer({ item, items, members, viewerActorId, roomEnd
         </div>
         <footer>
           {item ? deleteArmed ? <div className={styles.deleteConfirm}><button type="button" onClick={() => setDeleteArmed(false)}>Keep it</button><button type="button" onClick={() => onDelete(item.id)}>Delete plan</button></div> : <button type="button" className={styles.deleteButton} onClick={() => setDeleteArmed(true)} aria-label="Delete plan"><Icon name="trash" /></button> : <span />}
-          <button type="submit" className={styles.saveButton} disabled={invalid}>{communityProposal && !item ? "Open vote" : item ? "Save changes" : "Add to itinerary"}<Icon name="arrow" size={16} /></button>
+          <button type="submit" className={styles.saveButton} disabled={invalid}>{item ? "Save changes" : "Add to itinerary"}<Icon name="arrow" size={16} /></button>
         </footer>
       </form>
     </div>

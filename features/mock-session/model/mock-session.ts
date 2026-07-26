@@ -1,7 +1,7 @@
 import { parseActorId, parseRoomId, parseRoomPublicId, type ActorId, type RoomPublicId } from "@/core/domain/ids";
 import { isAssetReference } from "@/core/domain/asset";
 import { getBoardItemUnitSize } from "@/core/domain/board-layout";
-import type { BoardBackground, BoardComment, BoardItem, ChatMessage, ItineraryItem, MembershipState, MemoirPaperStyle, PersonSummary, PollPreview, RoomCapabilities, RoomDetail, RoomSummary } from "@/core/domain/room";
+import type { BoardBackground, BoardComment, BoardItem, ChatMessage, ItineraryItem, MembershipState, PersonSummary, RoomCapabilities, RoomDetail, RoomSummary } from "@/core/domain/room";
 import type { CreateRoomDraft } from "@/features/create-room/model/create-room-machine";
 
 export const MOCK_SESSION_VERSION = 7 as const;
@@ -27,14 +27,18 @@ export interface MockJoinRequest {
   readonly state: JoinRequestState;
 }
 
-export interface MockPoll extends PollPreview {
+/** @deprecated Vote records are retained only to safely read older local sessions. */
+export interface MockPoll {
+  readonly id: string;
+  readonly question: string;
+  readonly closesAt: string;
+  readonly memberSnapshot: number;
+  readonly requiredVotes: number;
+  readonly visibility: "public" | "anonymous";
+  readonly choices: readonly { readonly id: string; readonly label: string; readonly votes: number }[];
   readonly voterActorIds: readonly ActorId[];
   readonly resolvedChoiceId: string | null;
-  readonly proposal?:
-    | { readonly kind: "itinerary"; readonly item: ItineraryItem }
-    | { readonly kind: "extend-room"; readonly endsAt: string }
-    | { readonly kind: "end-room" }
-    | { readonly kind: "remove-member"; readonly targetActorId: ActorId };
+  readonly proposal?: { readonly kind: "itinerary"; readonly item: ItineraryItem } | { readonly kind: "extend-room"; readonly endsAt: string } | { readonly kind: "end-room" } | { readonly kind: "remove-member"; readonly targetActorId: ActorId };
 }
 
 export interface MockReport {
@@ -47,6 +51,7 @@ export interface MockReport {
 
 export interface MockRoom extends Omit<RoomDetail, "activePoll"> {
   readonly lifecycle: MockRoomLifecycle;
+  /** @deprecated Vote data is retained only for migration of existing local sessions. */
   readonly activePoll: MockPoll | null;
   readonly pollHistory?: readonly MockPoll[];
   readonly createdAt: string;
@@ -84,13 +89,12 @@ export type MockCommand =
   | ({ readonly type: "DELETE_MESSAGE"; readonly messageId: string } & TimedRoomCommand)
   | ({ readonly type: "REACT_MESSAGE"; readonly messageId: string; readonly emoji: string } & TimedRoomCommand)
   | ({ readonly type: "PIN_MESSAGE"; readonly messageId: string | null } & TimedRoomCommand)
+  /** @deprecated Ignored: voting is no longer part of the MVP. */
   | ({ readonly type: "CREATE_POLL"; readonly poll: MockPoll } & TimedRoomCommand)
+  /** @deprecated Ignored: voting is no longer part of the MVP. */
   | ({ readonly type: "CAST_VOTE"; readonly choiceId: string } & TimedRoomCommand)
   | ({ readonly type: "ADD_BOARD_ITEM"; readonly item: BoardItem } & TimedRoomCommand)
-  | ({ readonly type: "ADD_MEMOIR_PHOTO"; readonly item: BoardItem; readonly caption: { readonly id: string; readonly body: string } | null } & TimedRoomCommand)
-  | ({ readonly type: "ADD_MEMOIR_SPREAD" } & TimedRoomCommand)
   | ({ readonly type: "SET_BOARD_BACKGROUND"; readonly background: BoardBackground } & TimedRoomCommand)
-  | ({ readonly type: "SET_MEMOIR_PAGE_STYLE"; readonly pageNumber: number; readonly style: MemoirPaperStyle } & TimedRoomCommand)
   | ({ readonly type: "MOVE_BOARD_ITEM"; readonly itemId: string; readonly x: number; readonly y: number } & TimedRoomCommand)
   | ({ readonly type: "RESIZE_BOARD_NOTE"; readonly itemId: string; readonly width: number; readonly height: number } & TimedRoomCommand)
   | ({ readonly type: "RESIZE_BOARD_ITEM"; readonly itemId: string; readonly width: number; readonly height: number } & TimedRoomCommand)
@@ -150,13 +154,6 @@ function snapBoardItem(items: readonly BoardItem[], item: BoardItem, ignoreId?: 
   return null;
 }
 
-function getMemoirPageCount(room: Pick<MockRoom, "boardItems" | "memoirPageStyles" | "memoirPageCount">) {
-  const itemPage = room.boardItems.reduce((largest, item) => Math.max(largest, item.memoirPage ?? 0), 0);
-  const styledPage = Object.keys(room.memoirPageStyles ?? {}).reduce((largest, page) => Math.max(largest, Number(page) || 0), 0);
-  const pageCount = Math.max(2, room.memoirPageCount ?? 2, itemPage, styledPage);
-  return Math.min(500, pageCount + pageCount % 2);
-}
-
 export function deriveMockCapabilities(session: MockSession, room: MockRoom, nowIso: string): RoomCapabilities {
   const member = memberFor(room, session.viewer.actorId);
   const membership = room.membershipStates[session.viewer.actorId];
@@ -167,7 +164,7 @@ export function deriveMockCapabilities(session: MockSession, room: MockRoom, now
   const host = member?.role === "host";
   const admin = member?.role === "admin";
   const signedIn = session.viewer.authState === "signed-in";
-  return { canRead, canChat: writable && membership !== "muted", canVote: writable && signedIn, canAddBoardItem: writable && signedIn && membership !== "muted", canCreateItinerary: writable && (host || admin), canModerate: writable && (host || admin), canChangeDuration: writable && Boolean(host), canEndRoom: writable && Boolean(host) };
+  return { canRead, canChat: writable && membership !== "muted", canVote: false, canAddBoardItem: writable && signedIn && membership !== "muted", canCreateItinerary: writable && Boolean(host), canModerate: writable && (host || admin), canChangeDuration: writable && Boolean(host), canEndRoom: writable && Boolean(host) };
 }
 
 function updateRoom(session: MockSession, publicId: RoomPublicId, update: (room: MockRoom) => MockRoom): MockSession {
@@ -208,11 +205,7 @@ function applyCommand(session: MockSession, command: MockCommand): MockSession {
       const member: PersonSummary = { actorId: command.request.actorId, displayName: command.request.displayName, initials: command.request.initials, role: "member", isGuest: true };
       return systemMessage({ ...room, members: [...room.members, member], memberCount: activeMemberCount(room) + 1, membershipStates: { ...room.membershipStates, [member.actorId]: "active" }, joinRequests: [...room.joinRequests, { ...command.request, state: "approved" }] }, `${member.displayName} joined the room.`, command.request.requestedAt);
     }
-    const next = { ...room, joinRequests: [...room.joinRequests, command.request] };
-    if (room.mode !== "community-led" || room.activePoll && !room.activePoll.resolvedChoiceId && asTime(room.activePoll.closesAt) > asTime(command.request.requestedAt)) return next;
-    const snapshot = activeMemberCount(room);
-    const poll: MockPoll = { id: `join:${command.request.id}`, question: `Let ${command.request.displayName} join?`, closesAt: room.endsAt ?? command.request.requestedAt, memberSnapshot: snapshot, requiredVotes: Math.floor(snapshot / 2) + 1, visibility: "public", choices: [{ id: "approve", label: "Let them in", votes: 0 }, { id: "reject", label: "Not this time", votes: 0 }], voterActorIds: [], resolvedChoiceId: null };
-    return { ...next, activePoll: poll, pollHistory: [...(next.pollHistory ?? []), poll] };
+    return { ...room, joinRequests: [...room.joinRequests, command.request] };
   });
   if (command.type === "ASSUME_JOIN_IDENTITY") {
     const room = session.rooms.find((item) => item.publicId === command.roomPublicId);
@@ -220,16 +213,6 @@ function applyCommand(session: MockSession, command: MockCommand): MockSession {
     if (!room || !member || !activeMembership(room.membershipStates[member.actorId])) return session;
     return { ...session, viewer: { ...session.viewer, actorId: member.actorId, displayName: member.displayName, initials: member.initials, email: null, authState: "guest" } };
   }
-  if (command.type === "COMPLETE_COMMUNITY_JOIN_DEMO") return updateRoom(session, command.roomPublicId, (room) => {
-    const request = room.joinRequests.find((item) => item.id === command.requestId && item.state === "pending");
-    const poll = room.activePoll;
-    if (room.mode !== "community-led" || !request || !poll || poll.id !== `join:${request.id}` || !memberFor(room, command.actorId) || activeMemberCount(room) >= room.memberLimit) return room;
-    const member: PersonSummary = { actorId: request.actorId, displayName: request.displayName, initials: request.initials, role: "member", isGuest: true };
-    const choices = poll.choices.map((choice) => choice.id === "approve" ? { ...choice, votes: poll.requiredVotes } : choice);
-    const voters = room.members.filter((item) => activeMembership(room.membershipStates[item.actorId])).slice(0, poll.requiredVotes).map((item) => item.actorId);
-    const resolvedPoll = { ...poll, choices, voterActorIds: voters, resolvedChoiceId: "approve" };
-    return systemMessage({ ...room, activePoll: resolvedPoll, pollHistory: room.pollHistory?.length ? room.pollHistory.map((item) => item.id === resolvedPoll.id ? resolvedPoll : item) : [resolvedPoll], joinRequests: room.joinRequests.map((item) => item.id === request.id ? { ...item, state: "approved" } : item), members: [...room.members, member], memberCount: activeMemberCount(room) + 1, membershipStates: { ...room.membershipStates, [member.actorId]: "active" } }, `${member.displayName} joined after the Mock majority simulation.`, command.nowIso);
-  });
   if (command.type === "ADVANCE_ARCHIVE") return updateRoom(session, command.roomPublicId, (room) => {
     const allowed = room.lifecycle === "freezing" && command.lifecycle === "archiving" || room.lifecycle === "archiving" && command.lifecycle === "archived";
     if (!allowed) return room;
@@ -249,62 +232,11 @@ function applyCommand(session: MockSession, command: MockCommand): MockSession {
   if (command.type === "DELETE_MESSAGE") return capabilities.canModerate ? updateRoom(session, command.roomPublicId, (value) => ({ ...value, messages: value.messages.filter((message) => message.id !== command.messageId) })) : session;
   if (command.type === "REACT_MESSAGE") return capabilities.canChat ? updateRoom(session, command.roomPublicId, (value) => ({ ...value, messages: value.messages.map((message) => message.id !== command.messageId ? message : { ...message, reactions: message.reactions.some((reaction) => reaction.emoji === command.emoji) ? message.reactions.map((reaction) => reaction.emoji === command.emoji ? { ...reaction, count: reaction.count + 1 } : reaction) : [...message.reactions, { emoji: command.emoji, count: 1 }] }) })) : session;
   if (command.type === "PIN_MESSAGE") return capabilities.canModerate ? updateRoom(session, command.roomPublicId, (value) => ({ ...value, pinnedMessageId: command.messageId })) : session;
-  if (command.type === "CREATE_POLL") {
-    const poll = command.poll;
-    const choicesValid = poll.choices.length >= 2 && poll.choices.length <= 5 && new Set(poll.choices.map((choice) => choice.id)).size === poll.choices.length && poll.choices.every((choice) => choice.id && choice.label.trim() && choice.votes === 0);
-    const snapshot = activeMemberCount(room);
-    const closesAt = asTime(poll.closesAt);
-    const proposal = poll.proposal;
-    const proposalValid = !proposal
-      || proposal.kind === "itinerary" && itineraryFitsRoom(proposal.item, room)
-      || proposal.kind === "extend-room" && asTime(proposal.endsAt) > asTime(room.endsAt ?? command.nowIso) && asTime(proposal.endsAt) <= asTime(command.nowIso) + 24 * 60 * 60_000
-      || proposal.kind === "end-room"
-      || proposal.kind === "remove-member" && memberFor(room, proposal.targetActorId)?.role !== "host" && proposal.targetActorId !== command.actorId;
-    const valid = Boolean(poll.question.trim()) && poll.question.length <= 160 && choicesValid && poll.memberSnapshot === snapshot && poll.requiredVotes === Math.floor(snapshot / 2) + 1 && closesAt > asTime(command.nowIso) && (!room.endsAt || closesAt <= asTime(room.endsAt)) && proposalValid;
-    const priorPollClosed = !room.activePoll || Boolean(room.activePoll.resolvedChoiceId) || asTime(room.activePoll.closesAt) <= asTime(command.nowIso);
-    return capabilities.canVote && (room.mode === "community-led" || capabilities.canModerate) && priorPollClosed && valid ? updateRoom(session, command.roomPublicId, (value) => ({ ...value, activePoll: poll, pollHistory: [...(value.pollHistory ?? []), poll] })) : session;
-  }
-  if (command.type === "CAST_VOTE") return capabilities.canVote && room.activePoll && !room.activePoll.resolvedChoiceId && asTime(room.activePoll.closesAt) > asTime(command.nowIso) && room.activePoll.choices.some((choice) => choice.id === command.choiceId) && !room.activePoll.voterActorIds.includes(command.actorId) ? updateRoom(session, command.roomPublicId, (value) => {
-    if (!value.activePoll) return value;
-    const choices = value.activePoll.choices.map((choice) => choice.id === command.choiceId ? { ...choice, votes: choice.votes + 1 } : choice);
-    const winner = choices.find((choice) => choice.votes >= value.activePoll!.requiredVotes);
-    const poll = { ...value.activePoll, choices, voterActorIds: [...value.activePoll.voterActorIds, command.actorId], resolvedChoiceId: winner?.id ?? null };
-    let next: MockRoom = { ...value, activePoll: poll, pollHistory: value.pollHistory?.length ? value.pollHistory.map((item) => item.id === poll.id ? poll : item) : [poll] };
-    if (winner?.id === "yes" && poll.proposal?.kind === "itinerary") next = { ...next, itinerary: [...next.itinerary, poll.proposal.item].sort((a, b) => asTime(a.startsAt) - asTime(b.startsAt)) };
-    if (winner?.id === "yes" && poll.proposal?.kind === "extend-room") next = { ...next, endsAt: poll.proposal.endsAt };
-    if (winner?.id === "yes" && poll.proposal?.kind === "end-room") next = { ...next, lifecycle: "freezing", archiveActorIds: next.members.filter((member) => activeMembership(next.membershipStates[member.actorId])).map((member) => member.actorId) };
-    if (winner?.id === "yes" && poll.proposal?.kind === "remove-member") {
-      const wasActive = activeMembership(next.membershipStates[poll.proposal.targetActorId]);
-      next = { ...next, memberCount: Math.max(0, next.memberCount - Number(wasActive)), membershipStates: { ...next.membershipStates, [poll.proposal.targetActorId]: "removed" } };
-    }
-    if (winner && poll.id.startsWith("join:")) {
-      const requestId = poll.id.slice(5);
-      const request = next.joinRequests.find((item) => item.id === requestId && item.state === "pending");
-      if (request) {
-        const approved = winner.id === "approve" && activeMemberCount(next) < next.memberLimit;
-        const joinRequests = next.joinRequests.map((item) => item.id === requestId ? { ...item, state: approved ? "approved" as const : "rejected" as const } : item);
-        if (approved) {
-          const member: PersonSummary = { actorId: request.actorId, displayName: request.displayName, initials: request.initials, role: "member", isGuest: true };
-          next = systemMessage({ ...next, joinRequests, members: [...next.members, member], memberCount: activeMemberCount(next) + 1, membershipStates: { ...next.membershipStates, [member.actorId]: "active" } }, `${member.displayName} joined the room.`, command.nowIso);
-        } else next = { ...next, joinRequests };
-      }
-    }
-    return next;
-  }) : session;
-  if (command.type === "ADD_BOARD_ITEM") return capabilities.canAddBoardItem && isBoardItem(command.item) && command.item.ownerActorId === command.actorId && (!command.item.memoirPage || command.item.memoirPage <= getMemoirPageCount(room)) && (command.item.kind !== "photo" || room.photoCount < room.maxPhotos) ? updateRoom(session, command.roomPublicId, (value) => {
-    const placed = command.item.memoirPage ? command.item : snapBoardItem(value.boardItems, command.item);
+  if (command.type === "ADD_BOARD_ITEM") return capabilities.canAddBoardItem && isBoardItem(command.item) && command.item.ownerActorId === command.actorId && (command.item.kind !== "photo" || room.photoCount < room.maxPhotos) ? updateRoom(session, command.roomPublicId, (value) => {
+    const placed = command.item.kind === "photo" ? command.item : snapBoardItem(value.boardItems, command.item);
     return placed ? { ...value, boardItems: [...value.boardItems, placed], photoCount: value.photoCount + (placed.kind === "photo" ? 1 : 0) } : value;
   }) : session;
-  if (command.type === "ADD_MEMOIR_PHOTO") return capabilities.canAddBoardItem && isBoardItem(command.item) && command.item.kind === "photo" && command.item.ownerActorId === command.actorId && Boolean(command.item.memoirPage) && command.item.memoirPage! <= getMemoirPageCount(room) && room.photoCount < room.maxPhotos ? updateRoom(session, command.roomPublicId, (value) => {
-    if (value.boardItems.some((item) => item.id === command.item.id)) return value;
-    const captionBody = command.caption?.body.trim().slice(0, 500) ?? "";
-    const caption: BoardComment | null = command.caption && captionBody ? { id: command.caption.id, photoId: command.item.id, actorId: command.actorId, body: captionBody, createdAt: command.nowIso, kind: "caption" } : null;
-    if (caption && value.boardComments.some((comment) => comment.id === caption.id)) return value;
-    return { ...value, boardItems: [...value.boardItems, command.item], boardComments: caption ? [...value.boardComments, caption] : value.boardComments, photoCount: value.photoCount + 1 };
-  }) : session;
-  if (command.type === "ADD_MEMOIR_SPREAD") return capabilities.canAddBoardItem && getMemoirPageCount(room) <= 498 ? updateRoom(session, command.roomPublicId, (value) => ({ ...value, memoirPageCount: getMemoirPageCount(value) + 2 })) : session;
   if (command.type === "SET_BOARD_BACKGROUND") return capabilities.canAddBoardItem ? updateRoom(session, command.roomPublicId, (value) => ({ ...value, boardBackground: command.background })) : session;
-  if (command.type === "SET_MEMOIR_PAGE_STYLE") return capabilities.canAddBoardItem && Number.isInteger(command.pageNumber) && command.pageNumber >= 1 && command.pageNumber <= getMemoirPageCount(room) ? updateRoom(session, command.roomPublicId, (value) => ({ ...value, memoirPageStyles: { ...value.memoirPageStyles, [command.pageNumber]: command.style } })) : session;
   if (command.type === "MOVE_BOARD_ITEM") return capabilities.canAddBoardItem ? updateRoom(session, command.roomPublicId, (value) => ({ ...value, boardItems: value.boardItems.map((item) => {
     if (item.id !== command.itemId || item.ownerActorId !== command.actorId) return item;
     return snapBoardItem(value.boardItems, { ...item, x: command.x, y: command.y }, item.id) ?? item;
@@ -390,8 +322,7 @@ const isMessageContent = (value: unknown) => value === undefined || isRecord(val
 );
 const isMessage = (value: unknown) => isRecord(value) && isText(value.id, 100, false) && ["message", "system"].includes(String(value.kind)) && (value.author === null || isPerson(value.author)) && isText(value.body, 2000) && isIso(value.sentAt) && isMessageContent(value.content) && Array.isArray(value.reactions) && value.reactions.length <= 24 && value.reactions.every((reaction) => isRecord(reaction) && isText(reaction.emoji, 16, false) && isInt(reaction.count, 0, 100000));
 const isBoardComment = (value: unknown) => isRecord(value) && isText(value.id, 100, false) && isText(value.photoId, 100, false) && isActor(value.actorId) && isText(value.body, 500, false) && isIso(value.createdAt) && (value.kind === undefined || value.kind === "comment" || value.kind === "caption");
-const isBoardItem = (value: unknown) => isRecord(value) && isText(value.id, 100, false) && isActor(value.ownerActorId) && Number.isFinite(value.x) && Number.isFinite(value.y) && Number.isFinite(value.rotation) && (value.memoirPage === undefined || isInt(value.memoirPage, 1, 500)) && (value.sourceMessageId === undefined || isText(value.sourceMessageId, 100, false)) && (value.sourceActorId === undefined || isActor(value.sourceActorId)) && (value.kind === "note" ? isText(value.text, 500, false) && (value.width === undefined || Number.isFinite(value.width)) && (value.height === undefined || Number.isFinite(value.height)) && (value.variant === undefined || ["paper", "ink", "sage"].includes(String(value.variant))) : value.kind === "drawing" ? isAssetReference(value.asset, "image") && Number.isFinite(value.width) && Number.isFinite(value.height) : value.kind === "photo" && ["one", "two", "three", "four"].includes(String(value.variant)) && (value.frameVariant === undefined || ["pin", "gallery", "instant", "tape", "dark"].includes(String(value.frameVariant))) && (value.note === null || isText(value.note, 500)) && (value.asset === undefined || isAssetReference(value.asset, "image")) && (value.imageName === undefined || isText(value.imageName, 120)) && (value.aspectRatio === undefined || Number.isFinite(value.aspectRatio) && Number(value.aspectRatio) > 0) && Number.isFinite(value.width));
-const isMemoirPageStyles = (value: unknown) => value === undefined || isRecord(value) && Object.entries(value).every(([page, style]) => /^\d{1,3}$/.test(page) && Number(page) >= 1 && Number(page) <= 500 && ["ivory", "linen", "sage", "sky"].includes(String(style)));
+const isBoardItem = (value: unknown) => isRecord(value) && isText(value.id, 100, false) && isActor(value.ownerActorId) && Number.isFinite(value.x) && Number.isFinite(value.y) && Number.isFinite(value.rotation) && (value.sourceMessageId === undefined || isText(value.sourceMessageId, 100, false)) && (value.sourceActorId === undefined || isActor(value.sourceActorId)) && (value.kind === "note" ? isText(value.text, 500, false) && (value.width === undefined || Number.isFinite(value.width)) && (value.height === undefined || Number.isFinite(value.height)) && (value.variant === undefined || ["paper", "ink", "sage"].includes(String(value.variant))) : value.kind === "drawing" ? isAssetReference(value.asset, "image") && Number.isFinite(value.width) && Number.isFinite(value.height) : value.kind === "photo" && ["one", "two", "three", "four"].includes(String(value.variant)) && (value.frameVariant === undefined || ["pin", "gallery", "instant", "tape", "dark"].includes(String(value.frameVariant))) && (value.note === null || isText(value.note, 500)) && (value.asset === undefined || isAssetReference(value.asset, "image")) && (value.imageName === undefined || isText(value.imageName, 120)) && (value.aspectRatio === undefined || Number.isFinite(value.aspectRatio) && Number(value.aspectRatio) > 0) && Number.isFinite(value.width));
 const isItinerary = (value: unknown) => isRecord(value) && isText(value.id, 100, false) && isText(value.title, 80, false) && isText(value.description, 500) && isIso(value.startsAt) && ["scheduled", "manual"].includes(String(value.endMode)) && (value.endMode === "scheduled" && isIso(value.endsAt) && asTime(String(value.endsAt)) > asTime(String(value.startsAt)) || value.endMode === "manual" && value.endsAt === null) && isIso(value.endedAt, true) && (value.endedAt === null || value.endMode === "manual" && asTime(String(value.endedAt)) >= asTime(String(value.startsAt))) && (value.locationLabel === null || isText(value.locationLabel, 120)) && (value.mapsUrl === null || isText(value.mapsUrl, 500)) && isPerson(value.responsible) && isActor(value.createdByActorId) && isIso(value.createdAt) && isIso(value.updatedAt);
 const isJoinRequest = (value: unknown) => isRecord(value) && isText(value.id, 100, false) && isActor(value.actorId) && isText(value.displayName, 60, false) && isText(value.initials, 3, false) && isText(value.note, 240) && isIso(value.requestedAt) && ["pending", "approved", "rejected"].includes(String(value.state));
 const isReport = (value: unknown) => isRecord(value) && isText(value.id, 100, false) && isActor(value.reporterActorId) && isText(value.description, 1000, false) && isIso(value.createdAt) && (value.hostReply === null || isText(value.hostReply, 500, false));
@@ -401,8 +332,8 @@ const isPoll = (value: unknown) => value === null || isRecord(value) && isText(v
 function isMockRoom(value: unknown) {
   if (!isRecord(value) || typeof value.id !== "string" || !parseRoomId(value.id) || typeof value.publicId !== "string" || !parseRoomPublicId(value.publicId)) return false;
   if (!isText(value.name, 80, false) || !isText(value.description, 500) || !["host-led", "community-led"].includes(String(value.mode)) || !["active", "archived"].includes(String(value.status)) || !["active", "freezing", "archiving", "archived"].includes(String(value.lifecycle))) return false;
-  if (!isText(value.timeZone, 80, false) || !["stone", "linen", "charcoal", "herbarium", "clover", "bluebell"].includes(String(value.boardBackground ?? "stone")) || !isIso(value.endsAt, true) || !isIso(value.archivedAt, true) || !isIso(value.createdAt) || !isInt(value.memberCount, 0, 100) || !isInt(value.memberLimit, 2, 100) || !isInt(value.photoCount, 0, 500) || !isInt(value.maxPhotos, 1, 500) || !isInt(value.mediaLimitMb, 1, 100000) || value.memoirPageCount !== undefined && !isInt(value.memoirPageCount, 1, 500)) return false;
-  if (!Array.isArray(value.members) || value.members.length > 100 || !value.members.every(isPerson) || !Array.isArray(value.messages) || value.messages.length > 5000 || !value.messages.every(isMessage) || !Array.isArray(value.boardItems) || value.boardItems.length > 500 || !value.boardItems.every(isBoardItem) || !Array.isArray(value.boardComments) || value.boardComments.length > 5000 || !value.boardComments.every(isBoardComment) || !isMemoirPageStyles(value.memoirPageStyles) || !Array.isArray(value.itinerary) || value.itinerary.length > 500 || !value.itinerary.every(isItinerary)) return false;
+  if (!isText(value.timeZone, 80, false) || !["stone", "linen", "charcoal", "herbarium", "clover", "bluebell"].includes(String(value.boardBackground ?? "stone")) || !isIso(value.endsAt, true) || !isIso(value.archivedAt, true) || !isIso(value.createdAt) || !isInt(value.memberCount, 0, 100) || !isInt(value.memberLimit, 2, 100) || !isInt(value.photoCount, 0, 500) || !isInt(value.maxPhotos, 1, 500) || !isInt(value.mediaLimitMb, 1, 100000)) return false;
+  if (!Array.isArray(value.members) || value.members.length > 100 || !value.members.every(isPerson) || !Array.isArray(value.messages) || value.messages.length > 5000 || !value.messages.every(isMessage) || !Array.isArray(value.boardItems) || value.boardItems.length > 500 || !value.boardItems.every(isBoardItem) || !Array.isArray(value.boardComments) || value.boardComments.length > 5000 || !value.boardComments.every(isBoardComment) || !Array.isArray(value.itinerary) || value.itinerary.length > 500 || !value.itinerary.every(isItinerary)) return false;
   const photoIds = new Set(value.boardItems.filter((item) => isRecord(item) && item.kind === "photo").map((item) => String(item.id)));
   const actorIds = new Set(value.members.filter(isRecord).map((member) => String(member.actorId)));
   if (new Set(value.boardComments.map((comment) => isRecord(comment) ? comment.id : null)).size !== value.boardComments.length || !value.boardComments.every((comment) => isRecord(comment) && photoIds.has(String(comment.photoId)) && actorIds.has(String(comment.actorId)))) return false;
@@ -476,6 +407,6 @@ export function parsePersistedMockSession(value: string): MockSession | null {
 
 export function createRoomFromDraft(draft: CreateRoomDraft, viewer: MockViewer, ids: Pick<MockRoom, "id" | "publicId">, nowIso: string): MockRoom {
   const now = asTime(nowIso);
-  const creator: PersonSummary = { actorId: viewer.actorId, displayName: viewer.displayName, initials: viewer.initials, role: draft.leadership === "host-led" ? "host" : "member", isGuest: false };
-  return { id: ids.id, publicId: ids.publicId, name: draft.name.trim(), description: draft.description.trim(), mode: draft.leadership, status: "active", lifecycle: "active", timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC", endsAt: new Date(now + draft.durationMinutes * 60_000).toISOString(), archivedAt: null, memberCount: 1, photoCount: 0, boardPreview: ["one"], boardNote: draft.name.trim().toLocaleLowerCase(), boardBackground: "stone", isFavorite: false, memberListVisibility: draft.leadership === "community-led" ? "members" : draft.memberListVisibility, members: [creator], messages: [{ id: `system_created_${now}`, kind: "system", author: null, body: `${viewer.displayName} created the room.`, sentAt: nowIso, isOwn: false, reactions: [] }], activePoll: null, pollHistory: [], boardItems: [], boardComments: [], memoirPageCount: 2, itinerary: [], createdAt: nowIso, inviteCode: `E${Math.floor(now / 1000).toString(36).slice(-5).toUpperCase()}`, inviteRevision: 1, requiresApproval: draft.requiresApproval, membershipStates: { [viewer.actorId]: "active" }, archiveActorIds: [viewer.actorId], archiveRemovedBy: [], joinRequests: [], pinnedMessageId: null, memberLimit: draft.memberLimit, maxPhotos: 25, mediaLimitMb: 250, reports: [] };
+  const creator: PersonSummary = { actorId: viewer.actorId, displayName: viewer.displayName, initials: viewer.initials, role: "host", isGuest: false };
+  return { id: ids.id, publicId: ids.publicId, name: draft.name.trim(), description: draft.description.trim(), mode: "host-led", status: "active", lifecycle: "active", timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC", endsAt: new Date(now + draft.durationMinutes * 60_000).toISOString(), archivedAt: null, memberCount: 1, photoCount: 0, boardPreview: ["one"], boardNote: draft.name.trim().toLocaleLowerCase(), boardBackground: "stone", isFavorite: false, memberListVisibility: "members", members: [creator], messages: [{ id: `system_created_${now}`, kind: "system", author: null, body: `${viewer.displayName} created the room.`, sentAt: nowIso, isOwn: false, reactions: [] }], activePoll: null, pollHistory: [], boardItems: [], boardComments: [], itinerary: [], createdAt: nowIso, inviteCode: `E${Math.floor(now / 1000).toString(36).slice(-5).toUpperCase()}`, inviteRevision: 1, requiresApproval: false, membershipStates: { [viewer.actorId]: "active" }, archiveActorIds: [viewer.actorId], archiveRemovedBy: [], joinRequests: [], pinnedMessageId: null, memberLimit: draft.memberLimit, maxPhotos: 25, mediaLimitMb: 250, reports: [] };
 }

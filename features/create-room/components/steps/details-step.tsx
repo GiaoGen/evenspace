@@ -3,7 +3,7 @@ import styles from "../create-room-wizard.module.css";
 
 export function DetailsStep({ draft, nameError, descriptionError, setName, setDescription }: { readonly draft: CreateRoomDraft; readonly nameError?: string; readonly descriptionError?: string; readonly setName: (value: string) => void; readonly setDescription: (value: string) => void }) {
   return <section className={styles.stepContent} aria-labelledby="details-title">
-    <header className={styles.stepIntro}><span>Room identity</span><h1 id="details-title">Name this room</h1><p>Give people a clear sense of the moment before they enter.</p></header>
+    <header className={styles.stepIntro}><span>Activity</span><h1 id="details-title">Name this room</h1></header>
     <div className={`${styles.identityCard} ${nameError || descriptionError ? styles.cardInvalid : ""}`}>
       <label htmlFor="room-name">Room name</label>
       <input id="room-name" value={draft.name} onChange={(event) => setName(event.target.value)} placeholder="After the rain" maxLength={80} aria-invalid={Boolean(nameError)} />

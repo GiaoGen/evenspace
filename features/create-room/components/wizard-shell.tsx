@@ -4,7 +4,7 @@ import { Icon } from "@/components/ui/icon";
 import { createRoomSteps, type CreateRoomStep } from "../model/create-room-machine";
 import styles from "./create-room-wizard.module.css";
 
-const labels: Record<CreateRoomStep, string> = { details: "Name", leadership: "Decisions", timing: "Time", access: "Access", review: "Review" };
+const labels: Record<CreateRoomStep, string> = { details: "Details", timing: "Time", review: "Create" };
 
 export function WizardHeader({ title = "New room", returnLabel = "Cancel room creation" }: { readonly title?: string; readonly returnLabel?: string }) {
   return <header className={styles.header}><Link href="/rooms" aria-label={returnLabel}><Icon name="close" /></Link><strong>{title}</strong><span aria-hidden="true" /></header>;

@@ -34,7 +34,7 @@ function releaseUrl(id: string) {
 }
 
 export function useLocalAssetUrl(reference?: AssetReference | null) {
-  const [url, setUrl] = useState<string | null>(null);
+  const [url, setUrl] = useState<string | null>(() => reference ? urls.get(reference.id)?.url ?? null : null);
   useEffect(() => {
     let active = true;
     if (!reference) { queueMicrotask(() => { if (active) setUrl(null); }); return () => { active = false; }; }

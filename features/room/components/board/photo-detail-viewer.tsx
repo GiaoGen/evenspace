@@ -7,7 +7,7 @@ import { Icon } from "@/components/ui/icon";
 import type { BoardComment, BoardPhoto, PersonSummary } from "@/core/domain/room";
 import { LocalAssetImage } from "@/features/local-assets/components/local-asset-image";
 import { type PhotoNavigationDirection, usePhotoSwipe } from "./use-photo-swipe";
-import styles from "./board.module.css";
+import styles from "./photo-detail-viewer.module.css";
 
 function formatCommentTime(value: string) {
   return new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit" }).format(new Date(value));

@@ -9,7 +9,6 @@ export type ArtVariant = "one" | "two" | "three" | "four";
 export type BoardBackground = "stone" | "linen" | "charcoal" | "herbarium" | "clover" | "bluebell";
 export type BoardNoteVariant = "paper" | "ink" | "sage";
 export type BoardFrameVariant = "pin" | "gallery" | "instant" | "tape" | "dark";
-export type MemoirPaperStyle = "ivory" | "linen" | "sage" | "sky";
 export type ItineraryEndMode = "scheduled" | "manual";
 
 export interface BoardComment {
@@ -62,6 +61,7 @@ export interface ChatMessage {
     | { readonly type: "voice"; readonly durationSeconds: number; readonly asset: AssetReference };
 }
 
+/** @deprecated Vote data is retained only for migration of existing local sessions. */
 export interface PollPreview {
   readonly id: string;
   readonly question: string;
@@ -86,7 +86,6 @@ export interface BoardPhoto {
   readonly y: number;
   readonly rotation: number;
   readonly width: number;
-  readonly memoirPage?: number;
   readonly sourceMessageId?: string;
   readonly sourceActorId?: ActorId;
 }
@@ -102,7 +101,6 @@ export interface BoardNote {
   readonly width?: number;
   readonly height?: number;
   readonly variant?: BoardNoteVariant;
-  readonly memoirPage?: number;
   readonly sourceMessageId?: string;
   readonly sourceActorId?: ActorId;
 }
@@ -117,7 +115,6 @@ export interface BoardDrawing {
   readonly rotation: number;
   readonly width: number;
   readonly height: number;
-  readonly memoirPage?: number;
 }
 
 export type BoardItem = BoardPhoto | BoardNote | BoardDrawing;
@@ -145,8 +142,6 @@ export interface RoomDetail extends RoomSummary {
   readonly activePoll: PollPreview | null;
   readonly boardItems: readonly BoardItem[];
   readonly boardComments: readonly BoardComment[];
-  readonly memoirPageStyles?: Readonly<Record<string, MemoirPaperStyle>>;
-  readonly memoirPageCount?: number;
   readonly itinerary: readonly ItineraryItem[];
 }
 

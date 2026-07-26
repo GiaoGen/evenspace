@@ -18,7 +18,7 @@ export function JoinByCode() {
     event.preventDefault();
     const normalized = code.trim().toLocaleUpperCase();
     const room = session.rooms.find((item) => item.lifecycle === "active" && item.inviteCode.toLocaleUpperCase() === normalized);
-    if (!room) { setError("That invite code is not active in this browser's local data."); return; }
+    if (!room) { setError("That invite code isn’t active."); return; }
     router.push(`/join/${room.publicId}?revision=${room.inviteRevision}`);
   }
 

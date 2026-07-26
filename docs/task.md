@@ -1,21 +1,68 @@
 # EventSpace 当前任务记录
 
-> 最后更新：2026-07-21
+> 最后更新：2026-07-26
 > 用途：记录最近任务做了什么、当前真实进度、验证结果、遗留事项和下一步。  
 > 规则：本文件保持为当前阶段活文档；更早阶段摘要迁移到 [`history_taks.md`](./history_taks.md)。  
-> 本次同步范围：Git 基线 `328e760` 之后的提交 `c83225e`、`665a4bd`、`9af63f0`，以及当前文档同步改动。
+> 本次同步范围：相对 `13a4102` 的当前未提交重构与文档校准。
 
 ## 项目当前状态
 
 - 当前阶段：移动端优先的本地优先 Mock / 静态真实数据版本，尚未接入后端。
 - 正式产品路由已经从静态原型进入可操作状态，主要页面共享一套 `MockSession` 本地状态。
 - 结构化会话使用 `localStorage` 键 `eventspace:local-session:v1`；图片、语音和涂鸦 Blob 使用 IndexedDB `eventspace-local-assets`，并兼容迁移旧 data URL 会话。
-- 当前已经支持创建房间、房间列表、聊天、投票、画板、行程、成员治理、归档、账号本地身份与法律草稿页面。
-- 图片、语音和涂鸦已抽象为 `AssetReference`，会话 JSON 不再保存媒体正文；本地 Blob repository 可直接映射未来私有 Storage，但仍不具备跨设备与生产授权能力。
+- 当前已经支持创建房间、房间列表、文字/语音聊天、Photos 网格、行程、成员治理、归档、账号本地身份与法律草稿页面；Room 内联投票当前未接入，Book 与回忆录编辑器已删除。
+- 图片和语音已抽象为 `AssetReference`，会话 JSON 不再保存媒体正文；Photos 上传和语音录制使用本地 Blob repository。旧 drawing/Board 兼容类型仍在 domain/session 中，但没有正式编辑入口。
 - 生产构建不再依赖远程 Google Fonts / `next/font` 拉取；字体资源已通过 `public/fonts` 的本地 `@font-face` 加载，保留 Bodoni 衬线标题风格。
 - `/prototype` 系列路由只作为视觉历史参考，不再代表当前功能完成度。
 
 ## 最近完成任务
+
+### TASK-024 - Room 收敛为 Chat / Photos / Itinerary 与聊天视觉重构
+
+- 日期：2026-07-26
+- 状态：当前实现完成；仅为本地 Mock，尚未接入后端。
+- 完成内容：
+  - Room 第二页收敛为 `Photos` 网格。上传真实图片会压缩后存入 IndexedDB，以 `BoardPhoto`/`boardItems` 兼容字段保存；支持照片详情、评论与本人/管理员删除。Book、spread、caption 页面模型与自由 Board 编辑器均已删除。
+  - 创建向导收敛为 `details → timing → review` 三步；当前创建房间固定为 Host-led，成员上限 2–10，创建草稿仍写入本地存储。
+  - Chat 移除相机、相册和精确位置发送；工具托盘只保留房内搜索。仍支持文字、回复、反应、置顶、长按操作、历史图片查看/下载，以及最长 60 秒的本地语音录制。
+  - Chat 消息改为稳定随机色的整张圆角卡片：每条都显示成员标识、姓名、时间和正文；本人消息保持右缩/右侧标识构图但不再固定黑色。消息卡轻微叠放；底部为单层悬浮胶囊输入栏，空草稿时保留按住录音、输入后切换发送。
+- 验证：
+  - `npm run typecheck` 通过。
+  - `npm run build` 通过（Next.js 16.2.10）。
+  - `npm run check` 未通过：`room-experience.tsx:59` 触发 `react-hooks/set-state-in-effect`（effect 内同步 `setHeaderView`）。此外 `create-room-wizard.tsx` 有 1 个未使用类型 warning，`chat-panel.tsx` 有 8 个遗留 Poll/Votes 状态相关未使用变量 warning。
+- 已知边界与下一步：
+  - `PersonSummary` 没有头像 URL，聊天卡只能显示首字母成员标识，不能复现真实头像。
+  - `MockSession` 仍保留 `CREATE_POLL`、Board/drawing 与旧 poll history 兼容命令；Room UI 已不提供聊天投票入口，后续应决定是删除遗留状态还是单独恢复为正式功能。
+  - Rooms 卡片仍使用 `boardPreview` / `boardBackground` 兼容摘要，尚未迁移为 Photos 封面。
+
+> TASK-023 的 Photos/Book 回忆录内容为 2026-07-23 历史实现，已被 TASK-024 的 Photos 网格方案取代；不得再将其视为当前功能。
+
+### TASK-023 - Board 退出正式入口与 Photos/Book 回忆录第一阶段
+
+- 日期：2026-07-23
+- 基线：`13a4102`（`Add memoir spreads with page styles and captions`）
+- 状态：第一阶段已完成；复杂书页排版引擎、Rooms 卡片迁移和生产后端尚未完成。
+- 产品与交互：
+  - Room 顶部核心导航由 `Chat / Board / Itinerary` 改为 `Chat / Photos / Itinerary`；再次点击 Photos 在 `Photos` 与 `Book` 间直接切换，不再弹出 Board/Sequence 菜单。
+  - Photos 以纵向双页摊开的回忆录浏览；所有书页按双页生成，长按任意半页进入整组 spread 的聚焦编辑。
+  - 编辑工具位于书页下方，支持从 Chat 选择未加入的照片/文本、设备相册、相机、新文本和四种纸张样式；未选中编辑 spread 时新增内容进入最新页。
+  - 新照片在写入前显示 caption 确认层；caption 与照片通过 `BoardComment.kind = "caption"` 绑定并在详情评论中置顶。
+  - Book 使用 `Nodlik/StPageFlip` 的 `page-flip` 包，从闭合封面开始，支持 Spread/Single 两种视角、左右翻页和移动端尺寸重算；Single 模式只在正确页侧触发翻页，翻页完成后再移动视角。
+- 本地数据与代码边界：
+  - `MockSession` 升级为 v7；`BoardItem.memoirPage`、`MockRoom.memoirPageCount`、`memoirPageStyles` 和 `MemoirPaperStyle` 保存书页归属与纸张元数据。
+  - 新增 `ADD_MEMOIR_PHOTO`、`ADD_MEMOIR_SPREAD`、`SET_MEMOIR_PAGE_STYLE` 命令；新增 spread 每次固定增加两页，当前运行时上限为 500 页。
+  - 回忆录按编排器、document model、Photos 浏览、spread editor、来源 Dock、caption layer、Book 页面结构、StPageFlip lifecycle hook 和独立样式拆分，没有重新形成单文件巨型组件。
+  - 当前仍复用 `boardItems`、`boardComments`、`canAddBoardItem` 和 `DELETE_BOARD_ITEM`，这是迁移兼容层，不应直接成为未来后端 API 命名。
+- 验证：
+  - `npm run check` 通过。
+  - `npm test`：5 个测试文件、26 个测试通过，其中回忆录 document 与 MockSession 命令测试均通过。
+  - `npm run build` 通过，Next.js 16.2.10 正常打包 `page-flip` 动态客户端依赖。
+  - 390 x 844 移动端视口验证封面、Spread/Single、单页满宽、翻页完成后视角切换和无横向溢出。
+- 遗留事项：
+  - Photos 当前只支持 spread 级添加/删除和纸张样式，复杂自由排版、跨页移动、层级、裁切、撤销/重做尚未实现。
+  - Rooms 卡片仍消费旧 Board snapshot/background，尚未改为回忆录封面或 Photos spread 预览。
+  - StPageFlip 是客户端呈现依赖；后端只应保存页序、内容归属和样式，不保存翻页运行时状态。
+  - 生产端需要把 memoir page/spread、item placement、caption 与 asset 分别建模，并以事务、权限、版本号和服务器时间处理并发编辑。
 
 ### TASK-022 - 移动端本地资产保存修复与后端边界收紧
 

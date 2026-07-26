@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type MouseEvent, type PointerEvent } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type MouseEvent, type PointerEvent } from "react";
 import { Icon } from "@/components/ui/icon";
 import type { ChatMessage } from "@/core/domain/room";
 import { LocalAssetImage } from "@/features/local-assets/components/local-asset-image";
@@ -21,6 +21,19 @@ interface ChatMessageItemProps {
 }
 
 const formatTime = (value: string, timeZone: string) => new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit", timeZone }).format(new Date(value));
+const messageTints = [
+  "color-mix(in srgb,#e7caca 47%,var(--surface))",
+  "color-mix(in srgb,#e5d59d 49%,var(--surface))",
+  "color-mix(in srgb,#c8d8c2 52%,var(--surface))",
+  "color-mix(in srgb,#bfd5d8 49%,var(--surface))",
+  "color-mix(in srgb,#d4c5df 50%,var(--surface))",
+] as const;
+
+function messageTint(messageId: string) {
+  let hash = 0;
+  for (let index = 0; index < messageId.length; index += 1) hash = (hash * 31 + messageId.charCodeAt(index)) | 0;
+  return messageTints[Math.abs(hash) % messageTints.length];
+}
 
 function VoiceMessage({ message }: { readonly message: ChatMessage }) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -65,18 +78,20 @@ function VoiceMessage({ message }: { readonly message: ChatMessage }) {
 export function ChatMessageItem({ message, own, grouped, timeZone, replyBody, onPointerDown, onPointerMove, onPointerEnd, onContextMenu, onOpenImage }: ChatMessageItemProps) {
   const content = message.content;
   const className = [styles.message, own ? styles.ownMessage : "", grouped ? styles.groupedMessage : ""].filter(Boolean).join(" ");
+  const cardStyle = { "--message-tint": messageTint(message.id) } as CSSProperties;
 
   return <article
     className={className}
+    style={cardStyle}
     onPointerDown={(event) => onPointerDown(event, message)}
     onPointerMove={onPointerMove}
     onPointerUp={onPointerEnd}
     onPointerCancel={onPointerEnd}
     onContextMenu={(event) => onContextMenu(event, message)}
   >
-    <span className={styles.messageAvatar} aria-hidden={grouped}>{grouped ? "" : message.author?.initials ?? "?"}</span>
+    <span className={styles.messageAvatar} aria-hidden>{message.author?.initials ?? "?"}</span>
     <div className={styles.messageBody}>
-      {!grouped ? <p className={styles.messageMeta}><strong>{own ? "You" : message.author?.displayName}</strong><time>{formatTime(message.sentAt, timeZone)}</time></p> : null}
+      <p className={styles.messageMeta}><strong>{own ? "You" : message.author?.displayName}</strong><time>{formatTime(message.sentAt, timeZone)}</time></p>
       <div className={`${styles.bubble} ${content ? styles.mediaBubble : ""}`}>
         {replyBody ? <span className={styles.replyQuote}>Replying to {replyBody}</span> : null}
         {content?.type === "image" ? <button type="button" className={styles.chatImage} style={{ aspectRatio: content.aspectRatio }} onClick={() => onOpenImage(message)} aria-label={`Open ${content.name || "photo"}`}>

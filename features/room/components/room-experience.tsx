@@ -9,7 +9,7 @@ import type { MockRoom } from "@/features/mock-session/model/mock-session";
 import { useMockSession } from "@/features/mock-session/components/mock-session-provider";
 import { ChatPanel } from "./chat-panel";
 import { ItineraryPanel } from "./itinerary-panel";
-import { MemoirPanel, type MemoirMode } from "./memoir-panel";
+import { PhotosPanel } from "./photos-panel";
 import { RoomControls, type RoomControl } from "./room-controls";
 import styles from "./room-experience.module.css";
 
@@ -43,14 +43,23 @@ export function RoomExperience({ room, capabilities, viewerActorId }: { readonly
   const [visitedPages, setVisitedPages] = useState<ReadonlySet<RoomPage>>(() => new Set(["chat"]));
   const [control, setControl] = useState<RoomControl | null>(null);
   const [now, setNow] = useState(() => Date.now());
-  const [memoirMode, setMemoirMode] = useState<MemoirMode>("photos");
+  const [headerView, setHeaderView] = useState<"title" | "countdown">("title");
   const endTime = formatEnd(room.endsAt, room.timeZone);
-  const lifecycleLabel = room.lifecycle === "active" ? formatCountdown(room.endsAt, now) : room.lifecycle === "archived" ? "Archived · Read-only" : "Preserving · Read-only";
+  const lifecycleLabel = room.lifecycle === "archived" ? "Archived · Read-only" : "Preserving · Read-only";
+  const roomStart = Date.parse(room.createdAt);
+  const roomEnd = Date.parse(room.endsAt ?? "");
+  const durationProgress = Number.isFinite(roomStart) && Number.isFinite(roomEnd) && roomEnd > roomStart ? Math.min(1, Math.max(0, (now - roomStart) / (roomEnd - roomStart))) : 0;
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 30_000);
     return () => window.clearInterval(timer);
   }, []);
+
+  useEffect(() => {
+    if (room.lifecycle !== "active") { setHeaderView("title"); return; }
+    const timer = window.setTimeout(() => setHeaderView((current) => current === "title" ? "countdown" : "title"), headerView === "title" ? 5000 : 3000);
+    return () => window.clearTimeout(timer);
+  }, [headerView, room.lifecycle]);
 
   useEffect(() => {
     if (room.lifecycle !== "freezing" && room.lifecycle !== "archiving") return;
@@ -68,18 +77,18 @@ export function RoomExperience({ room, capabilities, viewerActorId }: { readonly
     <div className={styles.room}>
       <header className={styles.roomHeader}>
         <div className={styles.headerLeft}><Link className={styles.backButton} href="/rooms" aria-label="Return to rooms"><Icon name="arrow" /></Link></div>
-        <div className={styles.identity}><h1>{room.name}</h1><p><i /><span>{lifecycleLabel}</span><span className={styles.secondaryStatus}> · {room.mode === "host-led" ? "Host-led" : "Community-led"} · Local</span></p></div>
-        <div className={styles.headerActions}>{room.lifecycle === "active" ? <button type="button" aria-label="Share room" onClick={() => setControl("share")}><Icon name="share" /><span>Share</span></button> : null}<button type="button" aria-label="Open members" onClick={() => setControl("members")}><Icon name="members" /><span>Members</span></button><button type="button" aria-label={room.lifecycle === "archived" ? "Archive options" : "More room actions"} onClick={() => setControl("more")}><Icon name="more" /></button></div>
+        <div className={styles.identity} aria-live="polite"><div className={`${styles.headerIdentityView} ${headerView === "title" || room.lifecycle !== "active" ? styles.headerIdentityVisible : ""}`}><h1>{room.name}</h1>{room.lifecycle !== "active" ? <p><span>{lifecycleLabel}</span></p> : null}</div>{room.lifecycle === "active" ? <div className={`${styles.headerIdentityView} ${styles.headerCountdown} ${headerView === "countdown" ? styles.headerIdentityVisible : ""}`}><strong>{formatCountdown(room.endsAt, now)}</strong><span><i style={{ transform: `scaleX(${durationProgress})` }} /></span></div> : null}</div>
+        <div className={styles.headerActions}>{room.lifecycle === "active" ? <button type="button" aria-label="Share room" onClick={() => setControl("share")}><Icon name="share" /></button> : null}<button type="button" aria-label="Open members" onClick={() => setControl("members")}><Icon name="members" /></button><button type="button" aria-label={room.lifecycle === "archived" ? "Archive options" : "More room actions"} onClick={() => setControl("more")}><Icon name="more" /></button></div>
       </header>
       <nav className={styles.roomTabs} aria-label="Room pages">
-        {pages.map((item) => item.id === "photos" ? <button type="button" key={item.id} className={page === item.id ? styles.activeTab : ""} onClick={() => { if (page !== "photos") selectPage("photos"); else setMemoirMode((current) => current === "photos" ? "book" : "photos"); }} aria-current={page === item.id ? "page" : undefined} aria-label={memoirMode === "photos" ? "Switch to Book" : "Switch to Photos"}><Icon name={item.icon} size={16} /><span>{memoirMode === "book" ? "Book" : "Photos"}</span></button> : <button type="button" key={item.id} className={page === item.id ? styles.activeTab : ""} onClick={() => selectPage(item.id)} aria-current={page === item.id ? "page" : undefined}><Icon name={item.icon} size={16} /><span>{item.label}</span></button>)}
+        {pages.map((item) => <button type="button" key={item.id} className={page === item.id ? styles.activeTab : ""} onClick={() => selectPage(item.id)} aria-label={item.label} aria-current={page === item.id ? "page" : undefined}><Icon name={item.icon} size={17} /></button>)}
       </nav>
       <div className={styles.roomBody}>
         <main className={styles.roomContent}>
           <div className={styles.roomPages}>
-            <section className={`${styles.roomPage} ${page === "chat" ? styles.activePage : ""}`} aria-hidden={page !== "chat"}><ChatPanel roomPublicId={room.publicId} messages={room.messages} poll={room.activePoll} pinnedMessageId={room.pinnedMessageId} members={room.members} viewerActorId={viewerActorId} timeZone={room.timeZone} canChat={capabilities.canChat} canVote={capabilities.canVote} canModerate={capabilities.canModerate} archived={room.lifecycle !== "active"} /></section>
-            {visitedPages.has("photos") ? <section className={`${styles.roomPage} ${page === "photos" ? styles.activePage : ""}`} aria-hidden={page !== "photos"}><MemoirPanel roomPublicId={room.publicId} roomName={room.name} items={room.boardItems} comments={room.boardComments} messages={room.messages} pageStyles={room.memoirPageStyles ?? {}} pageCount={room.memoirPageCount ?? 1} members={room.members} mode={memoirMode} viewerActorId={room.members.find((member) => member.actorId === viewerActorId)?.actorId ?? room.members[0].actorId} canAdd={capabilities.canAddBoardItem} canModerate={capabilities.canModerate} /></section> : null}
-            {visitedPages.has("itinerary") ? <section className={`${styles.roomPage} ${page === "itinerary" ? styles.activePage : ""}`} aria-hidden={page !== "itinerary"}><ItineraryPanel roomPublicId={room.publicId} items={room.itinerary} timeZone={room.timeZone} canCreate={capabilities.canCreateItinerary} canVote={capabilities.canVote} canModerate={capabilities.canModerate} mode={room.mode} members={room.members} /></section> : null}
+            <section className={`${styles.roomPage} ${page === "chat" ? styles.activePage : ""}`} aria-hidden={page !== "chat"}><ChatPanel roomPublicId={room.publicId} messages={room.messages} poll={null} pinnedMessageId={room.pinnedMessageId} members={room.members} viewerActorId={viewerActorId} timeZone={room.timeZone} canChat={capabilities.canChat} canVote={false} canModerate={capabilities.canModerate} archived={room.lifecycle !== "active"} /></section>
+            {visitedPages.has("photos") ? <section className={`${styles.roomPage} ${page === "photos" ? styles.activePage : ""}`} aria-hidden={page !== "photos"}><PhotosPanel roomPublicId={room.publicId} items={room.boardItems} comments={room.boardComments} members={room.members} viewerActorId={viewerActorId} photoCount={room.photoCount} maxPhotos={room.maxPhotos} canAdd={capabilities.canAddBoardItem} canModerate={capabilities.canModerate} /></section> : null}
+            {visitedPages.has("itinerary") ? <section className={`${styles.roomPage} ${page === "itinerary" ? styles.activePage : ""}`} aria-hidden={page !== "itinerary"}><ItineraryPanel roomPublicId={room.publicId} items={room.itinerary} timeZone={room.timeZone} canCreate={capabilities.canCreateItinerary} canModerate={capabilities.canModerate} members={room.members} /></section> : null}
           </div>
         </main>
         <aside className={styles.sidebar}><section><p>About</p><span>{room.description}</span></section><section><p>{room.status === "active" ? "Ends at" : "Archived"}</p><strong>{room.status === "active" ? endTime : room.archivedAt ? new Intl.DateTimeFormat("en-US", { month: "long", day: "numeric", timeZone: room.timeZone }).format(new Date(room.archivedAt)) : "—"}</strong><span>{room.timeZone.replace("_", " ")}</span></section><section><p>People · {room.memberCount}</p><div className={styles.avatarStack}>{room.members.slice(0,4).map((member) => <b key={member.actorId}>{member.initials}</b>)}{room.memberCount > 4 ? <b>+{room.memberCount - 4}</b> : null}</div></section>{room.itinerary[0] ? <section><p>Next</p><div className={styles.next}><time>{formatEnd(room.itinerary[0].startsAt, room.timeZone)}</time><div><strong>{room.itinerary[0].title}</strong><span>{room.itinerary[0].locationLabel ?? "No fixed location"}</span></div><Icon name="chevron" /></div></section> : null}</aside>

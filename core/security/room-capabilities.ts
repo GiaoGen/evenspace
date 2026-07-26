@@ -30,7 +30,7 @@ export function deriveRoomCapabilities(
   return {
     canRead,
     canChat: canRead && isWritable && membership.state !== "muted",
-    canVote: canRead && isWritable && isSignedIn,
+    canVote: false,
     canAddBoardItem: canRead && isWritable && isSignedIn && membership.state !== "muted",
     canCreateItinerary: canRead && isWritable && (isHost || isAdmin),
     canModerate: canRead && isWritable && (isHost || isAdmin),

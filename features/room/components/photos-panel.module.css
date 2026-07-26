@@ -1,0 +1,215 @@
+.panel {
+  height: 100%;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background: var(--canvas);
+  color: var(--ink);
+  scrollbar-width: thin;
+}
+
+.fileInput {
+  position: fixed;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.header {
+  position: sticky;
+  z-index: 4;
+  top: 0;
+  width: min(900px, 100%);
+  min-height: 62px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 0 auto;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+  backdrop-filter: blur(14px);
+}
+
+.header > div {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+}
+
+.header strong {
+  font-family: var(--font-bodoni), Georgia, serif;
+  font-size: 23px;
+  font-weight: 500;
+}
+
+.header div span {
+  color: var(--muted);
+  font-size: 8px;
+}
+
+.header button,
+.empty button {
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 0 13px;
+  border: 0;
+  border-radius: 7px;
+  background: var(--ink);
+  color: var(--canvas);
+  font-size: 8px;
+  transition: opacity 150ms ease, transform 150ms ease;
+}
+
+.header button:active,
+.empty button:active {
+  transform: scale(.97);
+}
+
+.header button:disabled {
+  opacity: .38;
+}
+
+.notice {
+  position: sticky;
+  z-index: 3;
+  top: 0;
+  width: min(900px, 100%);
+  min-height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 auto;
+  padding: 8px 12px;
+  background: #a45a51;
+  color: #fff;
+  font-size: 9px;
+}
+
+.notice button {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, .15);
+  color: inherit;
+}
+
+.grid {
+  width: min(900px, 100%);
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0;
+  margin: 0 auto;
+  background: var(--canvas);
+}
+
+.tile {
+  position: relative;
+  min-width: 0;
+  aspect-ratio: 1;
+  overflow: hidden;
+  padding: 0;
+  border: 0;
+  background: var(--canvas);
+  cursor: pointer;
+  animation: tileEnter 260ms cubic-bezier(.2, .8, .2, 1) both;
+}
+
+.tile::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0);
+  transition: background 150ms ease;
+}
+
+.tile:hover::after {
+  background: rgba(0, 0, 0, .08);
+}
+
+.tile:active::after {
+  background: rgba(0, 0, 0, .16);
+}
+
+.addTile {
+  display: grid;
+  place-items: center;
+  background: var(--surface-2);
+  color: var(--muted);
+}
+
+.addTile:disabled {
+  opacity: .48;
+  cursor: wait;
+}
+
+.image {
+  object-fit: cover;
+}
+
+.placeholder {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+}
+
+.empty {
+  min-height: min(58vh, 520px);
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 8px;
+  padding: 30px;
+  color: var(--muted);
+  text-align: center;
+}
+
+.empty strong {
+  color: var(--ink);
+  font-family: var(--font-bodoni), Georgia, serif;
+  font-size: 24px;
+  font-weight: 500;
+}
+
+.empty span {
+  max-width: 260px;
+  font-size: 9px;
+  line-height: 1.45;
+}
+
+.empty button {
+  margin-top: 8px;
+}
+
+@keyframes tileEnter {
+  from { opacity: 0; transform: scale(.985); }
+}
+
+@media (max-width: 700px) {
+  .header {
+    min-height: 54px;
+    padding: 7px 10px;
+  }
+
+  .header strong { font-size: 20px; }
+  .header button { min-height: 38px; padding: 0 11px; }
+  .notice { top: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tile { animation: none; }
+  .tile::after,.header button,.empty button { transition: none; }
+}

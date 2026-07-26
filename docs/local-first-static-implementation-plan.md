@@ -63,21 +63,20 @@
 后端替换点：
 - 消息写入命令未来映射为服务端 RPC；搜索实现保留可替换边界。
 
-### Phase D — Board 与本地媒体
+### Phase D — Photos 与本地媒体（当前收敛方案）
 
 目标：
-- 画板完全以本地真实照片和注释驱动。
+- Photos 网格以本地真实照片驱动；当前不从 Chat 导入内容，也不包含 Book 阅读器。
 - IndexedDB 保存压缩后图片 Blob、尺寸、缩略图和引用 ID；JSON 状态只保存元数据。
-- 实现移动端单指平移、双指缩放、长按选中、本人内容移动/旋转/缩放/编辑、评论和表情。
-- Sequence 使用稳定上传顺序流，不使用会打乱阅读顺序的瀑布算法。
+- 使用 `BoardPhoto` 兼容字段保存图片与评论，后端接入前再将其替换为独立的 photos/comments DTO。
 
 验收：
-- 手机相册/拍照上传可用；不支持的格式给出明确说明。
-- 双指缩放在手指落在照片上时也生效。
-- 200 张上限内仍保持可操作；默认渲染缩略图，详情再读大图。
+- 手机相册多选上传可用；不支持的格式给出明确说明。当前没有相机捕获入口。
+- Book 在 320px 至桌面宽度初始化稳定，无首帧畸形、横向溢出或翻页方向错误。
+- 200 张上限内仍保持可浏览；默认使用缩略图，详情再读大图，并评估分页/虚拟化。
 
 后端替换点：
-- 本地媒体记录未来对应私有 Storage object + signed URL；本地 Blob ID 对应未来 storage path/asset id。
+- 本地媒体记录未来对应私有 Storage object + signed URL；本地 Blob ID 对应未来 storage path/asset id。页序、spread、item placement、paper style 和 caption 应使用独立 repository/DTO。
 
 ### Phase E — Itinerary、Poll 与治理
 
@@ -148,11 +147,28 @@
 1. 在现有 `AssetReference` 与 IndexedDB repository 之上补充配额反馈、失败重试和移动端真机恢复验证。
 2. 为 Chat 媒体采集建立 adapter：图片解码/压缩、录音生命周期、定位权限分别与 UI 解耦，并补 Safari/Chromium 失败路径。
 3. 为 `POST_MESSAGE` content、`ADD_BOARD_COMMENT` 和 `SET_BOARD_BACKGROUND` 增加独立运行时 schema 与 reducer 测试。
-4. 保持 Board 当前组件边界；下一轮复杂交互优先进入专用 hook/子组件，不再回填到编排器。
+4. 停止扩展旧 Board；回忆录复杂排版优先进入独立 model、hook 和子组件，不回填到 `memoir-panel.tsx` 或 Book reader。
 
 ## 2026-07-20 执行状态补充
 
 - `MockSession` 已升级到 v5，并为旧 v3/v4 行程补齐结束模式、计划/实际结束时间、所有者和时间戳；迁移仍是客户端兼容逻辑，不等于数据库 migration。
 - `/rooms/new` 草稿恢复已形成独立存储边界 `eventspace:create-room-draft:v1`，但 UI draft 仍不能直接作为未来创建接口 DTO。
 - Board 照片新增相框选择元数据，背景扩展为六套；轻量枚举和 asset reference 均可映射到后端字段，媒体正文已与房间 JSON 分离。
+
+## 2026-07-23 执行状态补充：回忆录迁移
+
+- 已完成：Room 正式入口由 Board/Sequence 改为 Photos/Book；旧 Board 代码暂时保留，不再继续扩展。
+- 已完成：`createMemoirDocument` 从现有 item、页数和纸张样式生成稳定偶数页与 spread；Photos 和 Book 共用该只读 document。
+- 已完成：相册/相机/Chat 图片、Chat 文本、新文本、纸张样式、caption 和新增双页均通过本地命令写入 `MockSession` v7；媒体继续使用 IndexedDB asset reference。
+- 已完成：Book 的 `page-flip` 生命周期与 UI 分离，支持封面、Spread/Single、移动端尺寸更新和翻页后视角定位。
+- 部分完成：当前编辑器只支持目标页选择、添加、删除和纸张样式；复杂排版引擎尚未进入数据模型。
+- 未完成：Rooms 卡片尚未从旧 Board snapshot/background 迁移为 memoir cover/spread preview。
+- 后端替换点：不要直接暴露 `boardItems` 兼容字段；先定义 `memoir_pages`、`memoir_items`、`photo_captions` 或等价聚合，以及带 expected version 的页面 mutation。
 - Room extension 已使用 5 分钟步进和本地上限校验；生产必须由服务端根据套餐、当前结束时间和总时长再次裁决。
+
+## 2026-07-26 当前同步：范围收敛
+
+- 2026-07-23 的 Photos/Book 回忆录切片已撤回：相关组件、`memoirPage` 扩展命令、spread 编辑和 Book reader 均不再存在于运行时代码。上述“回忆录迁移”记录仅保留为历史，不代表当前实现。
+- 当前媒体路径是 Photos 网格：设备选择图片、浏览器压缩、`AssetReference` 写入 IndexedDB、`BoardPhoto` 写入本地 session、照片详情评论与本人/管理员删除。没有相机捕获或 Chat 图片发送。
+- 当前 Chat 路径是文字、历史媒体展示和本地语音。`MediaRecorder` 仍需要真机验证；浏览器权限、HTTPS 和本地存储失败都必须有用户可见错误提示。
+- 下一步优先决定是否清理未使用的 Book/投票/旧 Board 兼容状态；在重新立项前，不得把遗留 reducer 命令描述为正式产品功能。

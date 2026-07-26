@@ -1,0 +1,59 @@
+.photoDetailBackdrop { position: fixed; z-index: 320; inset: 0; display: grid; place-items: end center; padding: max(12px,env(safe-area-inset-top)) 12px max(12px,env(safe-area-inset-bottom)); background: rgba(20,19,17,.72); animation: fadeIn 180ms ease-out both; }
+.photoDetail { position: relative; width: min(620px,100%); height: min(860px,calc(100dvh - max(24px,env(safe-area-inset-top)) - max(24px,env(safe-area-inset-bottom)))); min-height: 0; display: grid; overflow: hidden; grid-template-rows: minmax(260px,52%) minmax(0,1fr); border-radius: 8px; background: #292824; box-shadow: 0 28px 76px rgba(0,0,0,.38); animation: detailUp 300ms cubic-bezier(.2,.8,.22,1) both; }
+.photoDetailToolbar { position: absolute; z-index: 4; top: 10px; right: 10px; left: 10px; display: grid; grid-template-columns: 42px minmax(0,1fr) 42px; align-items: center; gap: 8px; pointer-events: none; }
+.photoDetailToolbar button { display: grid; width: 42px; height: 42px; place-items: center; border: 0; border-radius: 14px; background: rgba(31,30,27,.94); color: #f7f2ea; box-shadow: 0 8px 22px rgba(0,0,0,.2); pointer-events: auto; }
+.photoDetailToolbar .photoDetailDelete { background: #974b44; }
+.photoDetailPosition { justify-self: center; padding: 6px 10px; border-radius: 12px; background: rgba(31,30,27,.76); color: rgba(247,242,234,.82); font-size: 9px; font-variant-numeric: tabular-nums; }
+.photoDetailMedia { position: relative; min-height: 0; display: grid; overflow: hidden; place-items: center; padding: 56px 56px 18px; touch-action: pan-y; }
+.photoDetailMedia > div { width: 100%; height: 100%; min-width: 0; min-height: 0; transform: translate3d(var(--photo-drag-x,0),0,0); transition: transform 210ms cubic-bezier(.2,.8,.22,1),opacity 180ms ease; will-change: transform; }
+.photoDetailCanvas { position: relative; width: 100%; height: 100%; min-width: 0; min-height: 0; overflow: hidden; }
+.photoDetailObject { object-fit: contain; }
+.photoDetailImage { width: 100%; height: 100%; }
+.photoDetailArrow { position: absolute; z-index: 2; top: 50%; display: grid; width: 38px; height: 52px; place-items: center; border: 0; border-radius: 8px; background: rgba(31,30,27,.74); color: #f7f2ea; transform: translateY(-50%); transition: opacity 160ms ease,background 160ms ease,transform 160ms ease; }
+.photoDetailArrow:disabled { pointer-events: none; opacity: 0; }
+.photoDetailArrow:active { transform: translateY(-50%) scale(.92); }
+.photoDetailPrevious { left: 10px; }
+.photoDetailPrevious svg { transform: rotate(180deg); }
+.photoDetailNext { right: 10px; }
+.photoEnterFromLeft { animation: photoFromLeft 240ms cubic-bezier(.2,.8,.22,1) both; }
+.photoEnterFromRight { animation: photoFromRight 240ms cubic-bezier(.2,.8,.22,1) both; }
+.photoDetailConversation { min-height: 0; display: grid; grid-template-rows: auto minmax(0,1fr) auto; overflow: hidden; padding: 15px 16px max(12px,env(safe-area-inset-bottom)); background: #f3eee5; color: #24221e; }
+.photoDetailAuthor { display: flex; align-items: center; gap: 10px; padding-bottom: 13px; border-bottom: 1px solid rgba(36,34,30,.12); }
+.photoDetailAuthor > b,.photoCommentList article > b { display: grid; flex: 0 0 34px; height: 34px; place-items: center; border-radius: 50%; background: #7e8a7d; color: #fff; font-size: 9px; }
+.photoDetailAuthor span { min-width: 0; display: grid; gap: 2px; }
+.photoDetailAuthor strong { overflow: hidden; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.photoDetailAuthor small { color: rgba(36,34,30,.56); font-size: 8px; }
+.photoCommentList { min-height: 0; display: grid; align-content: start; gap: 14px; overflow-y: auto; padding: 15px 2px; overscroll-behavior: contain; scrollbar-width: none; }
+.photoCommentList::-webkit-scrollbar { display: none; }
+.photoCommentList article { display: grid; grid-template-columns: 34px minmax(0,1fr); gap: 10px; }
+.photoCommentList article > div { min-width: 0; }
+.photoCommentList .pinnedCaption { padding: 10px; background: #e1ddd4; }
+.pinnedCaption time { color: #69766b; font-weight: 750; text-transform: uppercase; }
+.photoCommentList article header { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.photoCommentList article strong { overflow: hidden; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.photoCommentList article time { flex: 0 0 auto; color: rgba(36,34,30,.48); font-size: 8px; }
+.photoCommentList article p { margin: 4px 0 0; overflow-wrap: anywhere; font-size: 12px; line-height: 1.42; }
+.photoCommentEmpty { align-self: center; display: grid; gap: 4px; color: rgba(36,34,30,.48); text-align: center; }
+.photoCommentEmpty strong { color: #24221e; font-family: var(--font-bodoni),Georgia,serif; font-size: 21px; font-weight: 600; }
+.photoCommentEmpty span { font-size: 9px; }
+.photoDetailComposer { display: grid; grid-template-columns: minmax(0,1fr) 42px; gap: 6px; padding: 5px; border-radius: 20px; background: #d9d4ca; }
+.photoDetailComposer input { min-width: 0; height: 38px; padding: 0 10px; border: 0; outline: 0; background: transparent; color: #24221e; font-size: 16px; }
+.photoDetailComposer input::placeholder { color: rgba(36,34,30,.48); }
+.photoDetailComposer button { display: grid; width: 42px; height: 38px; place-items: center; border: 0; border-radius: 16px; background: #758477; color: #fff; }
+.photoDetailComposer button:disabled { opacity: .36; }
+
+@keyframes fadeIn { from { opacity: 0; } }
+@keyframes detailUp { from { opacity: 0; transform: translateY(26px); } }
+@keyframes photoFromLeft { from { opacity: .35; transform: translate3d(-34px,0,0) scale(.98); } }
+@keyframes photoFromRight { from { opacity: .35; transform: translate3d(34px,0,0) scale(.98); } }
+
+@media (max-width: 700px) {
+  .photoDetailBackdrop { padding-right: 0; padding-bottom: 0; padding-left: 0; }
+  .photoDetail { width: 100%; height: calc(100dvh - max(8px,env(safe-area-inset-top))); grid-template-rows: minmax(230px,48%) minmax(0,1fr); border-radius: 8px 8px 0 0; }
+  .photoDetailMedia { padding-right: 12px; padding-left: 12px; }
+  .photoDetailArrow { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .photoDetailBackdrop,.photoDetail,.photoDetailMedia > div,.photoDetailArrow { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+}
