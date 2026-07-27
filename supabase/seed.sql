@@ -1,0 +1,2 @@
+-- Intentionally empty for BE-003.
+-- Deterministic development fixtures will be added with the schema pipeline.

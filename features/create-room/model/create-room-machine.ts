@@ -8,11 +8,15 @@ export interface CreateRoomDraft {
   readonly acceptedTerms: boolean;
 }
 
-export interface CreatedLocalRoom {
-  readonly localId: string;
+export interface CreatedRoom {
+  readonly id: string;
+  readonly publicId: string;
   readonly name: string;
   readonly createdAt: string;
   readonly endsAt: string;
+  readonly inviteToken: string;
+  readonly inviteCode: string;
+  readonly inviteRevision: number;
   readonly draft: CreateRoomDraft;
 }
 
@@ -21,7 +25,7 @@ export type CreateRoomErrors = Partial<Record<DraftField, string>>;
 
 export type CreateRoomState =
   | { readonly status: "editing"; readonly step: CreateRoomStep; readonly draft: CreateRoomDraft; readonly errors: CreateRoomErrors }
-  | { readonly status: "complete"; readonly room: CreatedLocalRoom };
+  | { readonly status: "complete"; readonly room: CreatedRoom };
 
 export type CreateRoomEvent =
   | { readonly type: "RESTORE_DRAFT"; readonly draft: CreateRoomDraft }
@@ -33,7 +37,8 @@ export type CreateRoomEvent =
   | { readonly type: "NEXT" }
   | { readonly type: "BACK" }
   | { readonly type: "GO_TO"; readonly step: CreateRoomStep }
-  | { readonly type: "SUBMIT"; readonly nowIso: string }
+  | { readonly type: "SUBMIT" }
+  | { readonly type: "COMPLETE"; readonly room: CreatedRoom }
   | { readonly type: "RESET" };
 
 export const createRoomSteps: readonly CreateRoomStep[] = ["details", "timing", "review"];
@@ -85,22 +90,10 @@ function updateDraft(state: Extract<CreateRoomState, { status: "editing" }>, pat
   return { ...state, draft: { ...state.draft, ...patch }, errors: {} };
 }
 
-function createResult(draft: CreateRoomDraft, nowIso: string): CreatedLocalRoom | null {
-  const now = Date.parse(nowIso);
-  if (!Number.isFinite(now)) return null;
-  const safeDraft = normalizeDraft(draft);
-  return {
-    localId: `local_${Math.floor(now / 1000).toString(36)}`,
-    name: safeDraft.name,
-    createdAt: new Date(now).toISOString(),
-    endsAt: new Date(now + safeDraft.durationMinutes * 60_000).toISOString(),
-    draft: safeDraft,
-  };
-}
-
 export function createRoomReducer(state: CreateRoomState, event: CreateRoomEvent): CreateRoomState {
   if (event.type === "RESET") return initialCreateRoomState;
   if (state.status === "complete") return state;
+  if (event.type === "COMPLETE") return { status: "complete", room: event.room };
 
   if (event.type === "RESTORE_DRAFT") return { ...state, draft: normalizeDraft({ ...event.draft, acceptedTerms: false }), errors: {} };
   if (event.type === "SET_NAME") return updateDraft(state, { name: event.value.slice(0, 80) });
@@ -129,8 +122,7 @@ export function createRoomReducer(state: CreateRoomState, event: CreateRoomEvent
       const invalidStep: CreateRoomStep = errors.name || errors.description ? "details" : errors.durationMinutes || errors.memberLimit ? "timing" : "review";
       return { ...state, step: invalidStep, errors };
     }
-    const room = createResult(state.draft, event.nowIso);
-    return room ? { status: "complete", room } : state;
+    return state;
   }
 
   return state;

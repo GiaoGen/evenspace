@@ -13,10 +13,10 @@ export function formatDuration(minutes: number) {
   return `${hours}h ${rest}m`;
 }
 
-export function InvitationCard({ name, draft, endTime, compact = false }: { readonly name: string; readonly draft: CreateRoomDraft; readonly endTime: string; readonly compact?: boolean }) {
+export function InvitationCard({ name, draft, endTime, compact = false, inviteCode }: { readonly name: string; readonly draft: CreateRoomDraft; readonly endTime: string; readonly compact?: boolean; readonly inviteCode?: string }) {
   return <article className={`${styles.inviteCard} ${compact ? styles.inviteCardCompact : ""}`}>
     <header><strong>{name || "Untitled room"}</strong><span>Host-led</span></header>
-    <div className={styles.inviteCenter}><div className={styles.fakeQr} aria-label="Invitation QR preview">{qrCells.map((filled, index) => <i key={index} className={filled ? styles.qrFilled : ""} />)}</div></div>
+    <div className={styles.inviteCenter}><div className={styles.fakeQr} aria-hidden="true">{qrCells.map((filled, index) => <i key={index} className={filled ? styles.qrFilled : ""} />)}</div>{inviteCode ? <strong className={styles.inviteCode}>{inviteCode}</strong> : null}</div>
     <footer><span><small>Duration</small>{formatDuration(draft.durationMinutes)}</span><span><small>Ends</small>{endTime}</span><span><small>People</small>Up to {draft.memberLimit}</span></footer>
   </article>;
 }

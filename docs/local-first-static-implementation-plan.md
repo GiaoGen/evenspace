@@ -72,11 +72,11 @@
 
 验收：
 - 手机相册多选上传可用；不支持的格式给出明确说明。当前没有相机捕获入口。
-- Book 在 320px 至桌面宽度初始化稳定，无首帧畸形、横向溢出或翻页方向错误。
+- Photos 网格在 320px 至桌面宽度保持稳定；详情层不被页面横向轨道裁切。
 - 200 张上限内仍保持可浏览；默认使用缩略图，详情再读大图，并评估分页/虚拟化。
 
 后端替换点：
-- 本地媒体记录未来对应私有 Storage object + signed URL；本地 Blob ID 对应未来 storage path/asset id。页序、spread、item placement、paper style 和 caption 应使用独立 repository/DTO。
+- 本地媒体记录未来对应私有 Storage object + signed URL；本地 Blob ID 对应未来 storage path/asset id。Photos、评论、排序与删除策略应使用独立 repository/DTO。
 
 ### Phase E — Itinerary、Poll 与治理
 
@@ -172,3 +172,9 @@
 - 当前媒体路径是 Photos 网格：设备选择图片、浏览器压缩、`AssetReference` 写入 IndexedDB、`BoardPhoto` 写入本地 session、照片详情评论与本人/管理员删除。没有相机捕获或 Chat 图片发送。
 - 当前 Chat 路径是文字、历史媒体展示和本地语音。`MediaRecorder` 仍需要真机验证；浏览器权限、HTTPS 和本地存储失败都必须有用户可见错误提示。
 - 下一步优先决定是否清理未使用的 Book/投票/旧 Board 兼容状态；在重新立项前，不得把遗留 reducer 命令描述为正式产品功能。
+
+## 2026-07-27 当前同步：短期 UI 浏览状态
+
+- `/rooms` 新增两个轻量 `sessionStorage` 键：`eventspace:rooms:grid` 记录当前标签页的 Grid/Magazine 偏好，`eventspace:rooms:active-room` 记录最近居中或打开的 Magazine 卡片。它们只服务阅读恢复，不进入 `MockSession`、不参与命令、不会替代 `localStorage` 的业务会话。
+- Room 的三页切换、Photos 初始滚动和行程编辑器 Portal 同样属于客户端呈现状态；没有新增本地 repository、持久化领域字段或可迁移的业务 mutation。
+- 后端接入时，如需要跨设备保存视图偏好，应另建用户偏好契约并由用户身份、同步策略和隐私规则决定；不得直接把现有浏览器键当作服务端字段。

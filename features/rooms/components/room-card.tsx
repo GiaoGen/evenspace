@@ -12,7 +12,7 @@ function formatRoomMeta(room: RoomSummary) {
   return room.status === "active" ? `Ends ${formatted} · ${room.memberCount} people` : `Archived ${formatted} · ${room.memberCount} people`;
 }
 
-function PhotoStack({ items, compact = false, roomHref }: { readonly items: readonly BoardItem[]; readonly compact?: boolean; readonly roomHref?: string }) {
+function PhotoStack({ items, compact = false, roomHref, onOpen }: { readonly items: readonly BoardItem[]; readonly compact?: boolean; readonly roomHref?: string; readonly onOpen?: () => void }) {
   const photos = useMemo(() => items.filter((item): item is BoardPhoto => item.kind === "photo"), [items]);
   const source = photos;
   const [view, setView] = useState(() => Math.floor(Math.max(0, source.length - 1) / 2));
@@ -32,15 +32,18 @@ function PhotoStack({ items, compact = false, roomHref }: { readonly items: read
 
   function applyLayout(xPosition: number, duration = 0, locked = false, shifted = false) {
     const width = Math.max(1, pointer.current.width || deckRef.current?.clientWidth || 1);
+    const visibleRadius = compactRef.current ? 2 : 4;
+    const reserveLevel = visibleRadius + 1;
     const layerLift = compactRef.current ? 4 : 8;
     const dragLift = compactRef.current ? 3 : 7;
     const factor = Math.max(-1, Math.min(1, xPosition / (width * .5)));
     const direction = factor >= 0 ? "left" : "right";
+    const incomingSide = direction === "left" ? -1 : 1;
     const transition = duration ? `transform ${duration}ms linear` : "none";
     cardRefs.current.forEach((card, offset) => {
       const side = Math.sign(offset);
       const level = Math.abs(offset);
-      const isReserve = level === 5;
+      const isReserve = level === reserveLevel;
       const sideFactor = side < 0 ? (direction === "left" ? Math.max(0, factor - .2) : Math.min(0, factor + .2)) : (direction === "left" ? Math.max(0, factor - .2) : Math.min(0, factor + .2));
       let scale = 1;
       let degree = 0;
@@ -57,16 +60,28 @@ function PhotoStack({ items, compact = false, roomHref }: { readonly items: read
         zIndex = locked ? 2 : 10;
         card.style.transformOrigin = direction === "left" ? "100% 100%" : "0 100%";
       } else {
-        const baseLevel = Math.min(level, 4);
+        const baseLevel = Math.min(level, visibleRadius);
         const sideSign = side < 0 ? -1 : 1;
         scale = 1 - .085 * baseLevel + (sideSign < 0 ? sideFactor : -sideFactor) * .085;
         degree = sideSign * 2.8 * baseLevel + sideFactor * 2.8;
         xOffset = sideSign * (8 * baseLevel + 2) + sideFactor * 3;
         yOffset = -layerLift * baseLevel + (sideSign < 0 ? sideFactor : -sideFactor) * dragLift;
         zIndex = level === 1 ? (direction === (sideSign < 0 ? "left" : "right") ? 3 : 1) : 0;
+        if (compactRef.current && level === visibleRadius && sideSign === -incomingSide && Math.abs(factor) > .01) visible = false;
         if (isReserve) {
           visible = direction === (sideSign < 0 ? "left" : "right") && Math.abs(factor) > .01;
-          if (shifted) { xOffset = sideSign * 34; yOffset = -layerLift * 3; degree = sideSign * 11.2; }
+          if (shifted) {
+            if (compactRef.current) {
+              scale = 1 - .085 * visibleRadius;
+              degree = sideSign * 2.8 * visibleRadius;
+              xOffset = sideSign * (8 * visibleRadius + 2);
+              yOffset = -layerLift * visibleRadius;
+            } else {
+              xOffset = sideSign * 34;
+              yOffset = -layerLift * 3;
+              degree = sideSign * 11.2;
+            }
+          }
           zIndex = -2;
         }
         card.style.transformOrigin = sideSign < 0 ? "0 100%" : "100% 100%";
@@ -136,24 +151,25 @@ function PhotoStack({ items, compact = false, roomHref }: { readonly items: read
     else applyLayout(0, 100);
   }
 
-  const offsets = source.length === 0 ? [] : [-5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5].filter((offset) => normalizedView + offset >= 0 && normalizedView + offset < source.length);
+  const renderRadius = compact ? 3 : 5;
+  const offsets = source.length === 0 ? [] : Array.from({ length: renderRadius * 2 + 1 }, (_, index) => index - renderRadius).filter((offset) => normalizedView + offset >= 0 && normalizedView + offset < source.length);
 
   return <div ref={deckRef} className={styles.photoStack} aria-label="Swipe room photos" onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={finishPointer} onPointerCancel={finishPointer} onClickCapture={(event) => { if (dragged.current) { event.preventDefault(); event.stopPropagation(); dragged.current = false; } }}>
     <div className={styles.photoStackPreload} aria-hidden="true">{source.map((photo) => <PinnedPhoto key={photo.id} variant={photo.variant} asset={photo.asset} imageName={photo.imageName} bare />)}</div>
     {source.length === 0 ? <span className={styles.photoStackEmpty}>No photos yet.</span> : null}
     <div className={styles.photoStackDeck}>{offsets.map((offset) => {
       const photo = source[normalizedView + offset];
-      return <div className={styles.photoStackCard} ref={(element) => { if (element) cardRefs.current.set(offset, element); else cardRefs.current.delete(offset); }} key={offset}>{roomHref ? <Link href={roomHref} className={styles.photoStackPhotoLink} aria-label={`Open room photo: ${photo.imageName ?? "photo"}`}><PinnedPhoto variant={photo.variant} asset={photo.asset} imageName={photo.imageName} bare className={styles.photoStackImage} /></Link> : <PinnedPhoto variant={photo.variant} asset={photo.asset} imageName={photo.imageName} bare className={styles.photoStackImage} />}</div>;
+      return <div className={styles.photoStackCard} ref={(element) => { if (element) cardRefs.current.set(offset, element); else cardRefs.current.delete(offset); }} key={offset}>{roomHref ? <Link href={roomHref} scroll={false} onClick={onOpen} className={styles.photoStackPhotoLink} aria-label={`Open room photo: ${photo.imageName ?? "photo"}`}><PinnedPhoto variant={photo.variant} asset={photo.asset} imageName={photo.imageName} bare className={styles.photoStackImage} /></Link> : <PinnedPhoto variant={photo.variant} asset={photo.asset} imageName={photo.imageName} bare className={styles.photoStackImage} />}</div>;
     })}</div>
   </div>;
 }
 
-export function RoomCard({ room, boardItems, grid, editing, active, index, toggleFavorite, requestDelete }: { readonly room: RoomSummary; readonly boardItems: readonly BoardItem[]; readonly grid: boolean; readonly editing: boolean; readonly active: boolean; readonly index: number; readonly toggleFavorite: () => void; readonly requestDelete: () => void }) {
+export function RoomCard({ room, boardItems, grid, editing, active, index, toggleFavorite, requestDelete, rememberRoom }: { readonly room: RoomSummary; readonly boardItems: readonly BoardItem[]; readonly grid: boolean; readonly editing: boolean; readonly active: boolean; readonly index: number; readonly toggleFavorite: () => void; readonly requestDelete: () => void; readonly rememberRoom: () => void }) {
   return (
     <article data-room-card className={`${styles.card} ${grid ? styles.cardGrid : ""} ${editing ? styles.cardEditing : ""} ${active ? styles.cardActive : styles.cardInactive}`} style={{ "--card-index": Math.min(index, 5) } as CSSProperties}>
       {editing ? <button className={`${styles.favorite} ${room.isFavorite ? styles.favoriteActive : ""}`} onClick={toggleFavorite} aria-label={room.isFavorite ? `Remove ${room.name} from favorites` : `Favorite ${room.name}`}><Icon name="heart" size={16} /><span>Favorite</span></button> : null}
       {editing ? <button className={styles.deleteRoom} onClick={requestDelete} aria-label={`Delete ${room.name}`}><Icon name="minus" size={16} /></button> : null}
-      {grid ? <PhotoStack items={boardItems} compact roomHref={`/rooms/${room.publicId}`} /> : <Link href={`/rooms/${room.publicId}`} className={styles.cardLink}>
+      {grid ? <PhotoStack items={boardItems} compact roomHref={`/rooms/${room.publicId}`} onOpen={rememberRoom} /> : <Link href={`/rooms/${room.publicId}`} scroll={false} onClick={rememberRoom} className={styles.cardLink}>
         <PhotoStack items={boardItems} />
         <div className={styles.cardInfo}><div><h2>{room.name}</h2><p><i className={room.status === "active" ? styles.liveDot : ""} />{formatRoomMeta(room)}</p></div><span><Icon name="arrow" /></span></div>
       </Link>}

@@ -83,7 +83,9 @@ data/rooms.ts           server-only 数据访问入口和最小 View DTO
 3. Supabase schema、迁移、Auth 与默认拒绝的 RLS 测试；
 4. 将 `MockRoomRepository` 替换为 `SupabaseRoomRepository`，保留 feature 和页面接口；
 5. 再开始真实 Chat 写入和私有 Realtime。
-## 2026-07-18 当前同步：Mock MVP 架构现状
+## 2026-07-18 历史同步：Mock MVP 架构现状
+
+> 以下内容记录当时的 Board / 回忆录过渡结构；当前正式运行时以 2026-07-26 与 2026-07-27 同步为准。
 
 当前 Mock MVP 已经不只是静态 fixture 展示，而是本地优先的可操作产品壳：
 
@@ -175,3 +177,9 @@ data/rooms.ts           server-only 数据访问入口和最小 View DTO
 - `ChatPanel` 的产品入口只包含搜索、文字消息和语音录制；图片/相机/位置发送与聊天 Poll/Votes UI 已移除。`MockCommand` 中保留的 `CREATE_POLL` 等命令只服务于 Room 控制和旧本地数据兼容。
 - `create-room-machine.ts` 的 `CreateRoomStep` 为 `details`、`timing`、`review` 三步；创建后的 mock room 固定为 `host-led`。本文先前关于五步创建、Community-led 创建配置和 Book 编排器的描述均为历史实现。
 - `page-flip` 仍在 `package.json`，但没有运行时代码导入。发布前应在依赖审计中决定删除，或在恢复 Book 时重新引入最小化客户端边界。
+
+## 2026-07-27 当前同步：浏览器导航状态
+
+- `RoomsPage` 通过 `useSyncExternalStore` 读取和订阅当前标签页的 `sessionStorage` UI 状态：`eventspace:rooms:grid` 保存浏览模式，`eventspace:rooms:active-room` 保存 Magazine 最近阅读位置。它们与 `MockSession` 的 `localStorage` 业务数据严格分离，存储失败时页面仍可切换和浏览。
+- `useRoomCarousel` 负责恢复和更新最近卡片位置；`RoomCard` 的 compact 照片牌堆只缩小可见渲染窗口，不裁剪 `boardItems` 中的照片数据。该手势/动画状态没有 reducer 命令和后端映射要求。
+- `RoomExperience` 将 Chat、Photos、Itinerary 同时挂载到原生横向滚动容器。`ItineraryComposer` 使用 Portal 脱离该容器；这些都是客户端布局隔离，不能被误写成跨页面状态持久化或服务端导航能力。

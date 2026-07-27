@@ -1,10 +1,17 @@
 .panel {
   height: 100%;
   overflow-y: auto;
-  overscroll-behavior: contain;
+  overscroll-behavior-y: contain;
+  scroll-padding-top: var(--room-floating-header-offset);
   background: var(--canvas);
   color: var(--ink);
   scrollbar-width: thin;
+}
+
+.panel::before {
+  content: "";
+  display: block;
+  height: var(--room-floating-header-offset);
 }
 
 .fileInput {

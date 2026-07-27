@@ -1,7 +1,7 @@
 "use client";
 
-import { createContext, useContext, useEffect, useMemo, useReducer, useRef, type Dispatch, type ReactNode } from "react";
-import { mockSessionReducer, parsePersistedMockSession, type MockSession, type MockSessionAction } from "../model/mock-session";
+import { createContext, useCallback, useContext, useEffect, useMemo, useReducer, useRef, type Dispatch, type ReactNode } from "react";
+import { mockSessionReducer, parsePersistedMockSession, type MockCommand, type MockSession, type MockSessionAction } from "../model/mock-session";
 import { collectAssetIds } from "@/features/local-assets/model/asset-references";
 import { clearLocalAssets, pruneLocalAssets } from "@/features/local-assets/model/local-asset-repository";
 import { migratePersistedLocalAssets } from "@/features/local-assets/model/migrate-local-assets";
@@ -77,6 +77,44 @@ export function MockSessionProvider({ initialSession, children }: { readonly ini
     void clearLocalAssets().catch(() => undefined);
     dispatch({ type: "RESET", session: initialSession });
   } }), [initialSession, session]);
+
+  return <MockSessionContext.Provider value={value}>{children}</MockSessionContext.Provider>;
+}
+
+/**
+ * Supplies the existing room UI with a server-backed session snapshot.
+ *
+ * This deliberately shares the same context contract as the local provider so
+ * RoomExperience and its visual children do not need backend-specific markup.
+ */
+export function BackendSessionProvider({
+  initialSession,
+  children,
+  onCommand,
+  onSettled,
+}: {
+  readonly initialSession: MockSession;
+  readonly children: ReactNode;
+  readonly onCommand: (command: MockCommand) => Promise<void>;
+  readonly onSettled: () => void;
+}) {
+  const [session, baseDispatch] = useReducer(mockSessionReducer, initialSession);
+
+  useEffect(() => {
+    baseDispatch({ type: "HYDRATE", session: initialSession });
+  }, [initialSession]);
+
+  const dispatch = useCallback<Dispatch<MockSessionAction>>((action) => {
+    baseDispatch(action);
+    if (action.type !== "COMMAND") return;
+    void onCommand(action.command).finally(onSettled);
+  }, [onCommand, onSettled]);
+
+  const value = useMemo<MockSessionContextValue>(() => ({
+    session,
+    dispatch,
+    reset: () => baseDispatch({ type: "HYDRATE", session: initialSession }),
+  }), [dispatch, initialSession, session]);
 
   return <MockSessionContext.Provider value={value}>{children}</MockSessionContext.Provider>;
 }

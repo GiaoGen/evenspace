@@ -1,6 +1,6 @@
 # EventSpace 当前任务记录
 
-> 最后更新：2026-07-26
+> 最后更新：2026-07-27
 > 用途：记录最近任务做了什么、当前真实进度、验证结果、遗留事项和下一步。  
 > 规则：本文件保持为当前阶段活文档；更早阶段摘要迁移到 [`history_taks.md`](./history_taks.md)。  
 > 本次同步范围：相对 `13a4102` 的当前未提交重构与文档校准。
@@ -12,10 +12,89 @@
 - 结构化会话使用 `localStorage` 键 `eventspace:local-session:v1`；图片、语音和涂鸦 Blob 使用 IndexedDB `eventspace-local-assets`，并兼容迁移旧 data URL 会话。
 - 当前已经支持创建房间、房间列表、文字/语音聊天、Photos 网格、行程、成员治理、归档、账号本地身份与法律草稿页面；Room 内联投票当前未接入，Book 与回忆录编辑器已删除。
 - 图片和语音已抽象为 `AssetReference`，会话 JSON 不再保存媒体正文；Photos 上传和语音录制使用本地 Blob repository。旧 drawing/Board 兼容类型仍在 domain/session 中，但没有正式编辑入口。
+- 后端范围已冻结：仅 Host-led；Chat 仅文本/语音；Photos 与 Itinerary 进入首期；Stripe 一次性房间支付进入 MVP；Book 延后设计但优先于投票，投票继续延后。
+- 后端实施、验收和任务 Mark 统一以 [`supabase-backend-integration-plan.md`](./supabase-backend-integration-plan.md) 为主计划书。
 - 生产构建不再依赖远程 Google Fonts / `next/font` 拉取；字体资源已通过 `public/fonts` 的本地 `@font-face` 加载，保留 Bodoni 衬线标题风格。
 - `/prototype` 系列路由只作为视觉历史参考，不再代表当前功能完成度。
 
 ## 最近完成任务
+
+### BACKEND-004 - Supabase 依赖与环境安全边界
+
+- 日期：2026-07-27
+- 状态：完成；主计划书中的 `BE-004` 已同步 Mark，现有 UI 与 Mock 数据流未改变。
+- 完成内容：
+  - 精确锁定 `@supabase/supabase-js@2.110.8`、`@supabase/ssr@0.12.3`、`zod@4.4.3` 和 `server-only@0.0.1`。
+  - 建立纯环境 schema、browser-safe public 配置模块和带 `server-only` 标记的 secret 配置模块。
+  - `next.config.ts` 在 Next 配置加载阶段验证 public URL/publishable key；`instrumentation.ts` 在 Node 服务实例启动时验证已配置的 secret。
+  - `.env.local` 继续只保存云项目 URL 和 publishable key；server secret 尚未配置，也没有进入仓库。
+  - 增加 public/server 环境、错误脱敏和 server-only 导入边界测试。
+  - 所有项目级 Supabase CLI 脚本显式使用 `--agent no`，避免 Agent 自动检测将交互命令切成 JSON 非交互模式。
+  - 已向 Supabase 技能维护者提交兼容性反馈：<https://github.com/supabase/agent-skills/issues/188>。
+- 验证：
+  - 错误 public 环境导致 `next build` 退出码 1，恢复真实 `.env.local` 后退出码 0。
+  - `npm run check`、`npm test`、`npm run build` 和 `git diff --check` 通过。
+  - 6 个测试文件共 26 个测试通过；仍为 9 个既有 ESLint warning。
+- 已知问题：
+  - `npm audit --omit=dev` 的官方 registry 与当前镜像 audit endpoint 均发生 TLS 连接中断，未执行 `npm audit fix --force`。
+- 下一步：
+  - 执行 `BE-005`：建立 browser、request-scoped server 和 admin Supabase client 边界，但继续不替换现有业务 UI。
+
+### BACKEND-003 - Supabase 云端开发项目创建与连接
+
+- 日期：2026-07-27
+- 状态：完成；主计划书中的 `BE-003` 已同步 Mark。
+- 已完成：
+  - 精确锁定项目内 Supabase CLI `2.107.0`，初始化 `supabase/config.toml` 与空 seed。
+  - 新增面向云项目的无真实密钥 `.env.example`、Supabase Git 忽略规则、linked migration 脚本与开发指引。
+  - 已验证 Supabase CLI 的 Agent 自动检测会导致交互登录进入 JSON/非交互模式；所有项目脚本已统一增加 `--agent no`。
+  - Docker、WSL 和本地 Supabase 已从必需前置条件中移除。
+  - 在组织 `mndzgvsjfzqrejuqldvm` 的美国东部 `us-east-1` 创建 `eventspace-dev`，project ref 为 `boooesdlmaeckrvpyjwb`，当前费用为 0 美元/月。
+  - 项目状态为 `ACTIVE_HEALTHY`，仓库 link 成功，云项目 URL 与现代 publishable key 已写入被 Git 忽略的 `.env.local`。
+  - Auth 与 Storage 端点返回 HTTP 200；security/performance advisors 均为 0 项。
+  - 未修改页面、组件、样式、`MockSession` 或任何业务 UI 数据流。
+- 验证：
+  - `npx supabase --agent no projects list` 显示 `eventspace-dev` 为 healthy 且 linked。
+  - `npm run check`、`npm run build`、`git diff --check` 通过；仍为 9 个既有 ESLint warning。
+- 已知工具问题：
+  - Supabase 连接器 create/execute SQL 通道出现 MCP transport error。
+  - linked SQL/migration 命令的临时 login role API 当前返回 EOF，转入 `BE-007` 处理。
+- 下一步：
+  - 执行 `BE-004`：安装并锁定 Supabase SSR/client 依赖，建立环境变量与 server-only secret 边界。
+
+### BACKEND-002 - 后端范围与文档基线校准
+
+- 日期：2026-07-27
+- 状态：文档完成；未修改业务代码，主计划书中的 `BE-002` 已同步 Mark。
+- 完成内容：
+  - `requirements-baseline.md` 将房间范围统一为 Host-led，删除当前基线中的 Community-led/无 Host 规则。
+  - Chat 当前范围统一为文本与最长 60 秒短语音；Chat 图片和精确位置发送不进入生产首期。
+  - Photos 保持照片网格与详情评论；旧 Board 不进入生产 API。Book 延后重新设计，优先级高于投票并保留进入 MVP 的可能。
+  - 投票系统延后，旧 Poll/Votes reducer、类型和历史任务只作为兼容/历史记录，不创建首批生产 schema。
+  - 支付进入 MVP，采用 Stripe-hosted Checkout 的一次性房间付费，首期商品为 Event Upgrade 和 Permanent Archive。
+  - `technical-architecture.md` 的核心实体、Realtime、支付和实施顺序已与 Supabase 主计划对齐。
+- 验证：
+  - 文档范围关键词一致性检查和 `git diff --check` 通过。
+  - `npm run check` 通过，保留 9 个既有未使用变量 warning；`npm run build` 通过。
+- 下一步：
+  - 执行 `BE-003`：创建并连接独立的 `eventspace-dev` Supabase 云项目。
+
+### TASK-025 - Rooms 浏览恢复与 Room 原生横滑壳
+
+- 日期：2026-07-27
+- 状态：代码完成；仍为本地 Mock UI，未新增后端、领域命令或数据模型。
+- 完成内容：
+  - `/rooms` 的 Grid 偏好使用 `sessionStorage` 键 `eventspace:rooms:grid` 保存；Magazine 横滑会记录最近居中的房间或用户打开的房间，并用 `eventspace:rooms:active-room` 在返回列表时恢复该卡居中。这两项仅是当前标签页的界面状态，不写入 `MockSession`，也不会跨设备同步。
+  - 双列 Grid 的照片牌堆在静止和拖动时最多显示五张；额外预备层只用于连续滑动。单列 Magazine 保持原有层数与浏览范围。收尾动画改为复用五张模式最外层的位移、旋转、缩放，避免滑动结束时跳回旧层级位置。
+  - Room 初始页调整为 Photos；Chat、Photos、Itinerary 三页同时挂载在浏览器原生横向 scroll-snap 轨道上，横向拖动切页、各页内部保持纵向滚动。浮动顶部栏两侧提供相邻页面入口，居中的房间名/倒计时打开 room options。
+  - Photos 首次进入会定位到最新照片；行程创建/编辑器改为渲染至 `document.body` 的 Portal，避免被横向页面轨道裁切。聊天、Photos、Itinerary 内容都为浮动顶部栏预留滚动空间。
+- 验证：
+  - `npx eslint features/rooms/components/room-card.tsx`、`npm run typecheck`、`npm test`（4 个测试文件、20 个测试）、`npm run check`、`npm run build` 和 `git diff --check` 通过。
+  - `npm run check` 无 error，但仍有 9 个既有未使用变量 warning：`create-room-wizard.tsx` 1 个，以及 `chat-panel.tsx` 中已收敛 Poll/Votes UI 的 8 个。
+  - 本轮按要求未运行浏览器验证；横向手势、五张堆叠动画和不同视口的视觉回归仍应在后续手动验收中覆盖。
+- 已知边界：
+  - `sessionStorage` 只保留当前标签页的阅读偏好和最近卡片，不是用户配置、更不是服务端同步状态。
+  - Room 页面切换、照片初始滚动和行程 Portal 均为客户端交互编排；生产端接入不应复用其浏览器状态作为授权或业务真相。
 
 ### TASK-024 - Room 收敛为 Chat / Photos / Itinerary 与聊天视觉重构
 
@@ -382,14 +461,13 @@
 ### 已经具备的本地能力
 
 - 本地创建房间、进入房间、Rooms 列表展示、筛选、收藏、删除个人入口。
-- 本地聊天、回复、反应、撤回、置顶、搜索，以及真实浏览器本地照片、位置和录音消息。
-- Chat/Board 媒体 Blob 已存入 IndexedDB，会话只保存 asset reference；它仍是单设备本地方案，不是生产媒体存储。
-- 本地投票创建、投票、结果进度、投票历史、行程型投票通过后添加行程。
-- 本地画板照片上传、压缩、拖动、缩放、删除、评论弹幕、文本标注、涂鸦。
-- Board 与 Rooms 卡片共享画板 item 的真实位置/大小预览逻辑。
+- 本地 Chat 支持文本、回复、反应、撤回、置顶、搜索和真实浏览器录音；历史图片/位置消息可以兼容渲染，但新 UI 不创建。
+- Photos 图片 Blob 和 Chat 语音 Blob 存入 IndexedDB，会话只保存 asset reference；它仍是单设备本地方案，不是生产媒体存储。
+- 本地 Photos 支持设备图片选择、压缩、网格、照片详情、评论和本人/管理员删除。
 - 本地行程创建、编辑、删除、负责人、起止时间、地点、说明、自动状态和重叠提示。
-- 成员审核、禁言、移除、拉黑、社区投票准入等 mock 治理状态。
+- Host-led 成员审核、禁言、移除、拉黑等 mock 治理状态。
 - 房间 active / freezing / archiving / archived 生命周期 mock。
+- 旧 Poll/Votes、Book 和自由 Board 类型/命令仍可能存在于兼容层，但不是当前正式 UI 能力。
 
 ### 尚未具备的真实后端能力
 
@@ -404,20 +482,16 @@
 ## 后端接入前必须解决
 
 - 把本地 asset repository 映射为私有 Storage 与服务端 asset 表，并设计上传授权、衍生图、引用提交和废弃对象清理协议。
-- 把客户端 reducer 中的权限、投票、归档、成员资格校验映射为服务端事务和数据库约束。
-- 为每类命令定义稳定 DTO：创建房间、发消息、创建投票、投票、上传媒体、移动画板 item、改行程、成员治理、归档。
-- 明确 server time 规则，所有到期、投票关闭、撤回窗口、归档状态推进都不能信任客户端时间。
-- 为移动端 Safari / Chromium 建立真机验收清单，尤其是文件上传、相机、键盘、viewport、Pointer Events、双指手势。
-- 继续拆分 `chat-panel.tsx`；Board 已完成组件化，但 Chat 仍混合媒体权限、录音、Poll 和界面状态。
-
-### 已知实现与规范偏差
-
-- 当前 Board CSS 的 Dock 使用了 `backdrop-filter`，Linen 背景使用轻微 `linear-gradient` 网格；这与设计系统 v1 的“禁止毛玻璃/渐变”原则不完全一致。当前效果已通过视觉回归，但后续需要明确将其收编为受限例外，或改为纯色/静态纹理实现。
+- 把客户端 reducer 中的权限、归档和成员资格校验映射为服务端事务和数据库约束。
+- 为首期命令定义稳定 DTO：创建房间、发消息、上传语音/照片、评论、改行程、成员治理和归档。
+- 明确 server time 规则，所有到期、撤回窗口和归档状态推进都不能信任客户端时间。
+- 为移动端 Safari / Chromium 建立真机验收清单，尤其是图片上传、语音录制、键盘和 viewport。
+- 继续拆分 `chat-panel.tsx` 的消息、录音、草稿和数据编排；删除或隔离未使用的 Poll/Votes 状态。
 
 ## 下一步建议
 
-1. 做移动端真机回归：iOS Safari / Android Chromium 的照片、录音、定位、键盘、Board 双指手势和全屏 Portal。
-2. 为 Chat / Board 的 asset reference 定义后端上传 DTO、私有读取授权、缩略图与删除/回收状态机。
-3. 拆分 `chat-panel.tsx` 的媒体控制、消息列表、附件托盘和 Poll 编排。
-4. 为 `POST_MESSAGE`、`ADD_BOARD_COMMENT`、`SET_BOARD_BACKGROUND` 等命令建立服务端 DTO 和运行时 schema；当前 reducer 对新消息 content 的写入校验仍主要依赖 TypeScript/UI。
-5. 补充 reducer、媒体结构恢复、Board 手势/fit、Poll 和房间到期的最小测试。
+1. 执行主计划 `BE-003`：创建并连接独立的 Supabase 云端开发项目。
+2. 执行 `BE-004`：安装并锁定 Supabase SSR/client 依赖，建立环境变量边界。
+3. 执行 `BE-005` 至 `BE-008`：完成 Next.js 16 Auth、migration、类型生成和 RLS 测试底座。
+4. 并行完成 `BE-009` 的 Stripe 测试账号、币种、商品和退款边界确认。
+5. 后端底座稳定后，再开始 profiles / actors / rooms / room_members 的正式 schema 与 RLS。

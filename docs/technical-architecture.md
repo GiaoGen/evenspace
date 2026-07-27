@@ -1,6 +1,6 @@
 # EventSpace 第一版技术架构方案
 
-> 状态：基于已确认的 Next.js、TypeScript、Supabase、PWA、Google Places/Maps 与 Stripe 方向拟定。  
+> 状态：2026-07-27 后端范围冻结后校准；详细实施与任务状态以 [`supabase-backend-integration-plan.md`](./supabase-backend-integration-plan.md) 为准。
 > 原则：个人开发者可维护、移动端优先、数十人房间实时协作、严格服务端授权、托管加密而非 E2EE。
 
 ## 1. 选型总览
@@ -10,12 +10,12 @@
 | Web 应用 | Next.js App Router + TypeScript | SSR、路由、PWA、服务端操作与部署生态成熟。 |
 | UI | Tailwind CSS + shadcn/ui 基础组件 + Motion | 保持黑白卡片视觉的一致性，精细控制动效与可访问性。 |
 | 数据/鉴权 | Supabase Postgres、Auth、RLS | 单一托管后端，支持 Google、magic link/OTP、匿名会话及行级授权。 |
-| 实时 | Supabase Realtime Broadcast + Postgres Changes | 适合数十人私密房间；事件可区分为即时同步与持久化记录。 |
+| 实时 | Supabase Realtime private Broadcast | 适合数十人私密房间；数据库提交后只广播权威实体 ID、操作和 revision。 |
 | 媒体 | Supabase Storage 私有 bucket | 房间级授权与 60 秒签名 URL。 |
 | 定时任务 | Supabase Cron/pg_cron + Edge Function | 处理归档、到期提醒、清理与通知；不依赖 Vercel Hobby 的低频 Cron。 |
 | 部署 | Vercel（生产使用适合商业项目的付费计划） | Next.js 原生部署、全球 CDN、WAF 与预算控制。 |
 | 邮件 | Resend 作为 Supabase Auth 的自定义 SMTP | 生产 magic link/OTP 可靠送达；使用自有认证域名。 |
-| 支付 | Stripe Checkout + Webhook | USD 一次性房间付费；卡信息不经过应用。 |
+| 支付 | Stripe-hosted Checkout + Webhook | 一次性房间付费；卡信息不经过应用，权益只由签名 webhook 发放。 |
 | 地点 | Google Places API (New) | 地点自动完成、精确地点卡片与 Google/Apple Maps 外跳。 |
 
 技术依赖必须固定主版本范围、启用自动安全更新，并由 lockfile 锁定实际版本。首发不引入微服务、消息队列或自建 WebSocket 集群。
@@ -39,13 +39,13 @@
 ### 3.2 访客
 
 - 进入房间时使用 Supabase Anonymous Sign-In 创建匿名认证用户，而不是公开数据库匿名访问。
-- 匿名用户有唯一 ID，可通过 RLS 获得严格的房间级权限；JWT 的 `is_anonymous` 声明限制其不能投票、上传、写回忆录或访问归档。
+- 匿名用户有唯一 ID，可通过 RLS 获得严格的房间级权限；JWT 的 `is_anonymous` 声明限制其不能上传 Photos、评论、购买权益或访问归档，但允许在房间未过期且未被禁言时发送文本和短语音。
 - 匿名注册须接入 Cloudflare Turnstile，并施加服务端速率限制；匿名用户及已过期访客定时清理。
 - 登录升级时，优先将同一匿名身份链接到其邮箱或 Google 身份。若邮箱已有既存账户，使用一次性、已验证的“访客记录认领”流程，把该房间成员资格和已发记录安全合并到目标账户。
 
 ## 4. 数据与授权模型
 
-Postgres 是真相来源。核心实体包括：`profiles`、`rooms`、`room_members`、`room_invites`、`room_join_requests`、`messages`、`message_replies`、`memoirs`、`memoir_pages`、`memoir_items`、`photo_comments`、`itineraries`、`itinerary_participants`、`polls`、`poll_votes`、`reports`、`payments`、`archive_entries`、`device_bans` 和 `audit_events`。旧 `board_items` / `board_comments` 只作为迁移来源评估。
+Postgres 是真相来源。首期核心实体包括：`profiles`、`actors`、`terms_acceptances`、`rooms`、`room_members`、`room_preferences`、`room_invites`、`room_join_requests`、`actor_claim_challenges`、`messages`、`message_reactions`、`message_pins`、`assets`、`photos`、`photo_comments`、`itineraries`、`reports`、`room_bans`、`archive_entries`、`audit_events`、`command_receipts` 和 `outbox_jobs`。支付模块包括 `products`、`prices`、`checkout_sessions`、`payment_events`、`room_entitlements` 和 `refund_events`。Book 与投票均不进入首批 schema；旧 `board_items` / `board_comments` 只作为本地兼容来源评估。
 
 所有暴露到 Data API 的表均启用 RLS。每项读取和写入策略至少同时验证：
 
@@ -55,15 +55,14 @@ Postgres 是真相来源。核心实体包括：`profiles`、`rooms`、`room_mem
 4. 角色与登录状态是否满足该操作；
 5. 内容所有权和对象所属房间。
 
-Service role key 只在服务端环境使用，绝不发送到浏览器。涉及多表状态变更的动作（结束房间、投票结算、角色转让、踢出、升级权益、访客认领）使用事务化 SQL RPC 或受控 Edge Function，避免客户端串联写入造成竞态。
+Secret/service role key 只在服务端环境使用，绝不发送到浏览器。涉及多表状态变更的动作（结束房间、角色转让、踢出、升级权益、访客认领）使用事务化 SQL RPC 或受控服务端流程，避免客户端串联写入造成竞态。
 
 ## 5. 实时协作
 
-- 聊天、投票、行程和回忆录的最终状态写入 Postgres。
+- Chat、Photos、Itinerary、成员和房间生命周期的最终状态写入 Postgres。
 - 通过私有 Realtime channel 广播即时更新；RLS/Realtime Authorization 限制订阅者只能接收有权访问的房间事件。
 - 聊天发送：服务端确认持久化成功后广播。
-- 回忆录排版：界面本地高频渲染，手势结束后提交 placement mutation；以 page revision 处理并发，不广播每个 pointer move。
-- 客户端使用乐观 UI；断线时保留文字草稿，并重试可安全重放的回忆录命令。服务端拒绝或页版本冲突时展示明确错误。
+- 客户端使用乐观 UI；断线时保留文字草稿，并用幂等键重试可安全重放的命令。服务端拒绝、权限变化或 revision 冲突时展示明确错误。
 - 不使用 Presence 作为用户可见在线状态，也不显示输入中或已读；Realtime 仅作为技术同步通道。
 
 ## 6. 到期、归档与清理
@@ -92,7 +91,7 @@ Service role key 只在服务端环境使用，绝不发送到浏览器。涉及
 
 - 目标设备支持 120Hz 时，输入、拖动和切换尽可能接近 120fps；普通设备最低保证 60fps。
 - 动画只使用 `transform`/`opacity` 等合成友好属性；支持 `prefers-reduced-motion`。
-- 图片懒加载、缩略图优先、长列表虚拟化；避免将全量聊天或全部回忆录原图一次性渲染。
+- 图片懒加载、缩略图优先、长列表虚拟化；避免将全量聊天或全部 Photos 原图一次性渲染。
 
 ## 8. 第三方服务边界
 
@@ -105,9 +104,10 @@ Service role key 只在服务端环境使用，绝不发送到浏览器。涉及
 
 ### Stripe
 
-- 仅 USD、一次性 Checkout Session；付款、退款和权限状态只能由经过签名验证的 webhook 更新。
+- 使用 `mode = payment` 的一次性 Checkout Session；首发币种由实际收费主体和结算账户确认，不在代码中预设为 USD。
+- 付款、退款和权益状态只能由经过签名验证且幂等处理的 webhook 更新；success redirect 不能解锁权益。
 - 产品价格、容量和权益存入配置/数据库，不硬编码在前端。
-- 创建房间、活动扩展、永久归档和容量扩展分别使用房间级价格配置。
+- MVP 商品为 Event Upgrade 和 Permanent Archive；容量扩展包后续再加入。
 
 ### 邮件与推送
 
@@ -123,13 +123,24 @@ Service role key 只在服务端环境使用，绝不发送到浏览器。涉及
 
 ## 10. 实施顺序
 
-1. 项目骨架、设计 token、Auth（登录 + 匿名访客）与 RLS 基础。
-2. 房间创建/进入、成员资格、到期状态机与私密媒体。
-3. 聊天、回忆录、行程和投票的持久化与私有实时同步。
-4. 归档、删除、通知、治理/举报与速率限制。
-5. PWA、支付、地图、性能优化和跨浏览器测试。
-6. 安全审查、Stripe/邮件/地图生产配置、法律文本审阅和发布检查。
-## 2026-07-18 当前同步：技术架构现状与后端接入提醒
+1. 冻结 Host-led、Chat 文本/语音、Photos、Itinerary、支付与延后能力的范围。
+2. 建立 Supabase 本地工程、Next.js 16 SSR Auth、migration、类型生成和 RLS 测试底座。
+3. 建立 Auth、actors、房间、成员资格、邀请、到期状态机与私有 Realtime。
+4. 持久化 Chat、Itinerary、Photos 和私有媒体流水线。
+5. 接入 Stripe Checkout、Webhook、房间权益和永久归档。
+6. 单独完成 Book MVP 候选设计评审；投票继续延后。
+7. 完成 Cron、审计、限流、备份、PWA、地图、邮件、法律与生产发布检查。
+
+## 2026-07-27 当前同步：后端范围冻结
+
+- 当前和首期生产房间仅支持 Host-led，不建设 Community-led/无 Host 模式。
+- Chat 首期仅支持文本和最长 60 秒的短语音；历史图片/位置联合类型不代表生产发送能力。
+- Photos 是当前正式媒体区域；生产 schema 使用 `photos` / `photo_comments` / `assets`，不复制 `boardItems` 兼容命名。
+- Book 延后重新设计，但优先级高于投票，并保留进入 MVP 的可能；设计确认前不创建 Book 表。
+- 投票系统延后；现有 Poll reducer/type 只服务旧 session 兼容和历史记录，不创建生产 Poll API。
+- 支付进入 MVP，采用 Stripe-hosted Checkout 的一次性房间付费，首期商品为 Event Upgrade 和 Permanent Archive。
+- [`supabase-backend-integration-plan.md`](./supabase-backend-integration-plan.md) 是后端实施、验收和任务 Mark 的唯一主计划书。
+## 2026-07-18 历史同步：技术架构现状与后端接入提醒
 
 当前代码仍是 Next.js App Router + React + TypeScript 的本地优先 Mock。后端目标仍可沿用本文的 Supabase / Postgres / Storage / Realtime 方向，但现状有以下变化需要纳入后续设计：
 
@@ -140,7 +151,7 @@ Service role key 只在服务端环境使用，绝不发送到浏览器。涉及
 - Board 已拆分编排、手势、展示与 Studio；`features/room/components/chat-panel.tsx` 仍承载较多媒体权限、录音、定位、Poll 和滚动状态，接后端前应继续拆分。
 - 字体已改为本地 `public/fonts` + `@font-face`，生产构建不应再依赖构建期远程字体下载。
 
-### 后端接入优先技术事项
+### 当时的后端接入优先技术事项
 
 - 保持 `AssetReference` 与 `AssetRepository` 作为 UI/领域层稳定契约，把当前 IndexedDB 实现替换为私有 Storage 上传 adapter；服务端返回 asset id、object key、MIME、大小和衍生图信息。
 - 媒体元数据写入、房间内容关联和废弃对象清理需要服务端事务/后台任务，不能照搬浏览器端引用扫描。

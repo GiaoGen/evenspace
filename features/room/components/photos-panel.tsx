@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, type ChangeEvent } from "react";
+import { useLayoutEffect, useRef, useState, type ChangeEvent } from "react";
 import { Icon } from "@/components/ui/icon";
 import type { ActorId, RoomPublicId } from "@/core/domain/ids";
 import type { ArtVariant, BoardComment, BoardItem, BoardPhoto, PersonSummary } from "@/core/domain/room";
@@ -37,12 +37,23 @@ export function PhotosPanel({
 }) {
   const { session, dispatch } = useMockSession();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const panelRef = useRef<HTMLElement | null>(null);
   const [detailPhotoId, setDetailPhotoId] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const photos = items.filter((item): item is BoardPhoto => item.kind === "photo").toReversed();
+  const photos = items.filter((item): item is BoardPhoto => item.kind === "photo");
   const detailPhoto = photos.find((photo) => photo.id === detailPhotoId) ?? null;
   const commandBase = () => ({ roomPublicId, actorId: session.viewer.actorId, nowIso: new Date().toISOString() } as const);
+
+  useLayoutEffect(() => {
+    const panel = panelRef.current;
+    if (!panel) return;
+    panel.scrollTop = panel.scrollHeight;
+    const frame = window.requestAnimationFrame(() => {
+      panel.scrollTop = panel.scrollHeight;
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, []);
 
   async function uploadPhotos(event: ChangeEvent<HTMLInputElement>) {
     const selectedFiles = Array.from(event.target.files ?? []);
@@ -100,7 +111,7 @@ export function PhotosPanel({
     setDetailPhotoId(adjacent?.id ?? null);
   }
 
-  return <section className={styles.panel} aria-label="Room photos">
+  return <section ref={panelRef} className={styles.panel} aria-label="Room photos">
     <input ref={fileInputRef} className={styles.fileInput} type="file" accept="image/*" multiple onChange={uploadPhotos} />
     <header className={styles.header} hidden>
       <div><strong>Photos</strong><span>{photoCount} / {maxPhotos}</span></div>

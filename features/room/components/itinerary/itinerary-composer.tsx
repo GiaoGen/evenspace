@@ -1,4 +1,5 @@
 import { useMemo, useState, type CSSProperties, type FormEvent } from "react";
+import { createPortal } from "react-dom";
 import { Icon } from "@/components/ui/icon";
 import type { ActorId } from "@/core/domain/ids";
 import type { ItineraryItem, PersonSummary } from "@/core/domain/room";
@@ -59,7 +60,9 @@ export function ItineraryComposer({ item, items, members, viewerActorId, roomEnd
     });
   }
 
-  return (
+  if (typeof document === "undefined") return null;
+
+  return createPortal(
     <div className={styles.composerBackdrop} role="presentation" onPointerDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
       <form className={styles.composer} onSubmit={submit} role="dialog" aria-modal="true" aria-label={item ? "Edit itinerary plan" : "Add itinerary plan"}>
         <header><span>{item ? "Edit plan" : "New plan"}</span><button type="button" onClick={onClose} aria-label="Close"><Icon name="close" /></button></header>
@@ -89,5 +92,5 @@ export function ItineraryComposer({ item, items, members, viewerActorId, roomEnd
         </footer>
       </form>
     </div>
-  );
+  , document.body);
 }

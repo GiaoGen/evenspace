@@ -1,6 +1,6 @@
 # EventSpace 交互式 Mock 覆盖与边界
 
-> 状态：2026-07-26。正式产品路由已经从静态高保真原型进入本地优先可操作 Mock。本文用于防止把“界面存在”“浏览器本地可操作”和“生产后端已安全实现”混为一谈。
+> 状态：2026-07-27。正式产品路由已经从静态高保真原型进入本地优先可操作 Mock。本文用于防止把“界面存在”“浏览器本地可操作”和“生产后端已安全实现”混为一谈。
 
 ## 1. Mock 会话模型
 
@@ -16,9 +16,9 @@
 | 路由 | 当前可操作能力 |
 | --- | --- |
 | `/` | Landing、创建入口、样例邀请、账户与法律入口 |
-| `/rooms` | All/Active/Achieved/Favorite、原位搜索、Magazine/Grid、真实横滑进度、编辑收藏/删除确认、真实 Board snapshot、打开新创建房间 |
+| `/rooms` | All/Active/Achieved/Favorite、原位搜索、Magazine/Grid、真实横滑进度、编辑收藏/删除确认、照片牌堆预览、打开新创建房间；Grid 偏好和 Magazine 最近卡片在当前标签页恢复 |
 | `/rooms/new` | 登录门槛、三步创建状态机、草稿恢复、校验、创建到列表/房间闭环和邀请卡 PNG 导出 |
-| `/rooms/[roomId]` | Chat / Photos / Itinerary、Share / Members / More、照片上传/详情评论、归档与访问终止状态 |
+| `/rooms/[roomId]` | Chat / Photos / Itinerary 原生横滑切页、Room options、照片上传/详情评论、行程编辑 Portal、归档与访问终止状态 |
 | `/join` | 邀请码解析、失效反馈、跳转到当前有效邀请 |
 | `/join/[roomId]` | 私密邀请、唯一昵称、头像选择、申请备注、免审核直入、Host 审核或 Community 多数表决闭环 |
 | `/account` | 卡片内昵称编辑、头像缩写、访客/登录 Mock、主题预览、本地房间摘要、会话重置、法律入口 |
@@ -37,6 +37,7 @@
 ### Photos
 
 - 以照片网格浏览现有 `BoardPhoto`；可从本机多选图片，浏览器压缩后写入 IndexedDB，并受 `maxPhotos` 配额限制。
+- Room 初次打开以 Photos 为默认页；Photos 面板首次挂载会定位到最新照片。此定位只发生在浏览器 UI 层，不改变照片排序或本地 session 数据。
 - 短点击照片打开全屏详情与纵向评论；本人或管理员可删除，评论仍通过 `ADD_BOARD_COMMENT` 写入本地 session。
 - 没有 Book、双页 spread、caption 提交层、相机入口、Chat 内容导入、纸张样式或复杂自由排版。
 - `MockSession` v7 的 `boardItems` / `boardComments` 是当前本地兼容存储，而不是未来生产 API 的推荐命名。
@@ -49,6 +50,13 @@
 - 创建/编辑支持 5 分钟步进 Duration 滑块和手动结束模式；手动行程由负责人或管理员从当前卡片结束。
 - 负责人或管理者可编辑和删除；不提供参加/不参加/签到或容量报名。
 - 仅允许固定的 Google/Apple Maps HTTPS 外链；不渲染地图、不调用 Places API。
+- 创建和编辑器通过 Portal 渲染到视口级 `document.body`，避免横向页面轨道裁切；这不改变行程命令、权限或本地存储边界。
+
+### Room 与 Rooms 的浏览状态
+
+- Room 的 Chat、Photos、Itinerary 同时挂载在浏览器原生横向 scroll-snap 轨道；非交互内容区域可以横拖切页，每页自己的内容区继续纵向滚动。顶部两侧按钮跳至相邻页，居中的房间名/倒计时打开 `More`。
+- `/rooms` 的 Grid 偏好使用 `sessionStorage` 键 `eventspace:rooms:grid`；`eventspace:rooms:active-room` 记录 Magazine 最近居中或打开的房间，以便返回列表时恢复位置。两者均不属于 `MockSession`，刷新当前标签页通常保留，关闭标签页、清除站点数据或换设备不保证保留。
+- Grid 卡片的照片牌堆最多同时显示五张；房间内的完整照片集合没有被裁剪，继续在卡片滑动和 Room Photos 中可访问。
 
 ### 治理与生命周期
 

@@ -7,7 +7,7 @@ import styles from "./landing-page.module.css";
 export function LandingPage() {
   return (
     <div className={styles.page}>
-      <AppHeader wordmarkHref="/" actions={<><Link className={styles.login} href="/account">Log in</Link><Link className={styles.menu} href="/rooms" aria-label="Open your rooms"><Icon name="more" /></Link></>} />
+      <AppHeader wordmarkHref="/" actions={<><Link className={styles.login} href="/login">Log in</Link><Link className={styles.menu} href="/rooms" aria-label="Open your rooms"><Icon name="more" /></Link></>} />
       <main>
         <section className={styles.hero}>
           <div className={styles.art} aria-hidden="true">

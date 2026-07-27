@@ -10,13 +10,27 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "check": "npm run lint && npm run typecheck"
+    "check": "npm run lint && npm run typecheck",
+    "supabase:login": "supabase --agent no login",
+    "supabase:link": "supabase --agent no link",
+    "supabase:migration:new": "supabase --agent no migration new",
+    "supabase:push": "supabase --agent no db push --linked",
+    "supabase:push:check": "supabase --agent no db push --linked --dry-run",
+    "supabase:migrations": "supabase --agent no migration list --linked",
+    "supabase:diff:check": "node scripts/check-supabase-schema-drift.mjs",
+    "supabase:types": "node scripts/supabase-types.mjs write",
+    "supabase:types:check": "node scripts/supabase-types.mjs check",
+    "supabase:test:db": "supabase --agent no test db --linked supabase/tests/database"
   },
   "dependencies": {
+    "@supabase/ssr": "0.12.3",
+    "@supabase/supabase-js": "2.110.8",
     "next": "16.2.10",
     "page-flip": "^2.0.7",
     "react": "19.2.4",
-    "react-dom": "19.2.4"
+    "react-dom": "19.2.4",
+    "server-only": "0.0.1",
+    "zod": "4.4.3"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
@@ -25,6 +39,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.2.10",
+    "supabase": "2.107.0",
     "tailwindcss": "^4",
     "typescript": "^5",
     "vitest": "^4.1.10"
