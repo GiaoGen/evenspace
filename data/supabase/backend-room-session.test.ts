@@ -77,6 +77,9 @@ beforeEach(() => {
     message_reactions: { data: [], error: null },
     message_pins: { data: null, error: null },
     itineraries: { data: [], error: null },
+    photos: { data: [], error: null },
+    photo_comments: { data: [], error: null },
+    assets: { data: [], error: null },
   };
   mocks.createSupabaseServerClient.mockResolvedValue({
     from: (table: string) => query(rows[table]),
@@ -103,7 +106,7 @@ describe("getBackendRoomSession", () => {
       canChat: true,
       canModerate: true,
       canVote: false,
-      canAddBoardItem: false,
+      canAddBoardItem: true,
     });
     expect(result?.realtimeTopic)
       .toBe("room:31000000-0000-4000-8000-000000000001:events");

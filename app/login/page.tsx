@@ -31,19 +31,6 @@ export default async function LoginPage({
   return (
     <div className={styles.page}>
       <main className={styles.shell}>
-        <section className={styles.story}>
-          <span className={styles.eyebrow}>Your private EventSpace</span>
-          <h1>Come back to<br />the moment.</h1>
-          <p>
-            One secure email link reconnects your rooms, Host controls, and
-            eligible archives across devices.
-          </p>
-          <div className={styles.storyCards} aria-hidden="true">
-            <span>Host-led rooms</span>
-            <span>Passwordless</span>
-            <span>Private by default</span>
-          </div>
-        </section>
         <LoginForm next={next} />
       </main>
     </div>

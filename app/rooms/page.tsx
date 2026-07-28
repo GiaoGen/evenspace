@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 
 import { presentRoomCollection } from "@/data/room-read-presenter";
 import { createSupabaseServerClient } from "@/data/supabase/server-client";
+import { getRoomCardMedia } from "@/data/supabase/room-card-media";
 import { SupabaseRoomReadRepository } from "@/data/supabase/supabase-room-read-repository";
 import { RoomsPage } from "@/features/rooms/components/rooms-page";
 
@@ -30,13 +31,14 @@ export default async function RoomsRoute() {
   const page = await new SupabaseRoomReadRepository().listCurrentViewerRooms({
     limit: 50,
   });
+  const cardMedia = await getRoomCardMedia(page);
   const fallbackIdentity =
     typeof data.claims.email === "string" ? data.claims.email : "EventSpace";
   const identity = page.items[0]?.viewer.nickname ?? fallbackIdentity;
 
   return (
     <RoomsPage
-      initialRooms={presentRoomCollection(page)}
+      initialRooms={presentRoomCollection(page, cardMedia)}
       viewerInitials={initials(identity)}
     />
   );

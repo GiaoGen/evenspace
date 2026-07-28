@@ -1,8 +1,11 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { useMockSession } from "@/features/mock-session/components/mock-session-provider";
-import { getAccountSummary, isDisplayNameAvailable } from "../model/account-summary";
+"use client";
+
+import { useState } from "react";
+import { signOutCurrentSession } from "@/app/auth/actions";
+import { updateAccountProfileAction } from "@/app/account/actions";
+import type { BackendAccount } from "@/data/supabase/backend-account";
 import { AccountActionSheet, type AccountSheet } from "./account-action-sheet";
 import { AccountHeader } from "./account-header";
 import { AccountLinks } from "./account-links";
@@ -16,37 +19,36 @@ function getInitials(displayName: string) {
   return displayName.split(/\s+/).slice(0, 2).map((part) => part[0]?.toLocaleUpperCase() ?? "").join("");
 }
 
-export function AccountPage() {
-  const { session, dispatch, reset } = useMockSession();
+export function AccountPage({ account }: { readonly account: BackendAccount }) {
+  const [viewer, setViewer] = useState(account.viewer);
   const [sheet, setSheet] = useState<AccountSheet | null>(null);
-  const summary = useMemo(() => getAccountSummary(session), [session]);
+  const summary = account.summary;
 
-  function saveName(displayName: string) {
-    dispatch({ type: "COMMAND", command: { type: "UPDATE_PROFILE", actorId: session.viewer.actorId, displayName, initials: getInitials(displayName), nowIso: new Date().toISOString() } });
+  async function saveName(displayName: string) {
+    const result = await updateAccountProfileAction({ displayName });
+    if (result.ok) setViewer((current) => ({ ...current, displayName, initials: getInitials(displayName) }));
   }
 
-  function switchMode() {
-    const signedIn = session.viewer.authState === "signed-in";
-    dispatch({ type: "COMMAND", command: { type: "SET_AUTH_STATE", actorId: session.viewer.actorId, authState: signedIn ? "guest" : "signed-in", email: signedIn ? null : "local@eventspace.invalid" } });
-    setSheet(null);
+  async function saveTheme(theme: typeof viewer.theme) {
+    const result = await updateAccountProfileAction({ displayName: viewer.displayName, theme });
+    if (result.ok) setViewer((current) => ({ ...current, theme }));
   }
 
-  function resetLocalData() {
-    reset();
-    setSheet(null);
+  async function signOut() {
+    await signOutCurrentSession();
   }
 
   return (
     <div className={styles.page}>
       <AccountHeader />
       <main>
-        <IdentityCard viewer={session.viewer} summary={summary} nameAvailable={(name) => isDisplayNameAvailable(session, name)} saveName={saveName} />
-        <AccountModeCard authState={session.viewer.authState} onOpen={() => setSheet("mode")} />
-        <AppearancePicker value={session.viewer.theme} onChange={(theme) => dispatch({ type: "COMMAND", command: { type: "SET_THEME", theme } })} />
+        <IdentityCard viewer={viewer} summary={summary} nameAvailable={(name) => Boolean(name.trim())} saveName={(name) => { void saveName(name); }} />
+        <AccountModeCard authState={viewer.authState} onOpen={() => setSheet("mode")} />
+        <AppearancePicker value={viewer.theme} onChange={(theme) => { void saveTheme(theme); }} />
         <LocalDataCard summary={summary} onManage={() => setSheet("data")} />
         <AccountLinks />
       </main>
-      {sheet ? <AccountActionSheet sheet={sheet} authState={session.viewer.authState} roomCount={summary.storedRooms} close={() => setSheet(null)} switchMode={switchMode} reset={resetLocalData} /> : null}
+      {sheet ? <AccountActionSheet sheet={sheet} authState={viewer.authState} roomCount={summary.storedRooms} close={() => setSheet(null)} switchMode={() => { void signOut(); }} reset={() => setSheet(null)} /> : null}
     </div>
   );
 }

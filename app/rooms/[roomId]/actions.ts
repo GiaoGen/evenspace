@@ -35,6 +35,11 @@ const itineraryItem = z.object({
   locationLabel: z.string().nullable().optional(),
   responsible: z.object({ actorId: z.string() }),
 });
+const voiceContent = z.object({
+  type: z.literal("voice"),
+  durationSeconds: z.number().int().positive().max(60),
+  asset: z.object({ id: uuid }),
+});
 
 const wiredCommand = z.discriminatedUnion("type", [
   z.object({
@@ -44,7 +49,7 @@ const wiredCommand = z.discriminatedUnion("type", [
       id: z.string(),
       body: z.string(),
       replyToId: z.string().optional(),
-      content: z.unknown().optional(),
+      content: voiceContent.optional(),
     }),
   }),
   z.object({ type: z.enum(["RECALL_MESSAGE", "DELETE_OWN_MESSAGE", "DELETE_MESSAGE"]), ...commandBase, messageId: uuid }),
@@ -97,13 +102,13 @@ export async function roomCommandAction(input: unknown): Promise<RoomCommandActi
 
   try {
     if (command.type === "POST_MESSAGE") {
-      if (command.message.content) return { status: "ignored" };
       const idempotencyKey = commandUuid(command.message.id);
       if (!idempotencyKey) return { status: "error", code: "invalid_input" };
       await sendRoomMessage({
         roomPublicId: command.roomPublicId,
-        kind: "text",
-        body: command.message.body,
+        kind: command.message.content?.type === "voice" ? "voice" : "text",
+        body: command.message.content ? undefined : command.message.body,
+        assetId: command.message.content?.asset.id,
         replyToMessageId: command.message.replyToId,
         idempotencyKey,
       });

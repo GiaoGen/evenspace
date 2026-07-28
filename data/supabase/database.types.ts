@@ -330,6 +330,110 @@ export type Database = {
           },
         ]
       }
+      photo_comments: {
+        Row: {
+          actor_id: string
+          body: string
+          created_at: string
+          id: string
+          photo_id: string
+          room_id: string
+        }
+        Insert: {
+          actor_id: string
+          body: string
+          created_at?: string
+          id?: string
+          photo_id: string
+          room_id: string
+        }
+        Update: {
+          actor_id?: string
+          body?: string
+          created_at?: string
+          id?: string
+          photo_id?: string
+          room_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "photo_comments_actor_id_fkey"
+            columns: ["actor_id"]
+            isOneToOne: false
+            referencedRelation: "actors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "photo_comments_photo_id_fkey"
+            columns: ["photo_id"]
+            isOneToOne: false
+            referencedRelation: "photos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "photo_comments_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "rooms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      photos: {
+        Row: {
+          aspect_ratio: number
+          asset_id: string
+          created_at: string
+          id: string
+          note: string | null
+          original_name: string
+          owner_actor_id: string
+          room_id: string
+        }
+        Insert: {
+          aspect_ratio: number
+          asset_id: string
+          created_at?: string
+          id?: string
+          note?: string | null
+          original_name: string
+          owner_actor_id: string
+          room_id: string
+        }
+        Update: {
+          aspect_ratio?: number
+          asset_id?: string
+          created_at?: string
+          id?: string
+          note?: string | null
+          original_name?: string
+          owner_actor_id?: string
+          room_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "photos_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: true
+            referencedRelation: "assets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "photos_owner_actor_id_fkey"
+            columns: ["owner_actor_id"]
+            isOneToOne: false
+            referencedRelation: "actors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "photos_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "rooms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           anonymized_at: string | null

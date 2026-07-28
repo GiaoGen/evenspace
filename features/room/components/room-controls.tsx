@@ -1,13 +1,13 @@
 "use client";
 
-import { useState, type FormEvent, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { Icon } from "@/components/ui/icon";
-import { createCompactId, createUuid } from "@/core/domain/uuid";
+import { createUuid } from "@/core/domain/uuid";
+import { rotateRoomInviteAction } from "@/app/rooms/[roomId]/invite-actions";
 import type { RoomCapabilities } from "@/core/domain/room";
 import { useMockSession } from "@/features/mock-session/components/mock-session-provider";
 import type { MockRoom } from "@/features/mock-session/model/mock-session";
 import styles from "./room-controls.module.css";
-import reportStyles from "./room-report.module.css";
 import shortcutStyles from "./room-control-shortcuts.module.css";
 import { usePollClock } from "@/features/room/model/use-poll-clock";
 import { getExtendedEndsAt, getExtensionPollQuestion, getMaxExtensionMinutes } from "@/features/room/model/room-extension";
@@ -34,29 +34,52 @@ function Sheet({ title, eyebrow, close, children }: { readonly title: string; re
 
 function QrMark() {
   const cells = [0,1,2,3,4,5,6,8,10,12,14,16,18,20,22,24,25,26,28,30,31,32,34,36,38,40,42,44,46,48,49,50,51,52,53,54,56,58,60,62,64,66,68,70,72,74,76,78,80];
-  return <svg className={styles.qr} viewBox="0 0 9 9" aria-label="Local room QR code">{cells.map((cell) => <rect key={cell} x={cell % 9} y={Math.floor(cell / 9)} width="1" height="1" />)}</svg>;
+  return <svg className={styles.qr} viewBox="0 0 9 9" aria-label="Private room invitation">{cells.map((cell) => <rect key={cell} x={cell % 9} y={Math.floor(cell / 9)} width="1" height="1" />)}</svg>;
+}
+
+function createInviteSecrets() {
+  const random = new Uint8Array(32);
+  crypto.getRandomValues(random);
+  const token = btoa(String.fromCharCode(...random)).replaceAll("+", "-").replaceAll("/", "_").replace(/=+$/, "");
+  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  const codeBytes = new Uint8Array(8);
+  crypto.getRandomValues(codeBytes);
+  const code = [...codeBytes].map((value) => alphabet[value % alphabet.length]).join("");
+  return { token, code };
 }
 
 function ShareControl({ room, close }: Pick<ControlProps, "room" | "close">) {
-  const { session, dispatch } = useMockSession();
+  const { session } = useMockSession();
   const [feedback, setFeedback] = useState("Ready to share");
-  const invitation = `/join/${room.publicId}?revision=${room.inviteRevision}`;
+  const [invite, setInvite] = useState<{ readonly token: string; readonly code: string } | null>(null);
+  const invitation = invite ? `/join/${room.publicId}?token=${invite.token}` : null;
 
   async function copy(value: string, label: string) {
     try { await navigator.clipboard.writeText(value); setFeedback(`${label} copied`); }
     catch { setFeedback("Copy is unavailable in this browser"); }
   }
 
+  async function createInvitation() {
+    const next = createInviteSecrets();
+    const result = await rotateRoomInviteAction({ roomPublicId: room.publicId, ...next });
+    if (!result.ok) {
+      setFeedback("A new invitation could not be created.");
+      return;
+    }
+    setInvite(next);
+    setFeedback("A fresh private invitation is ready.");
+  }
+
   return (
     <Sheet title="Bring people closer." eyebrow={room.name} close={close}>
-      <div className={styles.qrCard}><QrMark /><strong>Scan to open this invitation</strong><span>The QR represents the current local private link.</span></div>
+      <div className={styles.qrCard}><QrMark /><strong>Scan to open this invitation</strong><span>Generate a fresh private invitation before sharing it.</span></div>
       <div className={styles.copyRows}>
-        <button type="button" onClick={() => copy(`${window.location.origin}${invitation}`, "Invitation link")}><span><small>Private link</small><strong>{invitation}</strong></span><Icon name="share" /></button>
-        <button type="button" onClick={() => copy(room.inviteCode, "Invite code")}><span><small>Invite code</small><strong>{room.inviteCode}</strong></span><Icon name="share" /></button>
+        <button type="button" disabled={!invitation} onClick={() => invitation && copy(`${window.location.origin}${invitation}`, "Invitation link")}><span><small>Private link</small><strong>{invitation ?? "Generate a fresh link first"}</strong></span><Icon name="share" /></button>
+        <button type="button" disabled={!invite} onClick={() => invite && copy(invite.code, "Invite code")}><span><small>Invite code</small><strong>{invite?.code ?? "Generate a fresh code first"}</strong></span><Icon name="share" /></button>
       </div>
       <p className={styles.feedback} aria-live="polite">{feedback}</p>
       <button type="button" className={styles.secondary} disabled>Approval {room.requiresApproval ? "is required" : "is off"}</button>
-      {session.viewer.actorId === room.members.find((member) => member.role === "host")?.actorId ? <button type="button" className={styles.dangerText} onClick={() => dispatch({ type: "COMMAND", command: { type: "ROTATE_INVITE", roomPublicId: room.publicId, actorId: session.viewer.actorId, inviteCode: `E${createCompactId(5).toUpperCase()}`, nowIso: new Date().toISOString() } })}>Replace link and invite code</button> : null}
+      {session.viewer.actorId === room.members.find((member) => member.role === "host")?.actorId ? <button type="button" className={styles.dangerText} onClick={() => { void createInvitation(); }}>Create a fresh link and invite code</button> : null}
     </Sheet>
   );
 }
@@ -88,7 +111,7 @@ function MembersControl({ room, capabilities, close }: ControlProps) {
     setPending(null);
   }
 
-  if (room.memberListVisibility === "moderators" && !capabilities.canModerate) return <Sheet title="The people inside." eyebrow="Private member list" close={close}><p className={styles.mockBoundary}>This Host-led room keeps its member list visible to the Host and admins only.</p></Sheet>;
+  if (room.memberListVisibility === "moderators" && !capabilities.canModerate) return <Sheet title="The people inside." eyebrow="Private member list" close={close}><p className={styles.mockBoundary}>This Host-led room keeps its member list visible to the Host only.</p></Sheet>;
 
   return (
     <Sheet title="The people inside." eyebrow={`${room.memberCount} members`} close={close}>
@@ -104,7 +127,7 @@ function MembersControl({ room, capabilities, close }: ControlProps) {
               <div><strong>{member.displayName}{member.actorId === session.viewer.actorId ? " · You" : ""}</strong><p>{member.role} · {room.membershipStates[member.actorId] ?? "active"}{member.isGuest ? " · guest" : ""}</p></div>
               {canAct ? <button type="button" onClick={() => setPending({ actorId: member.actorId, kind: capabilities.canModerate ? "mute" : "vote-remove" })}><Icon name="more" /></button> : null}
               {pending?.actorId === member.actorId ? <div className={styles.memberActions}>
-                {capabilities.canModerate ? <><button type="button" onClick={() => setPending({ actorId: member.actorId, kind: "mute" })}>{room.membershipStates[member.actorId] === "muted" ? "Unmute" : "Mute"}</button><button type="button" onClick={() => setPending({ actorId: member.actorId, kind: "admin" })}>{member.role === "admin" ? "Remove admin" : "Make admin"}</button><button type="button" onClick={() => setPending({ actorId: member.actorId, kind: "remove" })}>Remove</button><button type="button" onClick={() => setPending({ actorId: member.actorId, kind: "ban" })}>Ban</button><button type="button" disabled={voteBlocked} onClick={() => setPending({ actorId: member.actorId, kind: "vote-remove" })}>Vote on removal</button></> : <button type="button" disabled={voteBlocked} onClick={() => setPending({ actorId: member.actorId, kind: "vote-remove" })}>Put removal to a vote</button>}
+                {capabilities.canModerate ? <><button type="button" onClick={() => setPending({ actorId: member.actorId, kind: "mute" })}>{room.membershipStates[member.actorId] === "muted" ? "Unmute" : "Mute"}</button><button type="button" onClick={() => setPending({ actorId: member.actorId, kind: "remove" })}>Remove</button><button type="button" onClick={() => setPending({ actorId: member.actorId, kind: "ban" })}>Ban</button></> : null}
                 <p>Confirm “{pending.kind}” for {member.displayName}?</p>
                 <button type="button" className={styles.confirm} disabled={pending.kind === "vote-remove" && voteBlocked} onClick={confirmAction}>Confirm</button>
                 <button type="button" onClick={() => setPending(null)}>Cancel</button>
@@ -117,33 +140,9 @@ function MembersControl({ room, capabilities, close }: ControlProps) {
   );
 }
 
-function Reports({ room }: { readonly room: MockRoom }) {
-  const { session, dispatch } = useMockSession();
-  const [reportText, setReportText] = useState("");
-  const [replyById, setReplyById] = useState<Readonly<Record<string, string>>>({});
-  const isHost = room.members.find((member) => member.actorId === session.viewer.actorId)?.role === "host";
-  const visibleReports = isHost ? room.reports : room.reports.filter((report) => report.reporterActorId === session.viewer.actorId);
-
-  function submitReport(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!reportText.trim()) return;
-    const nowIso = new Date().toISOString();
-    dispatch({ type: "COMMAND", command: { type: "SUBMIT_REPORT", roomPublicId: room.publicId, actorId: session.viewer.actorId, nowIso, report: { id: `report_${createUuid()}`, reporterActorId: session.viewer.actorId, description: reportText, createdAt: nowIso, hostReply: null } } });
-    setReportText("");
-  }
-
-  return (
-    <section className={reportStyles.reportBox}>
-      <strong>Report a concern</strong><p>Privately describe the person, message or content location. Only the Host replies.</p>
-      <form onSubmit={submitReport}><textarea value={reportText} onChange={(event) => setReportText(event.target.value.slice(0,1000))} placeholder="Describe what happened and where…" rows={3} /><button type="submit" disabled={!reportText.trim()}>Submit private report</button></form>
-      {visibleReports.length ? <div className={reportStyles.reportInbox}><strong>{isHost ? `Host inbox · ${visibleReports.filter((report) => !report.hostReply).length} open` : "Your private reports"}</strong>{visibleReports.map((report) => <article key={report.id}><p>{report.description}</p>{report.hostReply ? <span>Host replied privately: {report.hostReply}</span> : isHost ? <><input value={replyById[report.id] ?? ""} onChange={(event) => setReplyById((current) => ({ ...current, [report.id]: event.target.value.slice(0,500) }))} placeholder="Private reply" /><button type="button" disabled={!replyById[report.id]?.trim()} onClick={() => { dispatch({ type: "COMMAND", command: { type: "REPLY_REPORT", roomPublicId: room.publicId, actorId: session.viewer.actorId, reportId: report.id, reply: replyById[report.id], nowIso: new Date().toISOString() } }); setReplyById((current) => ({ ...current, [report.id]: "" })); }}>Reply</button></> : <span>Waiting for a private Host reply.</span>}</article>)}</div> : null}
-    </section>
-  );
-}
-
 function MoreControl({ room, capabilities, close, openControl }: ControlProps & { readonly openControl: (control: Exclude<RoomControl, "more">) => void }) {
-  const { session, dispatch, reset } = useMockSession();
-  const [confirm, setConfirm] = useState<"end" | "remove" | "reset" | null>(null);
+  const { session, dispatch } = useMockSession();
+  const [confirm, setConfirm] = useState<"end" | null>(null);
   const [extensionMode, setExtensionMode] = useState<"direct" | "vote" | null>(null);
   const [extensionMinutes, setExtensionMinutes] = useState(60);
   const [extensionNowIso, setExtensionNowIso] = useState(() => new Date().toISOString());
@@ -182,20 +181,16 @@ function MoreControl({ room, capabilities, close, openControl }: ControlProps & 
 
   function confirmSelection() {
     if (confirm === "end") endRoom();
-    else if (confirm === "remove") { dispatch({ type: "COMMAND", command: { type: "REMOVE_OWN_ARCHIVE", roomPublicId: room.publicId, actorId: session.viewer.actorId } }); close(); }
-    else if (confirm === "reset") { reset(); close(); }
   }
 
   return (
     <Sheet title="Room options." eyebrow={room.lifecycle === "archived" ? "Read-only archive" : "Private room settings"} close={close}>
       <div className={shortcutStyles.mobileShortcuts}><button type="button" onClick={() => openControl("share")}><Icon name="share" />Share</button><button type="button" onClick={() => openControl("members")}><Icon name="members" />Members</button></div>
       <div className={styles.optionList}>
-        {room.lifecycle === "active" ? <><button type="button" disabled={!capabilities.canChangeDuration} onClick={() => openExtension("direct")}><span><strong>Extend room</strong><small>Choose how much time to add to the room clock.</small></span><Icon name="arrow" /></button>{extensionMode === "direct" ? <RoomExtensionPicker mode="direct" minutes={extensionMinutes} maxMinutes={maxExtensionMinutes} endsAt={room.endsAt} nowIso={extensionNowIso} onChange={setExtensionMinutes} onCancel={() => setExtensionMode(null)} onConfirm={extend} /> : null}<button type="button" disabled><span><strong>Entry approval</strong><small>Fixed when this local room is created.</small></span><span>{room.requiresApproval ? "On" : "Off"}</span></button>{capabilities.canEndRoom ? <button type="button" className={styles.dangerOption} onClick={() => setConfirm("end")}><span><strong>End this room</strong><small>Immediately freeze every write and start archiving.</small></span><Icon name="arrow" /></button> : null}</> : <button type="button" className={styles.dangerOption} onClick={() => setConfirm("remove")}><span><strong>Remove from my archive</strong><small>This affects only your personal archive list.</small></span><Icon name="arrow" /></button>}
-        <button type="button" onClick={() => setConfirm("reset")}><span><strong>Reset data</strong><small>Clear rooms and interactions on this device.</small></span><Icon name="arrow" /></button>
+        {room.lifecycle === "active" ? <><button type="button" disabled={!capabilities.canChangeDuration} onClick={() => openExtension("direct")}><span><strong>Extend room</strong><small>Choose how much time to add to the room clock.</small></span><Icon name="arrow" /></button>{extensionMode === "direct" ? <RoomExtensionPicker mode="direct" minutes={extensionMinutes} maxMinutes={maxExtensionMinutes} endsAt={room.endsAt} nowIso={extensionNowIso} onChange={setExtensionMinutes} onCancel={() => setExtensionMode(null)} onConfirm={extend} /> : null}<button type="button" disabled><span><strong>Entry approval</strong><small>Set when this private room was created.</small></span><span>{room.requiresApproval ? "On" : "Off"}</span></button>{capabilities.canEndRoom ? <button type="button" className={styles.dangerOption} onClick={() => setConfirm("end")}><span><strong>End this room</strong><small>Immediately freeze every write and start archiving.</small></span><Icon name="arrow" /></button> : null}</> : null}
       </div>
       {room.lifecycle === "active" && capabilities.canVote && (room.mode === "community-led" || capabilities.canModerate) ? <div className={styles.optionList}><button type="button" disabled={roomVoteBlocked} onClick={() => openExtension("vote")}><span><strong>Vote to extend</strong><small>Choose an extension and open a visible majority vote.</small></span><Icon name="arrow" /></button>{extensionMode === "vote" ? <RoomExtensionPicker mode="vote" minutes={extensionMinutes} maxMinutes={maxExtensionMinutes} endsAt={room.endsAt} nowIso={extensionNowIso} onChange={setExtensionMinutes} onCancel={() => setExtensionMode(null)} onConfirm={() => createRoomVote("extend-room")} /> : null}<button type="button" disabled={roomVoteBlocked} onClick={() => createRoomVote("end-room")}><span><strong>Vote to end the room</strong><small>Archive immediately if the majority threshold is reached.</small></span><Icon name="arrow" /></button></div> : null}
-      {confirm ? <div className={styles.confirmBox}><strong>{confirm === "end" ? "End this room now?" : confirm === "remove" ? "Remove your archive entry?" : "Reset all data?"}</strong><p>{confirm === "end" ? "Chat, Photos and Itinerary become read-only immediately." : "This clears rooms and interactions on this device."}</p><div><button type="button" onClick={() => setConfirm(null)}>Cancel</button><button type="button" className={styles.confirm} onClick={confirmSelection}>Confirm</button></div></div> : null}
-      <Reports room={room} />
+      {confirm ? <div className={styles.confirmBox}><strong>End this room now?</strong><p>Chat, Photos and Itinerary become read-only immediately.</p><div><button type="button" onClick={() => setConfirm(null)}>Cancel</button><button type="button" className={styles.confirm} onClick={confirmSelection}>Confirm</button></div></div> : null}
     </Sheet>
   );
 }

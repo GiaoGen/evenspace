@@ -48,7 +48,7 @@ export function CreateRoomWizard() {
     return <div className={styles.page}><WizardHeader title="Room ready" returnLabel="Return to rooms" /><main className={styles.complete}>
       <header><span><Icon name="check" /></span><div><small>Room created</small><h1>{state.room.name}</h1></div></header>
       <InvitationCard name={state.room.name} draft={state.room.draft} endTime={endTime} inviteCode={state.room.inviteCode} />
-      <div className={styles.inviteActions}><button type="button" onClick={() => navigator.clipboard.writeText(`${window.location.origin}/join/${state.room.publicId}?token=${encodeURIComponent(state.room.inviteToken)}`)}><Icon name="share" />Copy invite link</button><Link href="/rooms">View in your rooms <Icon name="arrow" /></Link></div>
+      <div className={styles.inviteActions}><button type="button" onClick={() => navigator.clipboard.writeText(`${window.location.origin}/join/${state.room.publicId}?token=${encodeURIComponent(state.room.inviteToken)}`)}><Icon name="share" />Copy invite link</button><Link href={`/rooms/${state.room.publicId}`}>View in your rooms <Icon name="arrow" /></Link></div>
     </main></div>;
   }
 

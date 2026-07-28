@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 import { parseAuthDestination } from "@/data/supabase/auth-redirect";
+import { getEventSpaceAppOrigin } from "@/data/supabase/env-server";
 import { createSupabaseServerClient } from "@/data/supabase/server-client";
 
 const NO_STORE_HEADERS = {
@@ -62,7 +63,7 @@ export async function GET(request: NextRequest) {
   }
 
   const response = NextResponse.redirect(
-    new URL(destination.path, request.nextUrl.origin),
+    new URL(destination.path, getEventSpaceAppOrigin() ?? request.nextUrl.origin),
     303,
   );
 

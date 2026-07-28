@@ -83,11 +83,11 @@ export async function sendRoomMessage(input: {
   return rpc("send_room_message", {
     requested_room_public_id: parsed.data.roomPublicId,
     requested_kind: parsed.data.kind,
-    requested_body: parsed.data.body,
-    requested_asset_id: parsed.data.assetId,
-    requested_reply_to_message_id: parsed.data.replyToMessageId,
+    requested_body: parsed.data.body ?? null,
+    requested_asset_id: parsed.data.assetId ?? null,
+    requested_reply_to_message_id: parsed.data.replyToMessageId ?? null,
     requested_idempotency_key: parsed.data.idempotencyKey,
-  });
+  } as never);
 }
 
 export async function recallRoomMessage(messageId: string) {

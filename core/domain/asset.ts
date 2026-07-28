@@ -5,6 +5,8 @@ export interface AssetReference {
   readonly kind: AssetKind;
   readonly mimeType: string;
   readonly byteSize: number;
+  /** A short-lived, server-issued URL for private Supabase Storage media. */
+  readonly remoteUrl?: string;
 }
 
 export function isAssetReference(value: unknown, kind?: AssetKind): value is AssetReference {

@@ -34,10 +34,12 @@ function releaseUrl(id: string) {
 }
 
 export function useLocalAssetUrl(reference?: AssetReference | null) {
-  const [url, setUrl] = useState<string | null>(() => reference ? urls.get(reference.id)?.url ?? null : null);
+  const [url, setUrl] = useState<string | null>(() => reference?.remoteUrl ?? (reference ? urls.get(reference.id)?.url ?? null : null));
   useEffect(() => {
     let active = true;
     if (!reference) { queueMicrotask(() => { if (active) setUrl(null); }); return () => { active = false; }; }
+    const remoteUrl = reference.remoteUrl;
+    if (remoteUrl) { queueMicrotask(() => { if (active) setUrl(remoteUrl); }); return () => { active = false; }; }
     void createUrl(reference).then((next) => { if (active) setUrl(next); else if (next) releaseUrl(reference.id); });
     return () => { active = false; releaseUrl(reference.id); };
   }, [reference]);

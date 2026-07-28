@@ -35,15 +35,15 @@ export function AccountActionSheet({ sheet, authState, roomCount, close, switchM
         {sheet === "mode" ? <>
           <span className={styles.sheetMark}><Icon name={signedIn ? "home" : "members"} size={22} /></span>
           <small>Account mode</small>
-          <h2 id="account-sheet-title">{signedIn ? "Continue as a guest?" : "Use your local account?"}</h2>
-          <p>{signedIn ? "You can still enter rooms, but voting, Board posting and archive access become limited on this device." : "Your rooms, votes and memories will be connected to this local identity again."}</p>
-          <button className={styles.sheetPrimary} type="button" onClick={switchMode}>{signedIn ? "Use guest mode" : "Use local account"}<Icon name="arrow" size={16} /></button>
+          <h2 id="account-sheet-title">{signedIn ? "Sign out of this device?" : "Sign in to EventSpace?"}</h2>
+          <p>{signedIn ? "Your private rooms and memories stay in EventSpace. You can sign back in whenever you need them." : "Sign in with your email to reconnect your EventSpace account."}</p>
+          <button className={styles.sheetPrimary} type="button" onClick={switchMode}>{signedIn ? "Sign out" : "Go to sign in"}<Icon name="arrow" size={16} /></button>
         </> : <>
           <span className={`${styles.sheetMark} ${styles.sheetMarkDanger}`}><Icon name="trash" size={22} /></span>
-          <small>Local data</small>
-          <h2 id="account-sheet-title">Clear this browser?</h2>
-          <p>{roomCount} {roomCount === 1 ? "room" : "rooms"}, their messages and local media will be removed. This cannot be undone.</p>
-          <button className={`${styles.sheetPrimary} ${styles.sheetDanger}`} type="button" onClick={reset}>Reset local data<Icon name="trash" size={16} /></button>
+          <small>Private cloud</small>
+          <h2 id="account-sheet-title">Your room data is connected.</h2>
+          <p>{roomCount} {roomCount === 1 ? "room is" : "rooms are"} available through your signed-in EventSpace account.</p>
+          <button className={styles.sheetPrimary} type="button" onClick={reset}>Done<Icon name="check" size={16} /></button>
         </>}
         <button className={styles.sheetSecondary} type="button" onClick={dismiss}>Keep things as they are</button>
       </section>

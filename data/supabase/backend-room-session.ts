@@ -2,7 +2,8 @@ import "server-only";
 
 import type { ActorId } from "@/core/domain/ids";
 import { parseActorId } from "@/core/domain/ids";
-import type { ChatMessage, ItineraryItem, PersonSummary, RoomCapabilities } from "@/core/domain/room";
+import type { AssetReference } from "@/core/domain/asset";
+import type { BoardComment, BoardPhoto, ChatMessage, ItineraryItem, PersonSummary, RoomCapabilities } from "@/core/domain/room";
 import type { MembershipState } from "@/core/domain/room";
 import { SupabaseRoomReadRepository } from "@/data/supabase/supabase-room-read-repository";
 import { createSupabaseServerClient } from "@/data/supabase/server-client";
@@ -45,6 +46,9 @@ export async function getBackendRoomSession(
     reactionsResult,
     pinResult,
     itinerariesResult,
+    photosResult,
+    photoCommentsResult,
+    assetsResult,
     pendingRequestsResult,
     claimsResult,
   ] = await Promise.all([
@@ -53,6 +57,9 @@ export async function getBackendRoomSession(
     supabase.from("message_reactions").select("message_id,actor_id,emoji"),
     supabase.from("message_pins").select("message_id").eq("room_id", roomRead.id).maybeSingle(),
     supabase.from("itineraries").select("id,title,description,starts_at,end_mode,planned_ends_at,ended_at,location_label,responsible_actor_id,created_by_actor_id,created_at,updated_at,revision").eq("room_id", roomRead.id).order("starts_at", { ascending: true }),
+    supabase.from("photos").select("id,asset_id,owner_actor_id,original_name,aspect_ratio,note,created_at").eq("room_id", roomRead.id).order("created_at", { ascending: true }),
+    supabase.from("photo_comments").select("id,photo_id,actor_id,body,created_at").eq("room_id", roomRead.id).order("created_at", { ascending: true }),
+    supabase.from("assets").select("id,kind,status,object_key,mime_type,byte_size,duration_ms"),
     roomRead.viewer.role === "host"
       ? supabase.rpc("list_pending_join_requests", { requested_room_public_id: publicId })
       : Promise.resolve({ data: [], error: null }),
@@ -65,6 +72,9 @@ export async function getBackendRoomSession(
     reactionsResult.error,
     pinResult.error,
     itinerariesResult.error,
+    photosResult.error,
+    photoCommentsResult.error,
+    assetsResult.error,
     pendingRequestsResult.error,
     claimsResult.error,
   ].find(Boolean);
@@ -89,6 +99,28 @@ export async function getBackendRoomSession(
     });
   }
   const membersByActor = new Map(members.map((member) => [member.actorId, member]));
+  const assetUrls = new Map<string, string>();
+  await Promise.all((assetsResult.data ?? [])
+    .filter((asset) => asset.status === "ready" && asset.object_key)
+    .map(async (asset) => {
+      const { data } = await supabase.storage.from("room-media").createSignedUrl(asset.object_key!, 60 * 30);
+      if (data?.signedUrl) assetUrls.set(asset.id, data.signedUrl);
+    }));
+  const assetsById = new Map((assetsResult.data ?? []).map((asset) => [asset.id, asset]));
+  const assetReference = (id: string | null): AssetReference | null => {
+    if (!id) return null;
+    const asset = assetsById.get(id);
+    if (!asset || asset.status !== "ready" || !asset.mime_type || asset.byte_size === null) return null;
+    const remoteUrl = assetUrls.get(id);
+    if (!remoteUrl) return null;
+    return {
+      id: asset.id,
+      kind: asset.kind === "voice" ? "audio" : "image",
+      mimeType: asset.mime_type,
+      byteSize: asset.byte_size,
+      remoteUrl,
+    };
+  };
 
   const reactionCounts = new Map<string, Map<string, number>>();
   for (const reaction of reactionsResult.data ?? []) {
@@ -108,6 +140,7 @@ export async function getBackendRoomSession(
         role: "member" as const,
         isGuest: false,
       };
+      const voiceAsset = message.kind === "voice" ? assetReference(message.asset_id) : null;
       return {
         id: message.id,
         kind: message.kind === "system" ? "system" : "message",
@@ -118,8 +151,35 @@ export async function getBackendRoomSession(
         reactions: [...(reactionCounts.get(message.id) ?? new Map())]
           .map(([emoji, count]) => ({ emoji, count })),
         ...(message.reply_to_message_id ? { replyToId: message.reply_to_message_id } : {}),
+        ...(voiceAsset ? { content: { type: "voice" as const, durationSeconds: Math.max(1, Math.round((assetsById.get(message.asset_id!)?.duration_ms ?? 0) / 1000)), asset: voiceAsset } } : {}),
       };
     });
+
+  const photos: BoardPhoto[] = (photosResult.data ?? []).flatMap((photo, index) => {
+    const asset = assetReference(photo.asset_id);
+    if (!asset) return [];
+    return [{
+      id: photo.id,
+      kind: "photo" as const,
+      ownerActorId: actorId(photo.owner_actor_id),
+      variant: (["one", "two", "three", "four"] as const)[index % 4],
+      asset,
+      imageName: photo.original_name,
+      aspectRatio: photo.aspect_ratio,
+      note: photo.note,
+      x: 0,
+      y: 0,
+      rotation: 0,
+      width: 24,
+    }];
+  });
+  const photoComments: BoardComment[] = (photoCommentsResult.data ?? []).map((comment) => ({
+    id: comment.id,
+    photoId: comment.photo_id,
+    actorId: actorId(comment.actor_id),
+    body: comment.body,
+    createdAt: comment.created_at,
+  }));
 
   const itineraries: ItineraryItem[] = (itinerariesResult.data ?? []).map((item) => {
     const responsibleId = actorId(item.responsible_actor_id ?? item.created_by_actor_id);
@@ -187,7 +247,7 @@ export async function getBackendRoomSession(
     endsAt: roomRead.endsAt,
     archivedAt: roomRead.archivedAt,
     memberCount: roomRead.memberCount,
-    photoCount: 0,
+    photoCount: photos.length,
     boardPreview: [],
     boardNote: "",
     boardBackground: "stone",
@@ -197,8 +257,8 @@ export async function getBackendRoomSession(
     messages,
     activePoll: null,
     pollHistory: [],
-    boardItems: [],
-    boardComments: [],
+    boardItems: photos,
+    boardComments: photoComments,
     itinerary: itineraries,
     inviteCode: "",
     inviteRevision: roomRead.revision,
@@ -209,7 +269,7 @@ export async function getBackendRoomSession(
     joinRequests,
     pinnedMessageId: pinResult.data?.message_id ?? null,
     memberLimit: roomRead.memberLimit,
-    maxPhotos: 0,
+    maxPhotos: 25,
     mediaLimitMb: 25,
     reports: [],
   };
@@ -220,7 +280,7 @@ export async function getBackendRoomSession(
     canRead: true,
     canChat: writable && roomRead.viewer.state === "active",
     canVote: false,
-    canAddBoardItem: false,
+    canAddBoardItem: writable && roomRead.viewer.state === "active",
     canCreateItinerary: writable && host,
     canModerate: writable && host,
     canChangeDuration: false,

@@ -4,6 +4,7 @@ import type {
   RoomReadPage,
 } from "@/data/contracts/room-read-repository";
 import type { RoomCollectionItem } from "@/features/rooms/model/room-collection";
+import type { RoomCardMedia } from "@/data/supabase/room-card-media";
 
 const backgrounds: readonly RoomSummary["boardBackground"][] = [
   "stone",
@@ -20,7 +21,7 @@ function backgroundFor(room: RoomReadModel) {
   return backgrounds[seed % backgrounds.length];
 }
 
-export function presentRoomSummary(room: RoomReadModel): RoomSummary {
+export function presentRoomSummary(room: RoomReadModel, media?: RoomCardMedia): RoomSummary {
   const active = room.status === "active";
 
   return {
@@ -34,8 +35,8 @@ export function presentRoomSummary(room: RoomReadModel): RoomSummary {
     endsAt: room.endsAt,
     archivedAt: active ? null : room.archivedAt ?? room.endsAt,
     memberCount: room.memberCount,
-    photoCount: 0,
-    boardPreview: [],
+    photoCount: media?.photoCount ?? 0,
+    boardPreview: media?.boardItems.filter((item) => item.kind === "photo").map((item) => item.variant) ?? [],
     boardNote: "",
     boardBackground: backgroundFor(room),
     isFavorite: false,
@@ -44,9 +45,10 @@ export function presentRoomSummary(room: RoomReadModel): RoomSummary {
 
 export function presentRoomCollection(
   page: RoomReadPage,
+  mediaByRoom: ReadonlyMap<string, RoomCardMedia> = new Map(),
 ): readonly RoomCollectionItem[] {
   return page.items.map((room) => ({
-    room: presentRoomSummary(room),
-    boardItems: [],
+    room: presentRoomSummary(room, mediaByRoom.get(room.id)),
+    boardItems: mediaByRoom.get(room.id)?.boardItems ?? [],
   }));
 }

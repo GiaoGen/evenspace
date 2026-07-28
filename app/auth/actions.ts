@@ -10,6 +10,7 @@ import {
   parseTrustedRequestOrigin,
 } from "@/data/supabase/auth-redirect";
 import { createSupabaseServerClient } from "@/data/supabase/server-client";
+import { getEventSpaceAppOrigin } from "@/data/supabase/env-server";
 
 const emailSignInSchema = z.object({
   email: z.email().trim().max(254),
@@ -47,10 +48,17 @@ export async function requestEmailSignIn(
   }
 
   const requestHeaders = await headers();
-  const origin = parseTrustedRequestOrigin(
+  const configuredOrigin = getEventSpaceAppOrigin();
+  if (!configuredOrigin && process.env.NODE_ENV === "production") {
+    return {
+      status: "error",
+      message: "Sign-in is not configured for this deployment yet.",
+    };
+  }
+  const origin = configuredOrigin ?? parseTrustedRequestOrigin(
     requestHeaders.get("origin"),
-    requestHeaders.get("host") ?? requestHeaders.get("x-forwarded-host"),
-    requestHeaders.get("x-forwarded-proto"),
+    requestHeaders.get("x-forwarded-host") ?? requestHeaders.get("host"),
+    requestHeaders.get("x-forwarded-proto")?.split(",", 1)[0]?.trim() ?? null,
     requestHeaders.get("referer"),
   );
 

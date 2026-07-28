@@ -38,7 +38,7 @@ export function IdentityCard({ viewer, summary, nameAvailable, saveName }: { rea
       <div className={styles.identityTop}>
         <div className={styles.avatar}>{viewer.initials}</div>
         <div className={styles.identityCopy}>
-          <span>{viewer.authState === "signed-in" ? "Local account" : "Guest identity"}</span>
+          <span>{viewer.authState === "signed-in" ? "EventSpace account" : "Guest identity"}</span>
           <h1 id="account-name">{viewer.displayName}</h1>
           <p>{viewer.authState === "signed-in" ? viewer.email : "Kept on this device"}</p>
         </div>
@@ -56,7 +56,7 @@ export function IdentityCard({ viewer, summary, nameAvailable, saveName }: { rea
         <span><strong>{summary.memories}</strong>Memories</span>
         <span><strong>{summary.boardItems}</strong>Board items</span>
       </div>
-      <div className={`${styles.savedNotice} ${feedback === "saved" ? styles.savedNoticeVisible : ""}`} aria-live="polite"><Icon name="check" size={14} />Saved on this device</div>
+      <div className={`${styles.savedNotice} ${feedback === "saved" ? styles.savedNoticeVisible : ""}`} aria-live="polite"><Icon name="check" size={14} />Saved to your EventSpace account</div>
     </section>
   );
 }

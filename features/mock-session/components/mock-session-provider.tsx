@@ -5,6 +5,9 @@ import { mockSessionReducer, parsePersistedMockSession, type MockCommand, type M
 import { collectAssetIds } from "@/features/local-assets/model/asset-references";
 import { clearLocalAssets, pruneLocalAssets } from "@/features/local-assets/model/local-asset-repository";
 import { migratePersistedLocalAssets } from "@/features/local-assets/model/migrate-local-assets";
+import { getLocalAssetBlob } from "@/features/local-assets/model/local-asset-repository";
+import { uploadRoomMedia } from "@/features/room/model/cloud-media";
+import { addPhotoCommentAction, createRoomPhotoAction, deleteRoomPhotoAction } from "@/app/rooms/[roomId]/media-actions";
 
 const STORAGE_KEY = "eventspace:local-session:v1";
 const LEGACY_STORAGE_KEY = "eventspace:mock-session:v3";
@@ -95,10 +98,60 @@ export function BackendSessionProvider({
 }: {
   readonly initialSession: MockSession;
   readonly children: ReactNode;
-  readonly onCommand: (command: MockCommand) => Promise<void>;
+  readonly onCommand: (command: MockCommand) => Promise<{ readonly status: string }>;
   readonly onSettled: () => void;
 }) {
   const [session, baseDispatch] = useReducer(mockSessionReducer, initialSession);
+
+  const executeCloudMediaCommand = useCallback(async (command: MockCommand) => {
+    if (command.type === "POST_MESSAGE" && command.message.content?.type === "voice") {
+      const blob = await getLocalAssetBlob(command.message.content.asset);
+      if (!blob) return { status: "error" };
+      const asset = await uploadRoomMedia({
+        roomPublicId: command.roomPublicId,
+        kind: "voice",
+        file: blob,
+        mimeType: blob.type.split(";", 1)[0] || "audio/webm",
+        durationMs: command.message.content.durationSeconds * 1000,
+      });
+      return onCommand({
+        ...command,
+        message: {
+          ...command.message,
+          content: {
+            ...command.message.content,
+            asset: { id: asset.id, kind: "audio", mimeType: asset.mimeType, byteSize: asset.byteSize, remoteUrl: asset.signedUrl },
+          },
+        },
+      });
+    }
+    if (command.type === "ADD_BOARD_ITEM" && command.item.kind === "photo" && command.item.asset) {
+      const blob = await getLocalAssetBlob(command.item.asset);
+      if (!blob) return { status: "error" };
+      const asset = await uploadRoomMedia({
+        roomPublicId: command.roomPublicId,
+        kind: "image",
+        file: blob,
+        mimeType: blob.type || "image/jpeg",
+      });
+      const created = await createRoomPhotoAction({
+        roomPublicId: command.roomPublicId,
+        assetId: asset.id,
+        originalName: command.item.imageName ?? "Photo",
+        aspectRatio: command.item.aspectRatio ?? 1,
+      });
+      return created.ok ? { status: "ok" } : { status: "error" };
+    }
+    if (command.type === "ADD_BOARD_COMMENT") {
+      const created = await addPhotoCommentAction({ photoId: command.itemId, body: command.comment.body });
+      return created.ok ? { status: "ok" } : { status: "error" };
+    }
+    if (command.type === "DELETE_BOARD_ITEM") {
+      const removed = await deleteRoomPhotoAction({ photoId: command.itemId });
+      return removed.ok ? { status: "ok" } : { status: "error" };
+    }
+    return onCommand(command);
+  }, [onCommand]);
 
   useEffect(() => {
     baseDispatch({ type: "HYDRATE", session: initialSession });
@@ -107,8 +160,10 @@ export function BackendSessionProvider({
   const dispatch = useCallback<Dispatch<MockSessionAction>>((action) => {
     baseDispatch(action);
     if (action.type !== "COMMAND") return;
-    void onCommand(action.command).finally(onSettled);
-  }, [onCommand, onSettled]);
+    void executeCloudMediaCommand(action.command).then((result) => {
+      if (result.status === "error") baseDispatch({ type: "HYDRATE", session: initialSession });
+    }).finally(onSettled);
+  }, [executeCloudMediaCommand, initialSession, onSettled]);
 
   const value = useMemo<MockSessionContextValue>(() => ({
     session,

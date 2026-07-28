@@ -1507,3 +1507,58 @@ Magic Link 点击仍需使用获准邮箱做一次人工验收；Stripe 作为�
 
 **完成后的预期**：Host/成员核心房间流程达到可进行封闭 MVP 测试的数据接线水准；
 Photos/语音 Storage、支付、Book 和投票仍按既定范围延后。
+
+## 16. 2026-07-28 五项线上接入修复
+
+> 状态：代码、数据库迁移与自动验证已完成；移动端登录的最后一项云端域名配置需在
+> 部署域名确定后由项目 Owner 填入，不能猜测或使用 localhost。
+
+- [x] **FIX-001 Auth 移动端回调与登录页**：新增 EVENTSPACE_APP_ORIGIN，生产环境
+  未配置时 fail closed；邮件回调及 callback 最终跳转使用该固定 HTTPS origin；登录页改为
+  中央单卡片、邮件确认、会话检查后继续进入目标 Rooms 路径。
+- [ ] **FIX-001-CLOUD Auth URL Configuration**：在 Supabase Dashboard 将正式 HTTPS
+  域名设置为 Site URL，并将 https://domain/auth/callback 加入 Additional Redirect URLs；
+  同时在部署平台设置同值的 EVENTSPACE_APP_ORIGIN。此项完成前不可在手机上验证邮件登录。
+- [x] **FIX-002 Account 云端化**：/account 读取 Supabase Claims、profiles、当前用户
+  房间与 Photos 统计；昵称和主题写回 profiles；移除 Local account/浏览器本地账号语义。
+- [x] **FIX-003 Room 数据接线**：修正文字 Chat 的 nullable RPC 参数；语音与 Photos 通过
+  私有 Storage、上传签名、assets/photos/photo_comments、RLS、Host 删除权限和 Realtime
+  事件持久化；行程改为使用统一 Client Room snapshot，提交后立即显示。
+- [x] **FIX-004 创建房间直达**：创建完成页沿用原有按钮样式与文案，目标改为刚创建房间的
+  /rooms/{publicId}。
+- [x] **FIX-005 Room UI 保护**：Room、Chat、Photos、Itinerary、Controls 的受保护视觉文件
+  保持字节级基线不变；媒体与即时状态逻辑放入 adapter/provider 层。
+
+**验收记录（2026-07-28）**：
+
+- [x] 云端应用 room_media_photos_v1、room_media_photo_indexes_v1 两个迁移；
+  photos 与 photo_comments 已启用 RLS，room-media 为私有 Storage Bucket。
+- [x] npm test（89 项）、npm run typecheck、npm run lint、npm run build 和
+  npm run supabase:types:check 均通过。
+- [x] Supabase Security Advisor 无新增数据库/RLS风险；仅保留与密码登录无关的
+  Leaked Password Protection 提示。
+
+## 17. 2026-07-28 修复复核：照片上传与云端环境
+
+- [x] 修复 Account 的 `list_current_user_rooms` RPC 调用：显式传入三个参数，避免
+  PostgREST 因缺少 cursor 参数返回 400；补齐 Account client boundary，单个统计查询失败
+  不再使整个 Account 页面失败。
+- [x] Rooms 卡片现在从真实的 `photos` / `assets` 读取照片数和私有签名预览图；空白 preview
+  不再被 presenter 硬编码。
+- [x] Room Options 不再展示本地 reset、伪造的 QR/invite URL、admin 权限或延后的投票与 report
+  操作。Host 创建的 invitation 会由数据库的 `create_room_invite` 轮换，并且浏览器只持有一次性
+  明文 token。
+- [x] Photos 上传签名改为：先以用户会话运行 `prepare_room_media_upload` 完成 RLS/成员/房间状态
+  授权，再由服务器为该唯一 object key 创建短时 upload token；服务端 secret 不会发送到浏览器。
+- [ ] **FIX-003-CLOUD-MEDIA-SECRET**：当前 `.env.local` 和部署环境均未提供
+  `SUPABASE_SECRET_KEY`，因此上述安全签名器无法实际运行。这正是旧代码把上传签名失败折叠为
+  “Media is unavailable right now.” 后未被发现的环境缺口。必须在 Supabase Dashboard 的
+  Project Settings → API 复制 **secret key**，写入本机 `.env.local` 和 Vercel Production 的
+  `SUPABASE_SECRET_KEY`（绝不能使用 `NEXT_PUBLIC_` 前缀或提交到 git）后，照片上传才可验收。
+- [x] 验证：`npm run typecheck`、`npm test`（89 tests）与 `npm run build` 通过；云端已确认
+  `room-media` 为 private bucket，含 image/audio MIME 限制，且 `storage.objects` 的
+  `room_media_insert`、`room_media_select`、`room_media_delete` RLS policies 和两条媒体 migration
+  均存在。
+- [ ] `npm run supabase:types:check` 仍需要本机 Supabase CLI access token；当前 sandbox 无法写入
+  CLI 的 `C:\\Users\\giaog\\.supabase` telemetry 文件，故未能重新生成并比对远端 types。现有生产构建和
+  已提交 types 均通过 TypeScript 校验；待 CLI 认证环境可写时再执行此项。
