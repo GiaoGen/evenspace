@@ -42,6 +42,34 @@
 
 .back svg { transform: rotate(180deg); }
 
+.modeSwitch {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  margin-top: 34px;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: 17px;
+  background: var(--canvas);
+}
+
+.modeSwitch button {
+  min-height: 42px;
+  border: 0;
+  border-radius: 13px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 720;
+  cursor: pointer;
+}
+
+.modeSwitch button[data-active="true"] {
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: 0 8px 18px rgb(24 24 20 / 8%);
+}
+
 .cardCopy {
   margin-top: auto;
   padding-top: 54px;

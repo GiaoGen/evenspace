@@ -17,10 +17,12 @@ export const dynamic = "force-dynamic";
 export default async function LoginPage({
   searchParams,
 }: {
-  readonly searchParams: Promise<{ next?: string }>;
+  readonly searchParams: Promise<{ mode?: string; next?: string }>;
 }) {
-  const destination = parseAuthDestination((await searchParams).next);
+  const params = await searchParams;
+  const destination = parseAuthDestination(params.next);
   const next = destination.ok ? destination.path : "/rooms";
+  const mode = params.mode === "signup" ? "signup" : "signin";
   const supabase = await createSupabaseServerClient();
   const { data } = await supabase.auth.getClaims();
 
@@ -31,7 +33,7 @@ export default async function LoginPage({
   return (
     <div className={styles.page}>
       <main className={styles.shell}>
-        <LoginForm next={next} />
+        <LoginForm mode={mode} next={next} />
       </main>
     </div>
   );
