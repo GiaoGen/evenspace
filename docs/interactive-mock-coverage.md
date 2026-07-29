@@ -1,14 +1,14 @@
 # EventSpace 交互式 Mock 覆盖与边界
 
-> 状态：2026-07-27。正式产品路由已经从静态高保真原型进入本地优先可操作 Mock。本文用于防止把“界面存在”“浏览器本地可操作”和“生产后端已安全实现”混为一谈。
+> 状态：2026-07-30。正式产品路由已经进入 Supabase-backed 封闭 MVP 接线阶段；本文继续用于区分“本地 mock/fallback”“真实云端能力”和“尚未达到生产安全承诺”的边界。
 
 ## 1. Mock 会话模型
 
-- 所有正式产品路由共享同一套类型化 `MockSession` 和纯 reducer 命令。
-- fixture 只用于首次初始化；后续创建、消息、投票、回忆录、行程、成员与归档操作写入 `localStorage` 键 `eventspace:local-session:v1`，媒体 Blob 写入 IndexedDB，并兼容旧会话迁移。
+- 本地 mock 路由和 fallback 仍共享类型化 `MockSession` 与纯 reducer 命令；云端房间使用同一 UI contract，但通过 `BackendSessionProvider.executeCommand` 把支持的命令映射到 Server Action / RPC / Storage。
+- fixture 只用于本地 mock 初始化；云端房间由 Supabase RLS 查询返回权威快照。本地创建、消息、投票、旧回忆录、行程、成员与归档操作仍可写入 `localStorage` 键 `eventspace:local-session:v1`，媒体 Blob 写入 IndexedDB，并兼容旧会话迁移。
 - 刷新、关闭标签页和重新打开浏览器通常会恢复状态；清除站点数据或执行 `Reset Mock session` 会恢复 fixture。
 - 从存储恢复前进行版本和基本结构检查；无效或旧版本数据被丢弃。
-- Mock 数据不会写入服务器、数据库、Storage、支付或真实身份系统。
+- 本地 mock 数据不会写入服务器、数据库、Storage、支付或真实身份系统；云端房间数据已经写入 Supabase，并以服务器快照覆盖 UI。
 - 本地 `npm run build` 与 `npm start` 可直接验证 Mock。真实生产部署通过 Vercel/Netlify 的生产标记或 `EVENTSPACE_DEPLOYMENT=production` 识别，并默认拒绝固定 Mock 身份；只有受控预览显式设置 `EVENTSPACE_MODE=mock` 才放行。
 
 ## 2. 正式可操作路由
@@ -16,12 +16,12 @@
 | 路由 | 当前可操作能力 |
 | --- | --- |
 | `/` | Landing、创建入口、样例邀请、账户与法律入口 |
-| `/rooms` | All/Active/Achieved/Favorite、原位搜索、Magazine/Grid、真实横滑进度、编辑收藏/删除确认、照片牌堆预览、打开新创建房间；Grid 偏好和 Magazine 最近卡片在当前标签页恢复 |
-| `/rooms/new` | 登录门槛、三步创建状态机、草稿恢复、校验、创建到列表/房间闭环和邀请卡 PNG 导出 |
+| `/rooms` | 读取当前 Supabase session 可见房间，All/Active/Achieved/Favorite、原位搜索、Magazine/Grid、真实横滑进度、照片牌堆预览、账号头像入口；Grid 偏好和 Magazine 最近卡片在当前标签页恢复 |
+| `/rooms/new` | 登录门槛、三步创建状态机、草稿恢复、真实创建 RPC、真实 invite token/code、可扫描邀请 QR 和邀请卡 PNG 导出 |
 | `/rooms/[roomId]` | Chat / Photos / Itinerary 原生横滑切页、Room options、照片上传/详情评论、行程编辑 Portal、归档与访问终止状态 |
-| `/join` | 邀请码解析、失效反馈、跳转到当前有效邀请 |
-| `/join/[roomId]` | 私密邀请、唯一昵称、头像选择、申请备注、免审核直入、Host 审核或 Community 多数表决闭环 |
-| `/account` | 卡片内昵称编辑、头像缩写、访客/登录 Mock、主题预览、本地房间摘要、会话重置、法律入口 |
+| `/join` | 真实 8 位邀请码解析、失效反馈、跳转到当前有效邀请 |
+| `/join/[roomId]` | 真实私密邀请预览、昵称、账号头像带入、匿名访客 session、免审核直入或 Host 审核 pending；pending 页面轮询审批结果 |
+| `/account` | 真实 Supabase profile、昵称/主题更新、账号头像上传、房间/照片统计、退出登录、法律入口 |
 | `/legal/[document]` | Terms、Privacy、Community Rules、Cookie Notice 的结构草案与法律审阅警告 |
 
 ## 3. 房间交互覆盖
@@ -44,7 +44,7 @@
 
 ### Itinerary
 
-- Host/Admin 创建，Community-led 创建投票提案。
+- Host/Admin 创建；当前不提供 Community-led 行程投票提案。
 - 起止时间、地点文字、说明、负责人、重叠提醒与按日期排序。
 - 灰色未开始位于顶部、绿色进行中位于中间、红色已结束位于底部；进入页面自动定位当前或下一行程。
 - 创建/编辑支持 5 分钟步进 Duration 滑块和手动结束模式；手动行程由负责人或管理员从当前卡片结束。
@@ -60,7 +60,7 @@
 
 ### 治理与生命周期
 
-- 邀请链接/邀请码复制反馈与轮换；入房申请批准/拒绝。
+- 邀请链接/邀请码复制反馈与轮换；分享面板自动创建真实 private invite URL、短码和可扫描 QR；入房申请批准/拒绝。
 - 成员角色、管理员、禁言、移除、拉黑均要求明确确认。
 - Host 延长时间、二次确认结束、`freezing → archiving → archived` 状态演示。
 - 归档只读；每位用户只移除自己的归档入口，不改变其他人的共享归档资格。
@@ -69,8 +69,8 @@
 
 以下能力不能因为 Mock 中有入口就被视为完成：
 
-- Supabase Auth、匿名身份认领、RLS、RPC、Realtime 权威事件和服务器时间冻结；
-- 真实照片/语音上传、MIME 与文件签名验证、EXIF 清理、转码、私有 bucket 和签名 URL；
+- 完整生产登录域名/SMTP 验收、匿名身份认领、Turnstile、匿名清理、完整限流；
+- 头像/照片/语音已经使用私有 bucket 和签名 URL，但仍缺 MIME magic number 验证、EXIF 清理、转码、缩略图、恶意文件检查和对象清理；
 - Stripe Checkout、webhook、退款、永久归档权益与真实价格；
 - Browser Push、PWA 安装、Resend 邮件、Google Places、Cron 归档和删除任务；
 - 真实速率限制、设备封禁、审计日志、备份清理与法律文本。
@@ -83,6 +83,15 @@
 2. 为服务端建立独立 DTO/schema，不复用可信度不足的客户端 draft 或 session 数据。
 3. Mock reducer 负责演示和交互回归；生产授权以数据库事务、RLS、RPC 和服务器时间为准。
 4. 每替换一个 Mock 命令，都先补无权限、过期、重复、乱序和失败路径测试，再移除对应 Mock 边界文案。
+
+## 2026-07-30 当前同步：从 Mock 到云端的边界变化
+
+- `MockSession` 仍是 UI contract，不再等于全部业务真相。云端房间进入页面时先由 Supabase 读取权威快照，再用兼容 session hydrate 前端。
+- Photos/Voice/Avatar 的本地 Blob 只存在于上传前；成功后页面展示 Supabase `assets` 与签名 URL。失败时 `executeCommand` 回滚到服务器快照。
+- Join 不再需要用户先走邮箱登录；未登录提交会建立 anonymous Auth session。匿名访客仍不是永久账号，也不具备账号头像上传能力。
+- 创建完成卡和 Room share 的 QR 已是真实 invite URL，可扫码；不再作为视觉 mock 记录。
+- Account 已是云端资料页，不再是本地账号演示页；昵称、主题、头像和统计都来自 Supabase。
+- 旧本地投票、Book、Board/free canvas、Chat 图片/位置发送、申请备注仍属于历史兼容或延期能力，不能写成当前可操作范围。
 ## 2026-07-18 历史同步：旧本地优先 Mock 覆盖
 
 > 本节保留当时的 Board 覆盖记录；当前正式入口以本文开头和 2026-07-23 同步为准。

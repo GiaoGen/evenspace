@@ -1,8 +1,11 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, useTransition, type ReactNode } from "react";
+import { Avatar } from "@/components/ui/avatar";
 import { Icon } from "@/components/ui/icon";
+import { InvitationQr } from "@/components/ui/invitation-qr";
 import { createUuid } from "@/core/domain/uuid";
+import { useBrowserOrigin } from "@/core/web/use-browser-origin";
 import { rotateRoomInviteAction } from "@/app/rooms/[roomId]/invite-actions";
 import type { RoomCapabilities } from "@/core/domain/room";
 import { useMockSession } from "@/features/mock-session/components/mock-session-provider";
@@ -32,11 +35,6 @@ function Sheet({ title, eyebrow, close, children }: { readonly title: string; re
   );
 }
 
-function QrMark() {
-  const cells = [0,1,2,3,4,5,6,8,10,12,14,16,18,20,22,24,25,26,28,30,31,32,34,36,38,40,42,44,46,48,49,50,51,52,53,54,56,58,60,62,64,66,68,70,72,74,76,78,80];
-  return <svg className={styles.qr} viewBox="0 0 9 9" aria-label="Private room invitation">{cells.map((cell) => <rect key={cell} x={cell % 9} y={Math.floor(cell / 9)} width="1" height="1" />)}</svg>;
-}
-
 function createInviteSecrets() {
   const random = new Uint8Array(32);
   crypto.getRandomValues(random);
@@ -50,36 +48,56 @@ function createInviteSecrets() {
 
 function ShareControl({ room, close }: Pick<ControlProps, "room" | "close">) {
   const { session } = useMockSession();
-  const [feedback, setFeedback] = useState("Ready to share");
+  const isHost = session.viewer.actorId === room.members.find((member) => member.role === "host")?.actorId;
+  const [feedback, setFeedback] = useState("Preparing a private invitation.");
   const [invite, setInvite] = useState<{ readonly token: string; readonly code: string } | null>(null);
+  const [inviteState, setInviteState] = useState<"creating" | "ready" | "error" | "unavailable">(isHost ? "creating" : "unavailable");
+  const [isCreating, startCreating] = useTransition();
+  const initializedRef = useRef(false);
+  const origin = useBrowserOrigin();
   const invitation = invite ? `/join/${room.publicId}?token=${invite.token}` : null;
+  const invitationUrl = invitation && origin ? `${origin}${invitation}` : "";
 
   async function copy(value: string, label: string) {
     try { await navigator.clipboard.writeText(value); setFeedback(`${label} copied`); }
     catch { setFeedback("Copy is unavailable in this browser"); }
   }
 
-  async function createInvitation() {
+  const createInvitation = useCallback(async () => {
+    setInviteState("creating");
+    setFeedback("Preparing a private invitation.");
     const next = createInviteSecrets();
     const result = await rotateRoomInviteAction({ roomPublicId: room.publicId, ...next });
     if (!result.ok) {
+      setInviteState("error");
       setFeedback("A new invitation could not be created.");
       return;
     }
     setInvite(next);
+    setInviteState("ready");
     setFeedback("A fresh private invitation is ready.");
-  }
+  }, [room.publicId]);
+
+  useEffect(() => {
+    if (!isHost || initializedRef.current) return;
+    initializedRef.current = true;
+    startCreating(() => { void createInvitation(); });
+  }, [createInvitation, isHost]);
 
   return (
     <Sheet title="Bring people closer." eyebrow={room.name} close={close}>
-      <div className={styles.qrCard}><QrMark /><strong>Scan to open this invitation</strong><span>Generate a fresh private invitation before sharing it.</span></div>
+      <div className={styles.qrCard}>
+        {invitationUrl ? <InvitationQr value={invitationUrl} size={155} className={styles.qr} /> : null}
+        <strong>{invitationUrl ? "Scan to open this invitation" : inviteState === "error" ? "Invitation could not be created" : isHost ? "Preparing your invitation" : "Invitation unavailable"}</strong>
+        <span>{invitationUrl ? "This QR opens the current private invitation." : inviteState === "error" ? "Try creating a fresh invitation again." : isHost ? "A secure QR code and invite code are being created." : "Only the room host can create a private invitation."}</span>
+      </div>
       <div className={styles.copyRows}>
-        <button type="button" disabled={!invitation} onClick={() => invitation && copy(`${window.location.origin}${invitation}`, "Invitation link")}><span><small>Private link</small><strong>{invitation ?? "Generate a fresh link first"}</strong></span><Icon name="share" /></button>
-        <button type="button" disabled={!invite} onClick={() => invite && copy(invite.code, "Invite code")}><span><small>Invite code</small><strong>{invite?.code ?? "Generate a fresh code first"}</strong></span><Icon name="share" /></button>
+        <button type="button" disabled={!invitationUrl} onClick={() => invitationUrl && copy(invitationUrl, "Invitation link")}><span><small>Private link</small><strong>{invitation ?? "Preparing link"}</strong></span><Icon name="share" /></button>
+        <button type="button" disabled={!invite} onClick={() => invite && copy(invite.code, "Invite code")}><span><small>Invite code</small><strong>{invite?.code ?? "Preparing code"}</strong></span><Icon name="share" /></button>
       </div>
       <p className={styles.feedback} aria-live="polite">{feedback}</p>
       <button type="button" className={styles.secondary} disabled>Approval {room.requiresApproval ? "is required" : "is off"}</button>
-      {session.viewer.actorId === room.members.find((member) => member.role === "host")?.actorId ? <button type="button" className={styles.dangerText} onClick={() => { void createInvitation(); }}>Create a fresh link and invite code</button> : null}
+      {isHost ? <button type="button" className={styles.dangerText} disabled={isCreating || inviteState === "creating"} onClick={() => startCreating(() => { void createInvitation(); })}>{inviteState === "error" ? "Try creating the invitation again" : "Create a fresh link and invite code"}</button> : null}
     </Sheet>
   );
 }
@@ -115,7 +133,7 @@ function MembersControl({ room, capabilities, close }: ControlProps) {
 
   return (
     <Sheet title="The people inside." eyebrow={`${room.memberCount} members`} close={close}>
-      {capabilities.canModerate && requests.length ? <section className={styles.requests}><div className={styles.sectionTitle}><strong>Entry requests</strong><span>{requests.length}</span></div>{requests.map((request) => <article key={request.id}><b>{request.initials}</b><div><strong>{request.displayName}</strong><p>{request.note}</p></div><span><button type="button" onClick={() => review(request.id, "rejected")} aria-label={`Reject ${request.displayName}`}><Icon name="close" size={15} /></button><button type="button" onClick={() => review(request.id, "approved")} aria-label={`Approve ${request.displayName}`}><Icon name="check" size={15} /></button></span></article>)}</section> : null}
+      {capabilities.canModerate && requests.length ? <section className={styles.requests}><div className={styles.sectionTitle}><strong>Entry requests</strong><span>{requests.length}</span></div>{requests.map((request) => <article key={request.id}><Avatar className={styles.personAvatar} src={request.avatarUrl} text={request.initials} displayName={request.displayName} decorative /><div><strong>{request.displayName}</strong><p>{request.note}</p></div><span><button type="button" onClick={() => review(request.id, "rejected")} aria-label={`Reject ${request.displayName}`}><Icon name="close" size={15} /></button><button type="button" onClick={() => review(request.id, "approved")} aria-label={`Approve ${request.displayName}`}><Icon name="check" size={15} /></button></span></article>)}</section> : null}
       <section className={styles.members}>
         <div className={styles.sectionTitle}><strong>Members</strong><span>{activeMembers.length}</span></div>
         {activeMembers.map((member) => {
@@ -123,7 +141,7 @@ function MembersControl({ room, capabilities, close }: ControlProps) {
           const voteBlocked = Boolean(room.activePoll && !room.activePoll.resolvedChoiceId && Date.parse(room.activePoll.closesAt) > renderTime);
           return (
             <article key={member.actorId}>
-              <b>{member.initials}</b>
+              <Avatar className={styles.personAvatar} src={member.avatarUrl} text={member.initials} displayName={member.displayName} decorative />
               <div><strong>{member.displayName}{member.actorId === session.viewer.actorId ? " · You" : ""}</strong><p>{member.role} · {room.membershipStates[member.actorId] ?? "active"}{member.isGuest ? " · guest" : ""}</p></div>
               {canAct ? <button type="button" onClick={() => setPending({ actorId: member.actorId, kind: capabilities.canModerate ? "mute" : "vote-remove" })}><Icon name="more" /></button> : null}
               {pending?.actorId === member.actorId ? <div className={styles.memberActions}>

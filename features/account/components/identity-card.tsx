@@ -1,13 +1,17 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
+import { Avatar } from "@/components/ui/avatar";
 import { Icon } from "@/components/ui/icon";
 import type { MockViewer } from "@/features/mock-session/model/mock-session";
 import type { AccountSummary } from "../model/account-summary";
 import styles from "./account-page.module.css";
 
-export function IdentityCard({ viewer, summary, nameAvailable, saveName }: { readonly viewer: MockViewer; readonly summary: AccountSummary; readonly nameAvailable: (name: string) => boolean; readonly saveName: (name: string) => void }) {
+export function IdentityCard({ viewer, summary, nameAvailable, saveName, uploadAvatar }: { readonly viewer: MockViewer; readonly summary: AccountSummary; readonly nameAvailable: (name: string) => boolean; readonly saveName: (name: string) => void; readonly uploadAvatar: (file: File) => Promise<{ readonly ok: boolean; readonly message?: string }> }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(viewer.displayName);
   const [feedback, setFeedback] = useState<"saved" | "unavailable" | null>(null);
+  const [avatarFeedback, setAvatarFeedback] = useState("");
+  const [avatarPending, setAvatarPending] = useState(false);
+  const avatarInput = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (feedback !== "saved") return;
@@ -33,10 +37,50 @@ export function IdentityCard({ viewer, summary, nameAvailable, saveName }: { rea
     setFeedback(null);
   }
 
+  async function selectAvatar(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    setAvatarPending(true);
+    setAvatarFeedback("");
+    const result = await uploadAvatar(file);
+    setAvatarPending(false);
+    setAvatarFeedback(result.ok ? "Avatar saved" : result.message ?? "Avatar upload failed");
+  }
+
   return (
     <section className={`${styles.identityCard} ${styles.reveal}`} aria-labelledby="account-name">
       <div className={styles.identityTop}>
-        <div className={styles.avatar}>{viewer.initials}</div>
+        <div className={styles.avatarShell}>
+          <Avatar
+            className={styles.avatar}
+            src={viewer.avatarUrl}
+            text={viewer.initials}
+            displayName={viewer.displayName}
+          />
+          {editing && viewer.authState === "signed-in" ? (
+            <>
+              <input
+                ref={avatarInput}
+                className={styles.avatarInput}
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                onChange={(event) => { void selectAvatar(event); }}
+                tabIndex={-1}
+              />
+              <button
+                className={styles.avatarEdit}
+                type="button"
+                aria-label="Upload profile avatar"
+                title="Upload profile avatar"
+                disabled={avatarPending}
+                onClick={() => avatarInput.current?.click()}
+              >
+                <Icon name="edit" size={13} />
+              </button>
+            </>
+          ) : null}
+        </div>
         <div className={styles.identityCopy}>
           <span>{viewer.authState === "signed-in" ? "EventSpace account" : "Guest identity"}</span>
           <h1 id="account-name">{viewer.displayName}</h1>
@@ -51,6 +95,7 @@ export function IdentityCard({ viewer, summary, nameAvailable, saveName }: { rea
           {feedback === "unavailable" ? <p role="alert">That name is already used in one of your active rooms.</p> : null}
         </form>
       </div>
+      {avatarFeedback ? <p className={styles.avatarFeedback} role="status">{avatarFeedback}</p> : null}
       <div className={styles.identityStats}>
         <span><strong>{summary.activeRooms}</strong>Active</span>
         <span><strong>{summary.memories}</strong>Memories</span>

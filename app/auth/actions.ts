@@ -6,6 +6,7 @@ import { z } from "zod";
 
 import {
   createAuthCallbackUrl,
+  isLocalAuthOrigin,
   parseAuthDestination,
   parseTrustedRequestOrigin,
 } from "@/data/supabase/auth-redirect";
@@ -131,18 +132,25 @@ export async function signUpWithEmailPassword(
 
   const requestHeaders = await headers();
   const configuredOrigin = getEventSpaceAppOrigin();
-  if (!configuredOrigin && process.env.NODE_ENV === "production") {
-    return {
-      status: "error",
-      message: "Sign-in is not configured for this deployment yet.",
-    };
-  }
-  const origin = configuredOrigin ?? parseTrustedRequestOrigin(
+  const requestOrigin = parseTrustedRequestOrigin(
     requestHeaders.get("origin"),
     requestHeaders.get("x-forwarded-host") ?? requestHeaders.get("host"),
     requestHeaders.get("x-forwarded-proto")?.split(",", 1)[0]?.trim() ?? null,
     requestHeaders.get("referer"),
   );
+  if (
+    !configuredOrigin &&
+    process.env.NODE_ENV === "production" &&
+    !(requestOrigin && isLocalAuthOrigin(requestOrigin))
+  ) {
+    return {
+      status: "error",
+      message: "Sign-in is not configured for this deployment yet.",
+    };
+  }
+  const origin = requestOrigin && isLocalAuthOrigin(requestOrigin)
+    ? requestOrigin
+    : configuredOrigin ?? requestOrigin;
 
   if (!origin) {
     return {

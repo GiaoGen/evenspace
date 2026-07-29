@@ -1,23 +1,51 @@
 # EventSpace 当前任务记录
 
-> 最后更新：2026-07-27
+> 最后更新：2026-07-30
 > 用途：记录最近任务做了什么、当前真实进度、验证结果、遗留事项和下一步。  
 > 规则：本文件保持为当前阶段活文档；更早阶段摘要迁移到 [`history_taks.md`](./history_taks.md)。  
-> 本次同步范围：相对 `13a4102` 的当前未提交重构与文档校准。
+> 本次同步范围：相对 `origin/main` / 当前工作区 diff 的文档校准；只同步文档，不修改业务代码。
 
 ## 项目当前状态
 
-- 当前阶段：移动端优先的本地优先 Mock / 静态真实数据版本，尚未接入后端。
-- 正式产品路由已经从静态原型进入可操作状态，主要页面共享一套 `MockSession` 本地状态。
-- 结构化会话使用 `localStorage` 键 `eventspace:local-session:v1`；图片、语音和涂鸦 Blob 使用 IndexedDB `eventspace-local-assets`，并兼容迁移旧 data URL 会话。
-- 当前已经支持创建房间、房间列表、文字/语音聊天、Photos 网格、行程、成员治理、归档、账号本地身份与法律草稿页面；Room 内联投票当前未接入，Book 与回忆录编辑器已删除。
-- 图片和语音已抽象为 `AssetReference`，会话 JSON 不再保存媒体正文；Photos 上传和语音录制使用本地 Blob repository。旧 drawing/Board 兼容类型仍在 domain/session 中，但没有正式编辑入口。
-- 后端范围已冻结：仅 Host-led；Chat 仅文本/语音；Photos 与 Itinerary 进入首期；Stripe 一次性房间支付进入 MVP；Book 延后设计但优先于投票，投票继续延后。
+- 当前阶段：Supabase-backed 封闭 MVP 接线推进中；正式房间、账号、邀请、成员治理、Chat 文本/语音、Photos、Itinerary 与 Realtime 已从纯本地 Mock 迁到真实 Supabase 读写路径。
+- `MockSession` 仍存在，但在云端房间内主要作为 `RoomExperience` 的兼容前端状态外壳；`BackendSessionProvider.executeCommand` 会把支持的命令转成 Server Action / RPC / Storage 操作，失败后回滚到服务器快照。
+- 结构化本地会话 `eventspace:local-session:v1` 与 IndexedDB `eventspace-local-assets` 继续服务本地 mock、录音/图片采集的上传前临时 Blob，以及旧数据兼容；它不是云端业务真相。
+- 当前已经支持创建真实 Host-led 房间、真实邀请 token/code、可扫描 QR、匿名访客加入、待审核轮询、Host 审批、账号资料和头像上传、房间列表/详情、文字/语音 Chat、Photos 上传/评论/删除、行程和成员治理。Room 内联投票、Book 与回忆录编辑器仍不在当前正式范围。
+- 图片、语音与头像均走 `assets` + 私有 `room-media` Storage + 短期签名 URL；客户端仍需先持有本地 Blob 才能上传，服务端负责成员资格、状态、配额和对象归属校验。
+- 后端范围已冻结：仅 Host-led；Chat 文本/语音；Photos 与 Itinerary 进入首期；Stripe 一次性房间支付进入 MVP 但当前免费/封闭测试不阻塞；Book 延后设计，投票继续延后。
 - 后端实施、验收和任务 Mark 统一以 [`supabase-backend-integration-plan.md`](./supabase-backend-integration-plan.md) 为主计划书。
 - 生产构建不再依赖远程 Google Fonts / `next/font` 拉取；字体资源已通过 `public/fonts` 的本地 `@font-face` 加载，保留 Bodoni 衬线标题风格。
 - `/prototype` 系列路由只作为视觉历史参考，不再代表当前功能完成度。
 
 ## 最近完成任务
+
+### TASK-026 - 云端头像、访客加入与真实邀请二维码同步
+
+- 日期：2026-07-30
+- 状态：代码 diff 已完成，文档本轮同步；云端 migration / Supabase CLI 验证仍需按环境权限复核。
+- 完成内容：
+  - 新增通用 `Avatar` 组件和 `core/domain/avatar.ts`，`PersonSummary`、viewer、join request 和 itinerary responsible 均可携带 `avatarUrl`。
+  - `/account` 支持已登录账号上传 JPEG/PNG/WebP 头像：Server Action 调用 `prepare_profile_avatar_upload` / `finalize_profile_avatar_upload`，浏览器用 signed upload token 写入私有 `room-media`，完成后回写 `profiles.avatar_asset_id`。
+  - 头像会同步到默认跟随 profile 的 `room_members`；已有自定义房间头像不被覆盖，新建 membership 默认继承当前 profile avatar。
+  - `/join/[roomId]` 会读取已登录用户昵称和头像；未登录提交时先 `signInAnonymously`，再 `bootstrap_identity`，随后调用 `join_room_with_profile`。
+  - 待审核加入返回真实 `requestId`，前端每 3 秒调用 `/join/status` 轮询 `get_join_request_status`；审批通过后自动进入房间，被拒绝时停留在拒绝状态，不加载房间内容。
+  - 邀请卡、Room share 面板和下载 PNG 从假 QR 图案改为 `qrcode` 生成的真实邀请 URL；`next.config.ts` 允许渲染当前 Supabase 项目的私有签名 Storage 图片。
+  - Photos / voice / comment / delete 命令通过 `executeCommand` 返回明确错误文案，失败后回滚到服务器快照，避免乐观 UI 停留在未持久化状态。
+  - 新增 migration：`fix_media_rpc_argument_names`、`room_identity_avatars_and_guest_join`、`room_avatar_asset_indexes`、`sync_profile_avatar_to_rooms`；新增 pgtap 覆盖头像字段、权限、审核头像复制和 profile avatar 同步。
+- 真实能力边界：
+  - 真实能力：账号头像上传、私有 Storage 签名读写、profile / membership avatar 关联、匿名访客 Auth、加入请求状态轮询、真实可扫描 QR。
+  - 仍不是完整生产安全闭环：头像与媒体仍依赖 `SUPABASE_SECRET_KEY` 环境配置；Turnstile、正式限流、匿名身份清理、正式 SMTP/生产域名、Supabase Dashboard redirect URL 仍需环境侧验收。
+- 已知问题：
+  - `core/domain/avatar.ts` 当前 diff 中出现疑似编码异常字符，可能影响 `ring` avatar 文本显示；本轮按文档同步规则未改业务代码。
+  - `docs/room-ui-baseline.test.ts` 的哈希已更新，但原 `docs/room-ui-baseline.md` 也必须同步，否则说明与测试不一致。
+- 验证：
+  - 2026-07-30 `npm run check` 通过；ESLint 保留 8 个既有 warning，均为 `features/room/components/chat-panel.tsx` 中历史 Poll/Votes 兼容变量未使用。
+  - 2026-07-30 `npm run build` 未完成：Next build 在清理 `.next/server-3101.error.log` 时返回 `EBUSY: resource busy or locked`，连续两次复现，未进入业务编译阶段。普通 `Get-Process` 可见多个 `node.exe` 进程，但当前环境不允许读取进程命令行，故未擅自终止进程。
+  - 2026-07-30 `git diff --check` 通过；仅有工作区 LF/CRLF 提示。
+- 下一步：
+  - 复核 Supabase migration 是否已应用到目标云项目，并运行 `npm run supabase:types:check` / `npm run supabase:test:db`。
+  - 释放占用 `.next/server-3101.error.log` 的进程或清理构建目录后重跑 `npm run build`。
+  - 补齐移动端真实登录、匿名访客加入、头像上传、QR 扫描和 Host 审批的手动验收记录。
 
 ### BACKEND-004 - Supabase 依赖与环境安全边界
 
@@ -458,26 +486,34 @@
 
 ## 当前真实能力边界
 
-### 已经具备的本地能力
+### 已经具备的真实云端能力
+
+- Supabase Auth password / magic link 基础流程、cookie-backed SSR session、anonymous sign-in 访客身份和 `bootstrap_identity`。
+- Host-led 房间创建、真实邀请 token/code、可扫描 QR、短码解析、直入或 pending join request。
+- Host 审批、成员 mute/remove/ban、房间 end lifecycle、Realtime private Broadcast 后刷新权威快照。
+- Room 详情读取真实成员、消息、reaction、pin、行程、Photos、pending requests 和私有签名媒体 URL。
+- 文本 Chat、语音上传、Photos 上传、照片评论、删除、Itinerary 创建/编辑/结束均通过 Server Action / RPC / Storage 持久化。
+- Account 读取真实 profile、当前用户房间、照片统计、昵称/主题更新和头像上传。
+
+### 仍保留的本地 / mock 能力
 
 - 本地创建房间、进入房间、Rooms 列表展示、筛选、收藏、删除个人入口。
 - 本地 Chat 支持文本、回复、反应、撤回、置顶、搜索和真实浏览器录音；历史图片/位置消息可以兼容渲染，但新 UI 不创建。
 - Photos 图片 Blob 和 Chat 语音 Blob 存入 IndexedDB，会话只保存 asset reference；它仍是单设备本地方案，不是生产媒体存储。
 - 本地 Photos 支持设备图片选择、压缩、网格、照片详情、评论和本人/管理员删除。
 - 本地行程创建、编辑、删除、负责人、起止时间、地点、说明、自动状态和重叠提示。
-- Host-led 成员审核、禁言、移除、拉黑等 mock 治理状态。
+- Host-led 成员审核、禁言、移除、拉黑等 mock 治理状态仍存在于本地 fallback；云端房间已通过 RPC 持久化对应核心路径。
 - 房间 active / freezing / archiving / archived 生命周期 mock。
 - 旧 Poll/Votes、Book 和自由 Board 类型/命令仍可能存在于兼容层，但不是当前正式 UI 能力。
 
-### 尚未具备的真实后端能力
+### 尚未具备或仍待环境验收的生产能力
 
-- Supabase Auth、匿名身份认领、真实 session、RLS、RPC、Realtime。
-- Postgres schema、迁移、唯一约束、事务、幂等键、服务端时间。
-- 私有 Storage、图片 Blob 上传、EXIF 清理、转码、缩略图、签名 URL。
-- 浏览器本地录音已经可用；真实音频上传、服务端转码、恶意文件检查和跨设备授权访问尚未实现。
+- Turnstile、正式匿名访客限流、匿名账户清理、正式 SMTP/生产 redirect URL、移动端 magic link 全链路验收。
+- 媒体服务端 EXIF 清理、转码、缩略图、恶意文件检查、引用计数和对象清理流水线。
+- 浏览器本地录音和云端上传已接通；服务端转码、恶意文件检查和跨浏览器统一播放格式尚未完成。
 - Stripe Checkout、webhook、退款、永久归档权益。
 - PWA 安装、离线缓存、推送通知、邮件、Google Places / Maps API。
-- 真实限流、设备封禁、审计日志、备份、数据清理任务和正式法律文本。
+- 完整真实限流、设备封禁、审计日志、备份、归档清理任务和正式法律文本。
 
 ## 后端接入前必须解决
 
@@ -490,8 +526,8 @@
 
 ## 下一步建议
 
-1. 执行主计划 `BE-003`：创建并连接独立的 Supabase 云端开发项目。
-2. 执行 `BE-004`：安装并锁定 Supabase SSR/client 依赖，建立环境变量边界。
-3. 执行 `BE-005` 至 `BE-008`：完成 Next.js 16 Auth、migration、类型生成和 RLS 测试底座。
-4. 并行完成 `BE-009` 的 Stripe 测试账号、币种、商品和退款边界确认。
-5. 后端底座稳定后，再开始 profiles / actors / rooms / room_members 的正式 schema 与 RLS。
+1. 应用并复核 2026-07-28 至 2026-07-30 的 Supabase migrations，运行 `npm run supabase:types:check` 与 `npm run supabase:test:db`。
+2. 配置并验收 `EVENTSPACE_APP_ORIGIN`、Supabase Auth Site URL / Additional Redirect URLs、`SUPABASE_SECRET_KEY`。
+3. 用移动端真机走通：邮箱登录回调、未登录访客匿名加入、pending 审核轮询、头像上传、QR 扫描进入、Photos/Voice 上传。
+4. 处理 `core/domain/avatar.ts` 疑似编码异常，并确认 `avatarTextFor(..., "ring")` 的实际渲染。
+5. 继续补服务端媒体清理、EXIF/转码、匿名身份清理、正式限流、审计和生产法律文本。

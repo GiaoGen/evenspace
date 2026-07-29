@@ -75,3 +75,5 @@
   .pageNavButton { transition: none; }
   .roomPageJumping::after { opacity: 0; animation: none; }
 }
+.avatarStack > span { display: grid; place-items: center; width: 33px; height: 33px; margin-left: -7px; border: 2px solid var(--surface); border-radius: 50%; background: var(--surface-2); font-size: 7px; }
+.avatarStack > span:first-child { margin-left: 0; background: #c7b29b; color: #27241f; }

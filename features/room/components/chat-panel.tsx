@@ -190,6 +190,14 @@ export function ChatPanel({ roomPublicId, messages, poll, pinnedMessageId, membe
     setToolTrayOpen(false);
   }
 
+  function submitMessage(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!draft.trim()) return;
+    postMessage(draft);
+    textareaRef.current?.focus({ preventScroll: true });
+    window.requestAnimationFrame(() => textareaRef.current?.focus({ preventScroll: true }));
+  }
+
   function handleScroll(event: UIEvent<HTMLDivElement>) {
     const element = event.currentTarget;
     const nearBottom = element.scrollHeight - element.scrollTop - element.clientHeight < 72;
@@ -428,7 +436,7 @@ export function ChatPanel({ roomPublicId, messages, poll, pinnedMessageId, membe
 
     {!atBottom ? <button type="button" className={styles.latestButton} onClick={() => scrollToLatest(true)} aria-label="Jump to latest messages"><Icon name="chevron" size={15} />{unreadCount ? <b>{unreadCount}</b> : null}</button> : null}
 
-    {archived ? <div className={styles.readOnly}><Icon name="check" size={15} />This room is archived and read-only.</div> : <form className={`${styles.composer} ${recording ? styles.composerRecording : ""}`} onSubmit={(event) => { event.preventDefault(); postMessage(draft); }}>
+    {archived ? <div className={styles.readOnly}><Icon name="check" size={15} />This room is archived and read-only.</div> : <form className={`${styles.composer} ${recording ? styles.composerRecording : ""}`} onSubmit={submitMessage}>
       {replyTo ? <div className={styles.replyPreview}><span><b>Replying to</b>{messageLabel(messages.find((message) => message.id === replyTo)!)}</span><button type="button" onClick={() => setReplyTo(null)} aria-label="Cancel reply"><Icon name="close" size={14} /></button></div> : null}
       <button type="button" className={styles.addButton} aria-label="Open attachments" aria-expanded={toolTrayOpen} onClick={() => { setToolTrayOpen(true); textareaRef.current?.blur(); }}><Icon name="plus" size={18} /></button>
       <div className={styles.inputShell}>

@@ -1,5 +1,6 @@
 import "server-only";
 
+import { avatarTextFor, type AvatarVariant } from "@/core/domain/avatar";
 import type { ActorId } from "@/core/domain/ids";
 import { parseActorId } from "@/core/domain/ids";
 import type { AssetReference } from "@/core/domain/asset";
@@ -21,9 +22,10 @@ export interface BackendRoomSession {
   readonly realtimeTopic: `room:${string}:events`;
 }
 
-function initialsFor(value: string) {
-  return value.trim().split(/\s+/).slice(0, 2)
-    .map((part) => part[0]?.toLocaleUpperCase() ?? "").join("") || "?";
+function initialsFor(value: string, variant: string = "initials") {
+  const parsed: AvatarVariant =
+    variant === "single" || variant === "ring" ? variant : "initials";
+  return avatarTextFor(value, parsed);
 }
 
 function actorId(value: string): ActorId {
@@ -52,7 +54,7 @@ export async function getBackendRoomSession(
     pendingRequestsResult,
     claimsResult,
   ] = await Promise.all([
-    supabase.from("room_members").select("actor_id,nickname,role,state,archive_eligible").eq("room_id", roomRead.id),
+    supabase.from("room_members").select("actor_id,nickname,role,state,archive_eligible,avatar_variant,avatar_asset_id").eq("room_id", roomRead.id),
     supabase.from("messages").select("id,author_actor_id,kind,body,asset_id,reply_to_message_id,created_at,recalled_at,moderated_at").eq("room_id", roomRead.id).order("created_at", { ascending: true }).limit(500),
     supabase.from("message_reactions").select("message_id,actor_id,emoji"),
     supabase.from("message_pins").select("message_id").eq("room_id", roomRead.id).maybeSingle(),
@@ -61,7 +63,7 @@ export async function getBackendRoomSession(
     supabase.from("photo_comments").select("id,photo_id,actor_id,body,created_at").eq("room_id", roomRead.id).order("created_at", { ascending: true }),
     supabase.from("assets").select("id,kind,status,object_key,mime_type,byte_size,duration_ms"),
     roomRead.viewer.role === "host"
-      ? supabase.rpc("list_pending_join_requests", { requested_room_public_id: publicId })
+      ? supabase.rpc("list_pending_join_requests_with_avatar", { requested_room_public_id: publicId })
       : Promise.resolve({ data: [], error: null }),
     supabase.auth.getClaims(),
   ]);
@@ -82,10 +84,10 @@ export async function getBackendRoomSession(
 
   const memberRows = membersResult.data ?? [];
   const viewerActorId = actorId(roomRead.viewer.actorId);
-  const members: PersonSummary[] = memberRows.map((member) => ({
+  let members: PersonSummary[] = memberRows.map((member) => ({
     actorId: actorId(member.actor_id),
     displayName: member.nickname,
-    initials: initialsFor(member.nickname),
+    initials: initialsFor(member.nickname, member.avatar_variant),
     role: member.role === "host" ? "host" : "member",
     isGuest: false,
   }));
@@ -98,7 +100,6 @@ export async function getBackendRoomSession(
       isGuest: false,
     });
   }
-  const membersByActor = new Map(members.map((member) => [member.actorId, member]));
   const assetUrls = new Map<string, string>();
   await Promise.all((assetsResult.data ?? [])
     .filter((asset) => asset.status === "ready" && asset.object_key)
@@ -106,6 +107,16 @@ export async function getBackendRoomSession(
       const { data } = await supabase.storage.from("room-media").createSignedUrl(asset.object_key!, 60 * 30);
       if (data?.signedUrl) assetUrls.set(asset.id, data.signedUrl);
     }));
+  members = members.map((member) => {
+    const row = memberRows.find((item) => item.actor_id === member.actorId);
+    return {
+      ...member,
+      avatarUrl: row?.avatar_asset_id
+        ? assetUrls.get(row.avatar_asset_id) ?? null
+        : null,
+    };
+  });
+  const membersByActor = new Map(members.map((member) => [member.actorId, member]));
   const assetsById = new Map((assetsResult.data ?? []).map((asset) => [asset.id, asset]));
   const assetReference = (id: string | null): AssetReference | null => {
     if (!id) return null;
@@ -213,7 +224,10 @@ export async function getBackendRoomSession(
     id: request.request_id,
     actorId: actorId(request.actor_id),
     displayName: request.nickname,
-    initials: initialsFor(request.nickname),
+    initials: initialsFor(request.nickname, request.avatar_variant),
+    avatarUrl: request.avatar_asset_id
+      ? assetUrls.get(request.avatar_asset_id) ?? null
+      : null,
     note: request.note,
     requestedAt: request.requested_at,
     state: "pending",
@@ -294,9 +308,10 @@ export async function getBackendRoomSession(
     viewer: {
       actorId: viewerActorId,
       displayName: roomRead.viewer.nickname,
-      initials: initialsFor(roomRead.viewer.nickname),
+      initials: membersByActor.get(viewerActorId)?.initials ?? initialsFor(roomRead.viewer.nickname),
+      avatarUrl: membersByActor.get(viewerActorId)?.avatarUrl ?? null,
       email,
-      authState: "signed-in",
+      authState: claims?.is_anonymous ? "guest" : "signed-in",
       theme: "system",
     },
     rooms: [room],

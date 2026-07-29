@@ -69,6 +69,12 @@
   gap: 14px;
 }
 
+.avatarShell {
+  position: relative;
+  width: 64px;
+  height: 64px;
+}
+
 .avatar {
   width: 64px;
   height: 64px;
@@ -80,6 +86,33 @@
   font-size: 18px;
   font-weight: 760;
 }
+
+.avatarInput {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+
+.avatarEdit {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  width: 27px;
+  height: 27px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 2px solid var(--account-sage);
+  border-radius: 50%;
+  background: var(--account-sage-ink);
+  color: var(--account-sage);
+  cursor: pointer;
+}
+
+.avatarEdit:disabled { opacity: .55; }
+.avatarFeedback { margin: 9px 0 0; font-size: 8px; }
 
 .identityCopy { min-width: 0; }
 .identityCopy > span,

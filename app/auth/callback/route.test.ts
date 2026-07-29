@@ -54,6 +54,27 @@ describe("Supabase PKCE callback", () => {
     expect(response.headers.get("cache-control")).toContain("no-store");
   });
 
+  it("keeps localhost callback redirects local even when a production origin is configured", async () => {
+    const originalOrigin = process.env.EVENTSPACE_APP_ORIGIN;
+    process.env.EVENTSPACE_APP_ORIGIN = "https://eventspace.example";
+
+    try {
+      const response = await GET(
+        new NextRequest(
+          "http://localhost:3000/auth/callback?code=pkce-code&next=%2Frooms",
+        ),
+      );
+
+      expect(response.status).toBe(303);
+      expect(response.headers.get("location")).toBe(
+        "http://localhost:3000/rooms",
+      );
+    } finally {
+      if (originalOrigin === undefined) delete process.env.EVENTSPACE_APP_ORIGIN;
+      else process.env.EVENTSPACE_APP_ORIGIN = originalOrigin;
+    }
+  });
+
   it("rejects missing codes and external redirects before token exchange", async () => {
     for (const url of [
       "https://eventspace.example/auth/callback?next=%2Frooms",

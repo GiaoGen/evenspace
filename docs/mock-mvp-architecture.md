@@ -1,6 +1,6 @@
 # EventSpace 类型化 Mock MVP 架构
 
-> 状态：2026-07-26 本地优先交互式 Mock。该实现用于验证产品结构、页面边界、响应式布局、领域命令和完整核心旅程，不连接 Supabase，也不代表真实身份、权限、实时同步或服务器数据持久化已经完成。
+> 状态：2026-07-30 历史 Mock 架构与当前兼容壳说明。正式房间已接入 Supabase；`MockSession` 仍服务本地 mock、旧数据兼容和云端 UI contract，不再代表全部业务真相。
 
 ## 1. 可运行范围
 
@@ -10,11 +10,11 @@
 | `/rooms` | Server page + Client collection | 读取当前 mock viewer 的房间；状态筛选、搜索、杂志/双列视图、本地收藏 |
 | `/rooms/[roomId]` | Server page + Client experience | 校验参数并鉴权读取；通过顶部常驻按钮切换 Chat、Photos、Itinerary |
 | `/rooms/new` | Client state machine | 三步创建向导、逐步校验和明确的本地 Mock 完成态 |
-| `/join/[roomId]` | Client state machine | 邀请、唯一昵称、申请备注、等待与审核闭环 |
-| `/account` | Client settings | 资料、Mock 登录状态、主题与会话重置 |
+| `/join/[roomId]` | Server preview + Client wait state | 邀请预览、昵称、账号头像带入、anonymous guest、等待与审核结果轮询 |
+| `/account` | Server profile + Client settings | Supabase profile、昵称/主题、账号头像上传、退出登录 |
 | `/legal/[document]` | Server page | 法律文档结构草案与专业审阅警告 |
 
-正式产品路由共享版本化 `MockSession`。创建、消息、投票、回忆录、Itinerary、治理和个人归档操作通过同一纯 reducer 命令写入 `localStorage`；媒体 Blob 写入 IndexedDB。刷新和重开浏览器通常恢复，Reset 或清除站点数据恢复 fixture。界面持续说明其没有写入服务端。
+本地 mock 路由共享版本化 `MockSession`。创建、消息、投票、旧回忆录、Itinerary、治理和个人归档操作通过同一纯 reducer 命令写入 `localStorage`；媒体 Blob 写入 IndexedDB。云端房间使用同一前端 contract，但先由 Supabase 读取权威快照，再通过 `BackendSessionProvider` 将支持的命令转为 Server Action / RPC / Storage 操作。
 
 ## 2. 目录与依赖方向
 
@@ -25,17 +25,18 @@ features/landing/       Landing 页面组合
 features/rooms/         房间列表与卡片交互
 features/room/          Room 外壳及 Chat/Photos/Itinerary；Photos 复用 BoardPhoto 兼容数据与照片详情组件
 features/create-room/   创建草稿类型、独立草稿存储、纯 reducer 状态机、三步向导与邀请卡导出
-features/mock-session/  版本化浏览器会话、领域命令、selectors 与恢复校验
+features/mock-session/  版本化浏览器会话、云端兼容 provider、领域命令、selectors 与恢复校验
 features/join/          私密邀请与申请状态机
 features/account/       Mock 身份、主题、重置与法律入口
 core/domain/            领域类型、品牌 ID、状态枚举
 core/security/          与 UI 无关的权限派生
 data/contracts/         Repository 接口
 data/mock/              经过运行时检查的 fixture 与 Mock Repository
+data/supabase/          Supabase Auth、RLS read model、RPC adapter、Storage 签名与生成 types
 data/rooms.ts           server-only 数据访问入口和最小 View DTO
 ```
 
-依赖只允许由页面/feature 指向领域和数据接口；`core` 不依赖 React、Next.js 或 Supabase。正式 Supabase Repository 需要实现相同 `RoomRepository`，页面不直接查询数据库。
+依赖只允许由页面/feature 指向领域和数据接口；`core` 不依赖 React、Next.js 或 Supabase。云端 Server Component 和 Server Action 可以调用 `data/supabase/*`，Client Component 不直接查表或持有 service secret。
 
 ## 3. Server / Client 边界
 
@@ -177,6 +178,15 @@ data/rooms.ts           server-only 数据访问入口和最小 View DTO
 - `ChatPanel` 的产品入口只包含搜索、文字消息和语音录制；图片/相机/位置发送与聊天 Poll/Votes UI 已移除。`MockCommand` 中保留的 `CREATE_POLL` 等命令只服务于 Room 控制和旧本地数据兼容。
 - `create-room-machine.ts` 的 `CreateRoomStep` 为 `details`、`timing`、`review` 三步；创建后的 mock room 固定为 `host-led`。本文先前关于五步创建、Community-led 创建配置和 Book 编排器的描述均为历史实现。
 - `page-flip` 仍在 `package.json`，但没有运行时代码导入。发布前应在依赖审计中决定删除，或在恢复 Book 时重新引入最小化客户端边界。
+
+## 2026-07-30 当前同步：云端兼容壳与头像字段
+
+- `MockViewer`、`MockJoinRequest` 和 `PersonSummary` 新增可选 `avatarUrl`。Chat、Members、Itinerary、Rooms 和 Account 通过共享 `Avatar` 组件渲染签名头像 URL 或首字母 fallback。
+- `BackendSessionProvider.executeCommand` 是当前关键架构边界：本地 reducer 负责乐观 UI，`executeCloudMediaCommand` 负责 voice/photo/comment/delete 的 Storage/RPC 持久化，失败则 hydrate 回 `initialSession`。
+- 本地 `dispatch` 仍存在，但云端代码应优先使用 `executeCommand`，这样 UI 才能拿到失败消息并回滚；直接 dispatch 只适合本地 mock/fallback。
+- `core/domain/avatar.ts` 固定 `initials`、`single`、`ring` 三种 avatar 文本变体；数据库以 check constraint 约束同一枚举。当前文件中 `ring` 文本存在疑似编码异常，后续应作为代码修复处理。
+- Join flow 不再是纯 client state machine：Server Component 先读 invite preview、claims、profile 和 avatar asset，Server Action 负责 anonymous sign-in、identity bootstrap 和 `join_room_with_profile`，Client 只提交昵称并轮询 pending 状态。
+- Room share 与创建完成卡依赖 `core/web/use-browser-origin` 获取浏览器 origin，再用 `qrcode` 生成真实 invite URL；SSR 首帧没有 origin 时需要按钮/QR 禁用或占位。
 
 ## 2026-07-27 当前同步：浏览器导航状态
 

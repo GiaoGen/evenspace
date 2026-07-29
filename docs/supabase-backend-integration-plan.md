@@ -1,17 +1,18 @@
 # EventSpace Supabase 后端接入方案
 
-> 状态：首批后端基础任务已完成 8/8，BE-010 至 BE-022 的核心 Schema、
-> Supabase Auth、Rooms、成员治理、生命周期、私有 Realtime、Chat 与
-> Itinerary 后端已于 2026-07-27 完成；BE-009 支付规划按产品决策延期。  
+> 状态：2026-07-30 同步；首批后端基础任务已完成 8/8，BE-010 至 BE-022、
+> DW-001 至 DW-010、2026-07-28 五项线上接入修复，以及头像/访客加入/真实 QR
+> 工作区改动均已记录；BE-009 支付规划按产品决策延期。
 > 建立日期：2026-07-27。  
-> 适用基线：当前 `Chat / Photos / Itinerary` 本地优先 Mock。  
+> 适用基线：当前 `Chat / Photos / Itinerary` Supabase-backed 封闭 MVP；旧本地优先 Mock
+> 仅作为历史、fallback 和 UI contract 兼容层。
 > 目标：保留已完成的产品界面和纯领域逻辑，以 Supabase Auth、Postgres、RLS、Storage、Realtime、Cron 和 Edge Functions 建立生产级权威后端。
 
 ## 1. 执行结论
 
-当前项目可以正式接入 Supabase，但不能仅通过替换环境变量或把 `MockRoomRepository` 改成 Supabase 查询完成上线。
+当前项目已经进入 Supabase-backed 封闭 MVP，但仍不能仅通过替换环境变量完成生产上线。
 
-实施前准备度评估（历史基线）：
+以下实施前准备度评估为 2026-07-27 历史基线：
 
 | 范围 | 准备度 | 说明 |
 | --- | ---: | --- |
@@ -1562,3 +1563,28 @@ Photos/语音 Storage、支付、Book 和投票仍按既定范围延后。
 - [ ] `npm run supabase:types:check` 仍需要本机 Supabase CLI access token；当前 sandbox 无法写入
   CLI 的 `C:\\Users\\giaog\\.supabase` telemetry 文件，故未能重新生成并比对远端 types。现有生产构建和
   已提交 types 均通过 TypeScript 校验；待 CLI 认证环境可写时再执行此项。
+
+## 18. 2026-07-30 头像、访客加入与真实邀请二维码
+
+> 状态：代码、migration、类型和数据库测试文件已进入工作区；是否已推送到目标 Supabase 云项目仍需单独执行 CLI / Dashboard 验收。
+
+- [x] **AVATAR-001 数据模型**：`profiles`、`room_members`、`private.room_join_requests` 新增 `avatar_variant` 与 `avatar_asset_id`；头像 asset 继续复用私有 `room-media` bucket 和 `assets` 表，不新增公开 bucket。
+- [x] **AVATAR-002 RLS 读取边界**：新增 `security.can_read_avatar_asset`，允许头像拥有者、同房间可读成员，以及 Host 查看 pending request 头像；`assets_member_read` 与 `storage.objects` select policy 已补齐头像路径。
+- [x] **AVATAR-003 上传事务**：新增 `prepare_profile_avatar_upload` / `finalize_profile_avatar_upload`，只允许非 anonymous 的 authenticated account 上传 JPEG/PNG/WebP，大小上限 5 MB；完成时确认 Storage object 存在并把 profile 指向 ready asset。
+- [x] **AVATAR-004 房间同步**：profile avatar finalize 会同步到仍跟随 profile 的 `room_members`，保留已有自定义房间头像；新建 membership 默认继承当前 profile avatar。
+- [x] **JOIN-001 带头像的加入事务**：`join_room_with_profile` 包装既有 invite 事务，写入 pending request 或 membership 的 avatar 选择；客户端不能伪造他人 avatar asset。
+- [x] **JOIN-002 访客无登录加入**：`joinRoomAction` 在无 session 时执行 Supabase anonymous sign-in，再 bootstrap identity，避免把数据库 `anon` role 当作房间访客。
+- [x] **JOIN-003 待审核轮询**：pending 加入返回 `requestId`；`/join/status` 调用 `get_join_request_status`，只允许 request owner 查看 pending/approved/rejected，并设置 `private, no-store`。
+- [x] **JOIN-004 Host 审批展示**：Host pending request 列表改读 `list_pending_join_requests_with_avatar`，Room member list、Chat、Itinerary responsible、Rooms header 与 Account 使用签名头像 URL。
+- [x] **INVITE-QR-001 真实 QR**：创建完成卡和 Room share 面板使用 `qrcode` 生成当前 private invite URL，不再展示假 QR 图案；下载 PNG 同步生成可扫描 QR 与短码。
+- [x] **MEDIA-ERR-001 云端命令回滚**：`BackendSessionProvider.executeCommand` 为 voice/photo/comment/delete 返回明确错误，失败时回滚到服务器快照；Photos UI 不再把未持久化乐观更新静默留下。
+- [x] **NEXT-IMAGE-001 签名媒体渲染**：`next.config.ts` 根据 `NEXT_PUBLIC_SUPABASE_URL` 放行当前项目的 `/storage/v1/object/sign/room-media/**` 远程图片，避免头像/媒体签名 URL 被 Image 组件阻断。
+- [x] **TEST-001 数据库覆盖**：新增 `023-room-identity-avatars.test.sql` 与 `024-profile-avatar-room-sync.test.sql`，覆盖字段、execute 权限、security invoker wrapper、anonymous 禁止头像上传、审批头像复制和 profile avatar 同步。
+
+**仍需云端/环境验收**：
+
+- [ ] 确认四个 migration 已应用到目标 Supabase 云项目，并重新生成 / 比对 `data/supabase/database.types.ts`。
+- [ ] 运行 `npm run supabase:test:db`，确认 023/024 在云端测试环境通过。
+- [ ] 继续保留 `SUPABASE_SECRET_KEY`、Auth Site URL / Additional Redirect URLs、`EVENTSPACE_APP_ORIGIN` 的环境配置检查；头像和媒体签名上传都依赖 server secret。
+- [ ] 在手机上扫描创建完成卡和 Room share QR，分别验证 logged-in、anonymous guest、pending approve、rejected 四条路径。
+- [ ] 头像图片仍缺少服务端解码/重编码、EXIF 清理、恶意文件扫描和缩略图流水线；当前只完成 MIME/大小/RLS/Storage 对象归属边界。

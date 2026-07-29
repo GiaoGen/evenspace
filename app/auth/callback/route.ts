@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 
-import { parseAuthDestination } from "@/data/supabase/auth-redirect";
+import { isLocalAuthOrigin, parseAuthDestination } from "@/data/supabase/auth-redirect";
 import { getEventSpaceAppOrigin } from "@/data/supabase/env-server";
 import { createSupabaseServerClient } from "@/data/supabase/server-client";
 
@@ -62,10 +62,10 @@ export async function GET(request: NextRequest) {
     return callbackError();
   }
 
-  const response = NextResponse.redirect(
-    new URL(destination.path, getEventSpaceAppOrigin() ?? request.nextUrl.origin),
-    303,
-  );
+  const redirectOrigin = isLocalAuthOrigin(request.nextUrl.origin)
+    ? request.nextUrl.origin
+    : getEventSpaceAppOrigin() ?? request.nextUrl.origin;
+  const response = NextResponse.redirect(new URL(destination.path, redirectOrigin), 303);
 
   Object.entries(NO_STORE_HEADERS).forEach(([name, value]) => {
     response.headers.set(name, value);

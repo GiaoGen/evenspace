@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState, useSyncExternalStore } from "react";
 import { AppHeader } from "@/components/app-header/app-header";
+import { Avatar } from "@/components/ui/avatar";
 import { Icon } from "@/components/ui/icon";
 import { filterRoomCollection, getRoomFilterCounts, type RoomCollectionItem, type RoomFilter } from "../model/room-collection";
 import { rememberRoomCarouselItem, useRoomCarousel } from "../model/use-room-carousel";
@@ -38,7 +39,7 @@ function updateGridPreference(grid: boolean) {
   window.dispatchEvent(new Event(GRID_PREFERENCE_EVENT));
 }
 
-export function RoomsPage({ initialRooms, viewerInitials }: { readonly initialRooms: readonly RoomCollectionItem[]; readonly viewerInitials: string }) {
+export function RoomsPage({ initialRooms, viewerInitials, viewerAvatarUrl }: { readonly initialRooms: readonly RoomCollectionItem[]; readonly viewerInitials: string; readonly viewerAvatarUrl: string | null }) {
   const [filter, setFilter] = useState<RoomFilter>("all");
   const [filterOpen, setFilterOpen] = useState(false);
   const grid = useSyncExternalStore(subscribeToGridPreference, readGridPreference, () => false);
@@ -53,7 +54,7 @@ export function RoomsPage({ initialRooms, viewerInitials }: { readonly initialRo
 
   return (
     <div className={styles.page}>
-      <AppHeader leading={<Link href="/account" className={styles.avatar} aria-label="Open account">{viewerInitials}</Link>} actions={<Link href="/rooms/new" className={styles.topCreateAction} aria-label="Create a room"><Icon name="plus" size={17} /></Link>} />
+      <AppHeader leading={<Link href="/account" className={styles.avatar} aria-label="Open account"><Avatar src={viewerAvatarUrl} text={viewerInitials} displayName="Your account" decorative /></Link>} actions={<Link href="/rooms/new" className={styles.topCreateAction} aria-label="Create a room"><Icon name="plus" size={17} /></Link>} />
       <main className={styles.main}>
         <RoomsToolbar filter={filter} counts={counts} filterOpen={filterOpen} searchOpen={searchOpen} editing={editing} grid={grid} query={query} visibleCount={visibleRooms.length} canEdit={false} setFilterOpen={setFilterOpen} setFilter={setFilter} openSearch={() => { setSearchOpen(true); setFilterOpen(false); }} closeSearch={closeSearch} setQuery={setQuery} toggleEditing={() => undefined} toggleGrid={() => updateGridPreference(!grid)} />
         {visibleRooms.length ? <section ref={containerRef} key={`${filter}:${grid}:${query}`} className={`${styles.cards} ${grid ? styles.cardsGrid : ""}`} aria-label="Your rooms">{visibleRooms.map(({ room, boardItems }, index) => <RoomCard key={room.id} room={room} boardItems={boardItems} grid={grid} editing={editing} active={grid || index === activeIndex} index={index} toggleFavorite={() => undefined} requestDelete={() => undefined} rememberRoom={() => rememberRoomCarouselItem(room.publicId)} />)}</section> : <section className={styles.empty}><Icon name="board" size={26} /><h1>No rooms here.</h1><p>{query ? "Try a different room name." : "The next shared moment will appear here."}</p></section>}

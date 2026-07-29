@@ -57,3 +57,4 @@
 @media (prefers-reduced-motion: reduce) {
   .photoDetailBackdrop,.photoDetail,.photoDetailMedia > div,.photoDetailArrow { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
 }
+.personAvatar { display: grid; flex: 0 0 34px; width: 34px; height: 34px; place-items: center; border-radius: 50%; background: #7e8a7d; color: #fff; font-size: 9px; }

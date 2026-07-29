@@ -35,11 +35,31 @@ export default async function RoomsRoute() {
   const fallbackIdentity =
     typeof data.claims.email === "string" ? data.claims.email : "EventSpace";
   const identity = page.items[0]?.viewer.nickname ?? fallbackIdentity;
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("avatar_asset_id")
+    .eq("user_id", data.claims.sub)
+    .maybeSingle();
+  let viewerAvatarUrl: string | null = null;
+  if (profile?.avatar_asset_id) {
+    const { data: asset } = await supabase
+      .from("assets")
+      .select("object_key,status")
+      .eq("id", profile.avatar_asset_id)
+      .maybeSingle();
+    if (asset?.status === "ready" && asset.object_key) {
+      const { data: signed } = await supabase.storage
+        .from("room-media")
+        .createSignedUrl(asset.object_key, 60 * 30);
+      viewerAvatarUrl = signed?.signedUrl ?? null;
+    }
+  }
 
   return (
     <RoomsPage
       initialRooms={presentRoomCollection(page, cardMedia)}
       viewerInitials={initials(identity)}
+      viewerAvatarUrl={viewerAvatarUrl}
     />
   );
 }

@@ -437,6 +437,8 @@ export type Database = {
       profiles: {
         Row: {
           anonymized_at: string | null
+          avatar_asset_id: string | null
+          avatar_variant: string
           created_at: string
           deleted_at: string | null
           display_name: string
@@ -446,6 +448,8 @@ export type Database = {
         }
         Insert: {
           anonymized_at?: string | null
+          avatar_asset_id?: string | null
+          avatar_variant?: string
           created_at?: string
           deleted_at?: string | null
           display_name: string
@@ -455,6 +459,8 @@ export type Database = {
         }
         Update: {
           anonymized_at?: string | null
+          avatar_asset_id?: string | null
+          avatar_variant?: string
           created_at?: string
           deleted_at?: string | null
           display_name?: string
@@ -462,12 +468,22 @@ export type Database = {
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "profiles_avatar_asset_id_fkey"
+            columns: ["avatar_asset_id"]
+            isOneToOne: false
+            referencedRelation: "assets"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       room_members: {
         Row: {
           actor_id: string
           archive_eligible: boolean
+          avatar_asset_id: string | null
+          avatar_variant: string
           joined_at: string
           left_at: string | null
           nickname: string
@@ -480,6 +496,8 @@ export type Database = {
         Insert: {
           actor_id: string
           archive_eligible?: boolean
+          avatar_asset_id?: string | null
+          avatar_variant?: string
           joined_at?: string
           left_at?: string | null
           nickname: string
@@ -492,6 +510,8 @@ export type Database = {
         Update: {
           actor_id?: string
           archive_eligible?: boolean
+          avatar_asset_id?: string | null
+          avatar_variant?: string
           joined_at?: string
           left_at?: string | null
           nickname?: string
@@ -502,6 +522,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "room_members_avatar_asset_id_fkey"
+            columns: ["avatar_asset_id"]
+            isOneToOne: false
+            referencedRelation: "assets"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "room_members_actor_id_fkey"
             columns: ["actor_id"]
@@ -694,6 +721,13 @@ export type Database = {
           revision: number
         }[]
       }
+      finalize_profile_avatar_upload: {
+        Args: { requested_asset_id: string }
+        Returns: {
+          asset_id: string
+          object_key: string
+        }[]
+      }
       get_current_user_room: {
         Args: { requested_public_id: string }
         Returns: {
@@ -720,8 +754,35 @@ export type Database = {
           viewer_state: string
         }[]
       }
+      get_join_request_status: {
+        Args: {
+          requested_request_id: string
+          requested_room_public_id: string
+        }
+        Returns: {
+          request_status: string
+        }[]
+      }
       join_room_with_invite: {
         Args: {
+          requested_code?: string
+          requested_nickname: string
+          requested_note?: string
+          requested_room_public_id: string
+          requested_token?: string
+        }
+        Returns: {
+          actor_id: string
+          outcome: string
+          public_id: string
+          request_id: string
+          room_id: string
+        }[]
+      }
+      join_room_with_profile: {
+        Args: {
+          requested_avatar_asset_id?: string
+          requested_avatar_variant?: string
           requested_code?: string
           requested_nickname: string
           requested_note?: string
@@ -776,6 +837,18 @@ export type Database = {
           requested_at: string
         }[]
       }
+      list_pending_join_requests_with_avatar: {
+        Args: { requested_room_public_id: string }
+        Returns: {
+          actor_id: string
+          avatar_asset_id: string
+          avatar_variant: string
+          nickname: string
+          note: string
+          request_id: string
+          requested_at: string
+        }[]
+      }
       pin_room_message: {
         Args: { requested_message_id: string; requested_room_public_id: string }
         Returns: {
@@ -800,6 +873,16 @@ export type Database = {
           requires_approval: boolean
           room_id: string
           time_zone: string
+        }[]
+      }
+      prepare_profile_avatar_upload: {
+        Args: {
+          requested_byte_size: number
+          requested_mime_type: string
+        }
+        Returns: {
+          asset_id: string
+          object_key: string
         }[]
       }
       react_to_room_message: {

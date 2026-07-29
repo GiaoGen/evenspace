@@ -2,6 +2,7 @@ import "server-only";
 
 import { z } from "zod";
 
+import { avatarVariants, type AvatarVariant } from "@/core/domain/avatar";
 import { createSupabaseServerClient } from "@/data/supabase/server-client";
 
 const publicIdSchema = z.string().regex(/^room_[a-z0-9_]{3,40}$/);
@@ -139,6 +140,8 @@ export async function joinRoomWithInvite(input: {
   readonly note?: string;
   readonly token?: string;
   readonly code?: string;
+  readonly avatarVariant: AvatarVariant;
+  readonly avatarAssetId?: string;
 }): Promise<JoinRoomResult> {
   const parsed = z.object({
     publicId: publicIdSchema,
@@ -146,15 +149,19 @@ export async function joinRoomWithInvite(input: {
     note: z.string().trim().max(240).optional().default(""),
     token: tokenSchema.optional(),
     code: codeSchema.optional(),
+    avatarVariant: z.enum(avatarVariants),
+    avatarAssetId: z.uuid().optional(),
   }).refine((value) => Number(Boolean(value.token)) + Number(Boolean(value.code)) === 1).safeParse(input);
   if (!parsed.success) throw new RoomInviteError("invalid_input");
   const supabase = await createSupabaseServerClient();
-  const { data, error } = await supabase.rpc("join_room_with_invite", {
+  const { data, error } = await supabase.rpc("join_room_with_profile", {
     requested_room_public_id: parsed.data.publicId,
     requested_nickname: parsed.data.nickname,
     requested_note: parsed.data.note,
     requested_token: parsed.data.token,
     requested_code: parsed.data.code,
+    requested_avatar_variant: parsed.data.avatarVariant,
+    requested_avatar_asset_id: parsed.data.avatarAssetId,
   });
   if (error) throw mapRpcError(error);
   return first(joinResultSchema, data);

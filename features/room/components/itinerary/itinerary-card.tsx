@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Avatar } from "@/components/ui/avatar";
 import { Icon } from "@/components/ui/icon";
 import type { ItineraryItem } from "@/core/domain/room";
 import { formatItineraryDistance, formatItineraryTimeRange, getItineraryStatus, getSafeItineraryMapsUrl } from "../../model/itinerary";
@@ -19,7 +20,7 @@ export function ItineraryCard({ item, now, timeZone, canEdit, isScrollTarget, on
         <span className={styles.cardTopline}><time>{formatItineraryTimeRange(item, timeZone)}</time><em>{status === "current" ? <i /> : null}{statusLabels[status]}</em></span>
         <span className={styles.cardTitle}>{item.title}</span>
         <span className={styles.cardPlace}>{item.locationLabel ? <><Icon name="location" size={14} />{item.locationLabel}</> : "Location to be decided"}</span>
-        <span className={styles.cardFooter}><span><b>{item.responsible.initials}</b><strong>{item.responsible.displayName}</strong><small>is leading</small></span><span>{formatItineraryDistance(item, now)}<Icon name="chevron" size={14} /></span></span>
+        <span className={styles.cardFooter}><span><Avatar src={item.responsible.avatarUrl} text={item.responsible.initials} displayName={item.responsible.displayName} decorative /><strong>{item.responsible.displayName}</strong><small>is leading</small></span><span>{formatItineraryDistance(item, now)}<Icon name="chevron" size={14} /></span></span>
       </button>
       <div className={`${styles.cardDetails} ${expanded ? styles.cardDetailsOpen : ""}`}>
         <div className={styles.cardDetailsInner}>

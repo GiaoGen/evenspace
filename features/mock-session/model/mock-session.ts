@@ -12,6 +12,7 @@ export interface MockViewer {
   readonly actorId: ActorId;
   readonly displayName: string;
   readonly initials: string;
+  readonly avatarUrl?: string | null;
   readonly email: string | null;
   readonly authState: "guest" | "signed-in";
   readonly theme: "system" | "light" | "dark";
@@ -22,6 +23,7 @@ export interface MockJoinRequest {
   readonly actorId: ActorId;
   readonly displayName: string;
   readonly initials: string;
+  readonly avatarUrl?: string | null;
   readonly note: string;
   readonly requestedAt: string;
   readonly state: JoinRequestState;

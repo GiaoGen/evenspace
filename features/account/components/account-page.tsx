@@ -1,11 +1,14 @@
 "use client";
 
-"use client";
-
 import { useState } from "react";
+import {
+  finalizeAccountAvatarUploadAction,
+  prepareAccountAvatarUploadAction,
+  updateAccountProfileAction,
+} from "@/app/account/actions";
 import { signOutCurrentSession } from "@/app/auth/actions";
-import { updateAccountProfileAction } from "@/app/account/actions";
 import type { BackendAccount } from "@/data/supabase/backend-account";
+import { createSupabaseBrowserClient } from "@/data/supabase/browser-client";
 import { AccountActionSheet, type AccountSheet } from "./account-action-sheet";
 import { AccountHeader } from "./account-header";
 import { AccountLinks } from "./account-links";
@@ -34,6 +37,36 @@ export function AccountPage({ account }: { readonly account: BackendAccount }) {
     if (result.ok) setViewer((current) => ({ ...current, theme }));
   }
 
+  async function uploadAvatar(file: File) {
+    const prepared = await prepareAccountAvatarUploadAction({
+      mimeType: file.type,
+      byteSize: file.size,
+    });
+    if (!prepared.ok) return prepared;
+
+    const supabase = createSupabaseBrowserClient();
+    const { error } = await supabase.storage
+      .from("room-media")
+      .uploadToSignedUrl(
+        prepared.data.objectKey,
+        prepared.data.token,
+        file,
+        { contentType: file.type },
+      );
+    if (error) return { ok: false as const, message: "The avatar upload failed." };
+
+    const finalized = await finalizeAccountAvatarUploadAction({
+      assetId: prepared.data.assetId,
+    });
+    if (finalized.ok) {
+      setViewer((current) => ({
+        ...current,
+        avatarUrl: finalized.data.avatarUrl,
+      }));
+    }
+    return finalized;
+  }
+
   async function signOut() {
     await signOutCurrentSession();
   }
@@ -42,7 +75,13 @@ export function AccountPage({ account }: { readonly account: BackendAccount }) {
     <div className={styles.page}>
       <AccountHeader />
       <main>
-        <IdentityCard viewer={viewer} summary={summary} nameAvailable={(name) => Boolean(name.trim())} saveName={(name) => { void saveName(name); }} />
+        <IdentityCard
+          viewer={viewer}
+          summary={summary}
+          nameAvailable={(name) => Boolean(name.trim())}
+          saveName={(name) => { void saveName(name); }}
+          uploadAvatar={uploadAvatar}
+        />
         <AccountModeCard authState={viewer.authState} onOpen={() => setSheet("mode")} />
         <AppearancePicker value={viewer.theme} onChange={(theme) => { void saveTheme(theme); }} />
         <LocalDataCard summary={summary} onManage={() => setSheet("data")} />

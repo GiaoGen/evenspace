@@ -186,3 +186,4 @@
   .cardFooter { align-items: start; flex-direction: column; }
   .cardFooter > span:last-child { align-self: flex-end; }
 }
+.cardFooter > span:first-child > span { grid-row: span 2; display: grid; place-items: center; width: 31px; height: 31px; border: 1px solid color-mix(in srgb,currentColor 24%,transparent); border-radius: 50%; background: color-mix(in srgb,var(--card-background) 65%,white 35%); font-size: 7px; }

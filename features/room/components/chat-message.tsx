@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type CSSProperties, type MouseEvent, type PointerEvent } from "react";
+import { Avatar } from "@/components/ui/avatar";
 import { Icon } from "@/components/ui/icon";
 import type { ChatMessage } from "@/core/domain/room";
 import { LocalAssetImage } from "@/features/local-assets/components/local-asset-image";
@@ -89,7 +90,7 @@ export function ChatMessageItem({ message, own, grouped, timeZone, replyBody, on
     onPointerCancel={onPointerEnd}
     onContextMenu={(event) => onContextMenu(event, message)}
   >
-    <span className={styles.messageAvatar} aria-hidden>{message.author?.initials ?? "?"}</span>
+    <Avatar className={styles.messageAvatar} src={message.author?.avatarUrl} text={message.author?.initials ?? "?"} displayName={message.author?.displayName ?? "Room member"} decorative />
     <div className={styles.messageBody}>
       <p className={styles.messageMeta}><strong>{own ? "You" : message.author?.displayName}</strong><time>{formatTime(message.sentAt, timeZone)}</time></p>
       <div className={`${styles.bubble} ${content ? styles.mediaBubble : ""}`}>

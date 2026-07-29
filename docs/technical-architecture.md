@@ -1,6 +1,6 @@
 # EventSpace 第一版技术架构方案
 
-> 状态：2026-07-27 后端范围冻结后校准；详细实施与任务状态以 [`supabase-backend-integration-plan.md`](./supabase-backend-integration-plan.md) 为准。
+> 状态：2026-07-30 Supabase 封闭 MVP 接线校准；详细实施与任务状态以 [`supabase-backend-integration-plan.md`](./supabase-backend-integration-plan.md) 为准。
 > 原则：个人开发者可维护、移动端优先、数十人房间实时协作、严格服务端授权、托管加密而非 E2EE。
 
 ## 1. 选型总览
@@ -11,7 +11,7 @@
 | UI | Tailwind CSS + shadcn/ui 基础组件 + Motion | 保持黑白卡片视觉的一致性，精细控制动效与可访问性。 |
 | 数据/鉴权 | Supabase Postgres、Auth、RLS | 单一托管后端，支持 Google、magic link/OTP、匿名会话及行级授权。 |
 | 实时 | Supabase Realtime private Broadcast | 适合数十人私密房间；数据库提交后只广播权威实体 ID、操作和 revision。 |
-| 媒体 | Supabase Storage 私有 bucket | 房间级授权与 60 秒签名 URL。 |
+| 媒体 | Supabase Storage 私有 bucket | 房间级授权与短期签名 URL；当前 UI 为头像和房间媒体生成 30 分钟读取签名 URL。 |
 | 定时任务 | Supabase Cron/pg_cron + Edge Function | 处理归档、到期提醒、清理与通知；不依赖 Vercel Hobby 的低频 Cron。 |
 | 部署 | Vercel（生产使用适合商业项目的付费计划） | Next.js 原生部署、全球 CDN、WAF 与预算控制。 |
 | 邮件 | Resend 作为 Supabase Auth 的自定义 SMTP | 生产 magic link/OTP 可靠送达；使用自有认证域名。 |
@@ -45,7 +45,7 @@
 
 ## 4. 数据与授权模型
 
-Postgres 是真相来源。首期核心实体包括：`profiles`、`actors`、`terms_acceptances`、`rooms`、`room_members`、`room_preferences`、`room_invites`、`room_join_requests`、`actor_claim_challenges`、`messages`、`message_reactions`、`message_pins`、`assets`、`photos`、`photo_comments`、`itineraries`、`reports`、`room_bans`、`archive_entries`、`audit_events`、`command_receipts` 和 `outbox_jobs`。支付模块包括 `products`、`prices`、`checkout_sessions`、`payment_events`、`room_entitlements` 和 `refund_events`。Book 与投票均不进入首批 schema；旧 `board_items` / `board_comments` 只作为本地兼容来源评估。
+Postgres 是真相来源。首期核心实体包括：`profiles`、`actors`、`terms_acceptances`、`rooms`、`room_members`、`room_preferences`、`room_invites`、`room_join_requests`、`actor_claim_challenges`、`messages`、`message_reactions`、`message_pins`、`assets`、`photos`、`photo_comments`、`itineraries`、`reports`、`room_bans`、`archive_entries`、`audit_events`、`command_receipts` 和 `outbox_jobs`。`profiles`、`room_members` 与 `room_join_requests` 当前已携带 `avatar_variant` / `avatar_asset_id`，头像 asset 继续复用私有 `assets` + `room-media`。支付模块包括 `products`、`prices`、`checkout_sessions`、`payment_events`、`room_entitlements` 和 `refund_events`。Book 与投票均不进入首批 schema；旧 `board_items` / `board_comments` 只作为本地兼容来源评估。
 
 所有暴露到 Data API 的表均启用 RLS。每项读取和写入策略至少同时验证：
 
@@ -140,9 +140,20 @@ Secret/service role key 只在服务端环境使用，绝不发送到浏览器�
 - 投票系统延后；现有 Poll reducer/type 只服务旧 session 兼容和历史记录，不创建生产 Poll API。
 - 支付进入 MVP，采用 Stripe-hosted Checkout 的一次性房间付费，首期商品为 Event Upgrade 和 Permanent Archive。
 - [`supabase-backend-integration-plan.md`](./supabase-backend-integration-plan.md) 是后端实施、验收和任务 Mark 的唯一主计划书。
+
+## 2026-07-30 当前同步：头像、匿名加入与 QR 接线
+
+- Account avatar 采用与 Photos/Voice 相同的私有 Storage 策略：客户端先请求 `prepare_profile_avatar_upload`，服务端创建 pending `assets` 记录和 object key；浏览器用 signed upload token 上传；`finalize_profile_avatar_upload` 校验 Storage object 存在后把 asset 标记 ready 并写回 profile。
+- `security.can_read_avatar_asset` 是头像读取的专用补充策略：头像拥有者、可读房间成员、以及可管理 pending request 的 Host 可以读取相应 asset；组件只消费服务端生成的 signed URL，不直接拼 Storage object key。
+- 加入房间使用 `join_room_with_profile`，在既有 invite 事务之外写入 avatar variant / asset。未登录访客由 Server Action 先 `signInAnonymously`，再 `bootstrap_identity`，因此数据库 `anon` role 仍不能直接执行加入 RPC。
+- 待审核状态由 `/join/status` route handler 读取 `get_join_request_status`，只返回 pending/approved/rejected，并设置 `Cache-Control: private, no-store`；这不是 Realtime，当前是 3 秒轮询。
+- 邀请 QR 由 `qrcode` 包在浏览器生成，并编码当前 origin + private invite token URL；下载 PNG 也使用同一真实 URL。旧 fake QR 不再代表当前行为。
+- `next.config.ts` 根据 `NEXT_PUBLIC_SUPABASE_URL` 放行当前 Supabase host 的 `/storage/v1/object/sign/room-media/**` 图片；切换 Supabase 项目时需要随 public env 重新构建。
+- `BackendSessionProvider.executeCommand` 已成为云端房间命令适配层：本地 reducer 先乐观应用，支持的命令上传媒体或调用 RPC，失败后 hydrate 回服务器快照并把错误返回 UI。
+- 后端风险：头像和房间媒体仍缺服务端 EXIF 清理、转码、缩略图、恶意文件扫描、引用计数清理；匿名访客还需要 Turnstile、速率限制和清理任务才能作为生产安全承诺。
 ## 2026-07-18 历史同步：技术架构现状与后端接入提醒
 
-当前代码仍是 Next.js App Router + React + TypeScript 的本地优先 Mock。后端目标仍可沿用本文的 Supabase / Postgres / Storage / Realtime 方向，但现状有以下变化需要纳入后续设计：
+本节为历史同步，保留用于理解旧本地优先阶段；当前判断以 2026-07-30 同步为准。
 
 - 本地状态主入口为 `MockSessionProvider`，通过 `localStorage` 保存 `eventspace:local-session:v1`，兼容旧 `sessionStorage`。
 - `MockSession` command reducer 已经覆盖大部分写操作，后端接入时可以把 command 逐步映射为 Server Action / RPC / repository mutation。

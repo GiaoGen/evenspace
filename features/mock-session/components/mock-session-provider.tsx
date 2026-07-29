@@ -15,10 +15,12 @@ const LEGACY_STORAGE_KEY = "eventspace:mock-session:v3";
 interface MockSessionContextValue {
   readonly session: MockSession;
   readonly dispatch: Dispatch<MockSessionAction>;
+  readonly executeCommand: (command: MockCommand) => Promise<CommandResult>;
   readonly reset: () => void;
 }
 
 const MockSessionContext = createContext<MockSessionContextValue | null>(null);
+type CommandResult = { readonly status: "ok" } | { readonly status: "error"; readonly message: string };
 
 function readStoredSession() {
   try { return window.localStorage.getItem(STORAGE_KEY) ?? window.sessionStorage.getItem(LEGACY_STORAGE_KEY); }
@@ -72,14 +74,19 @@ export function MockSessionProvider({ initialSession, children }: { readonly ini
     return () => { delete document.documentElement.dataset.theme; };
   }, [session.viewer.theme]);
 
-  const value = useMemo<MockSessionContextValue>(() => ({ session, dispatch, reset: () => {
+  const executeCommand = useCallback((command: MockCommand): Promise<CommandResult> => {
+    dispatch({ type: "COMMAND", command });
+    return Promise.resolve({ status: "ok" });
+  }, [dispatch]);
+
+  const value = useMemo<MockSessionContextValue>(() => ({ session, dispatch, executeCommand, reset: () => {
     try {
       window.localStorage.removeItem(STORAGE_KEY);
       window.sessionStorage.removeItem(LEGACY_STORAGE_KEY);
     } catch { /* In-memory reset still succeeds. */ }
     void clearLocalAssets().catch(() => undefined);
     dispatch({ type: "RESET", session: initialSession });
-  } }), [initialSession, session]);
+  } }), [executeCommand, initialSession, session]);
 
   return <MockSessionContext.Provider value={value}>{children}</MockSessionContext.Provider>;
 }
@@ -103,10 +110,10 @@ export function BackendSessionProvider({
 }) {
   const [session, baseDispatch] = useReducer(mockSessionReducer, initialSession);
 
-  const executeCloudMediaCommand = useCallback(async (command: MockCommand) => {
+  const executeCloudMediaCommand = useCallback(async (command: MockCommand): Promise<CommandResult> => {
     if (command.type === "POST_MESSAGE" && command.message.content?.type === "voice") {
       const blob = await getLocalAssetBlob(command.message.content.asset);
-      if (!blob) return { status: "error" };
+      if (!blob) return { status: "error", message: "This voice message is no longer available locally." };
       const asset = await uploadRoomMedia({
         roomPublicId: command.roomPublicId,
         kind: "voice",
@@ -114,7 +121,7 @@ export function BackendSessionProvider({
         mimeType: blob.type.split(";", 1)[0] || "audio/webm",
         durationMs: command.message.content.durationSeconds * 1000,
       });
-      return onCommand({
+      const result = await onCommand({
         ...command,
         message: {
           ...command.message,
@@ -124,10 +131,11 @@ export function BackendSessionProvider({
           },
         },
       });
+      return result.status === "ok" ? { status: "ok" } : { status: "error", message: "This voice message could not be sent." };
     }
     if (command.type === "ADD_BOARD_ITEM" && command.item.kind === "photo" && command.item.asset) {
       const blob = await getLocalAssetBlob(command.item.asset);
-      if (!blob) return { status: "error" };
+      if (!blob) return { status: "error", message: "This photo is no longer available locally." };
       const asset = await uploadRoomMedia({
         roomPublicId: command.roomPublicId,
         kind: "image",
@@ -140,36 +148,53 @@ export function BackendSessionProvider({
         originalName: command.item.imageName ?? "Photo",
         aspectRatio: command.item.aspectRatio ?? 1,
       });
-      return created.ok ? { status: "ok" } : { status: "error" };
+      return created.ok ? { status: "ok" } : { status: "error", message: created.message };
     }
     if (command.type === "ADD_BOARD_COMMENT") {
       const created = await addPhotoCommentAction({ photoId: command.itemId, body: command.comment.body });
-      return created.ok ? { status: "ok" } : { status: "error" };
+      return created.ok ? { status: "ok" } : { status: "error", message: created.message };
     }
     if (command.type === "DELETE_BOARD_ITEM") {
       const removed = await deleteRoomPhotoAction({ photoId: command.itemId });
-      return removed.ok ? { status: "ok" } : { status: "error" };
+      return removed.ok ? { status: "ok" } : { status: "error", message: removed.message };
     }
-    return onCommand(command);
+    const result = await onCommand(command);
+    return result.status === "ok" || result.status === "ignored" ? { status: "ok" } : { status: "error", message: "This room action could not be completed." };
   }, [onCommand]);
 
   useEffect(() => {
     baseDispatch({ type: "HYDRATE", session: initialSession });
   }, [initialSession]);
 
-  const dispatch = useCallback<Dispatch<MockSessionAction>>((action) => {
-    baseDispatch(action);
-    if (action.type !== "COMMAND") return;
-    void executeCloudMediaCommand(action.command).then((result) => {
+  const executeCommand = useCallback(async (command: MockCommand): Promise<CommandResult> => {
+    baseDispatch({ type: "COMMAND", command });
+    try {
+      const result = await executeCloudMediaCommand(command);
       if (result.status === "error") baseDispatch({ type: "HYDRATE", session: initialSession });
-    }).finally(onSettled);
+      return result;
+    } catch (error) {
+      console.error("Room command failed", error);
+      baseDispatch({ type: "HYDRATE", session: initialSession });
+      return {
+        status: "error",
+        message: error instanceof Error ? error.message : "This room action could not be completed.",
+      };
+    } finally {
+      onSettled();
+    }
   }, [executeCloudMediaCommand, initialSession, onSettled]);
+
+  const dispatch = useCallback<Dispatch<MockSessionAction>>((action) => {
+    if (action.type === "COMMAND") void executeCommand(action.command);
+    else baseDispatch(action);
+  }, [executeCommand]);
 
   const value = useMemo<MockSessionContextValue>(() => ({
     session,
     dispatch,
+    executeCommand,
     reset: () => baseDispatch({ type: "HYDRATE", session: initialSession }),
-  }), [dispatch, initialSession, session]);
+  }), [dispatch, executeCommand, initialSession, session]);
 
   return <MockSessionContext.Provider value={value}>{children}</MockSessionContext.Provider>;
 }

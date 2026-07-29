@@ -1,9 +1,10 @@
 "use client";
 
+import QRCode from "qrcode";
+
+import { InvitationQr } from "@/components/ui/invitation-qr";
 import type { CreateRoomDraft } from "../model/create-room-machine";
 import styles from "./create-room-wizard.module.css";
-
-const qrCells = Array.from({ length: 81 }, (_, index) => index % 2 === 0 || index % 13 === 0 || [3, 7, 17, 29, 41, 53, 67, 73].includes(index));
 
 export function formatDuration(minutes: number) {
   const hours = Math.floor(minutes / 60);
@@ -13,15 +14,15 @@ export function formatDuration(minutes: number) {
   return `${hours}h ${rest}m`;
 }
 
-export function InvitationCard({ name, draft, endTime, compact = false, inviteCode }: { readonly name: string; readonly draft: CreateRoomDraft; readonly endTime: string; readonly compact?: boolean; readonly inviteCode?: string }) {
+export function InvitationCard({ name, draft, endTime, compact = false, inviteCode, inviteUrl = "" }: { readonly name: string; readonly draft: CreateRoomDraft; readonly endTime: string; readonly compact?: boolean; readonly inviteCode?: string; readonly inviteUrl?: string }) {
   return <article className={`${styles.inviteCard} ${compact ? styles.inviteCardCompact : ""}`}>
     <header><strong>{name || "Untitled room"}</strong><span>Host-led</span></header>
-    <div className={styles.inviteCenter}><div className={styles.fakeQr} aria-hidden="true">{qrCells.map((filled, index) => <i key={index} className={filled ? styles.qrFilled : ""} />)}</div>{inviteCode ? <strong className={styles.inviteCode}>{inviteCode}</strong> : null}</div>
+    <div className={styles.inviteCenter}><InvitationQr value={inviteUrl} size={compact ? 108 : 168} className={styles.inviteQr} />{inviteCode ? <strong className={styles.inviteCode}>{inviteCode}</strong> : null}</div>
     <footer><span><small>Duration</small>{formatDuration(draft.durationMinutes)}</span><span><small>Ends</small>{endTime}</span><span><small>People</small>Up to {draft.memberLimit}</span></footer>
   </article>;
 }
 
-export function downloadInvitationCard(name: string, draft: CreateRoomDraft, endTime: string) {
+export async function downloadInvitationCard(name: string, draft: CreateRoomDraft, endTime: string, inviteUrl: string, inviteCode: string) {
   const canvas = document.createElement("canvas");
   canvas.width = 1080;
   canvas.height = 1350;
@@ -37,13 +38,19 @@ export function downloadInvitationCard(name: string, draft: CreateRoomDraft, end
   context.fillText(name.slice(0, 24), 76, 130, 760);
   context.font = "600 24px Arial, sans-serif";
   context.fillText("HOST-LED", 790, 116, 220);
-    const cell = 42;
-    const startX = 351;
-    const startY = 370;
-    context.fillStyle = "#f8f3eb";
-    context.fillRect(startX - 35, startY - 35, cell * 9 + 70, cell * 9 + 70);
-    context.fillStyle = "#201d19";
-    qrCells.forEach((filled, index) => { if (filled) context.fillRect(startX + index % 9 * cell, startY + Math.floor(index / 9) * cell, cell - 7, cell - 7); });
+  const qrDataUrl = await QRCode.toDataURL(inviteUrl, {
+    width: 448,
+    margin: 2,
+    errorCorrectionLevel: "M",
+    color: { dark: "#201d19", light: "#f8f3eb" },
+  });
+  const qrImage = new Image();
+  qrImage.src = qrDataUrl;
+  await qrImage.decode();
+  context.drawImage(qrImage, 316, 335, 448, 448);
+  context.textAlign = "center";
+  context.font = "600 58px Georgia, serif";
+  context.fillText(inviteCode, 540, 880, 850);
   context.textAlign = "left";
   context.font = "600 22px Arial, sans-serif";
   context.fillText(`DURATION  ${formatDuration(draft.durationMinutes)}`, 76, 1170);

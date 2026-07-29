@@ -153,6 +153,37 @@ describe("Supabase auth Server Actions", () => {
     expect(result.status).toBe("sent");
   });
 
+  it("prefers localhost callbacks over configured production origins", async () => {
+    const originalOrigin = process.env.EVENTSPACE_APP_ORIGIN;
+    process.env.EVENTSPACE_APP_ORIGIN = "https://eventspace.example";
+    vi.mocked(headers).mockResolvedValue(
+      new Headers({
+        host: "localhost:3000",
+        origin: "http://localhost:3000",
+      }) as never,
+    );
+
+    try {
+      const result = await signUpWithEmailPassword(
+        initialState,
+        signUpForm("person@example.com"),
+      );
+
+      expect(signUp).toHaveBeenCalledWith(
+        expect.objectContaining({
+          options: expect.objectContaining({
+            emailRedirectTo:
+              "http://localhost:3000/auth/callback?next=%2Frooms",
+          }),
+        }),
+      );
+      expect(result.status).toBe("sent");
+    } finally {
+      if (originalOrigin === undefined) delete process.env.EVENTSPACE_APP_ORIGIN;
+      else process.env.EVENTSPACE_APP_ORIGIN = originalOrigin;
+    }
+  });
+
   it("rejects invalid input and redirects without contacting Supabase", async () => {
     const invalidEmail = await signInWithEmailPassword(
       initialState,

@@ -22,5 +22,35 @@ export default async function JoinRoomPage({ params, searchParams }: { readonly 
   }
   const supabase = await createSupabaseServerClient();
   const { data } = await supabase.auth.getClaims();
-  return <JoinRoomFlow publicId={publicId} token={token} code={code} invite={invite} authenticated={Boolean(data?.claims?.sub)} />;
+  const userId = typeof data?.claims?.sub === "string" ? data.claims.sub : null;
+  let initialName = "";
+  let initialAvatarAssetId: string | undefined;
+  let initialAvatarUrl: string | undefined;
+
+  if (userId) {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("display_name,avatar_asset_id")
+      .eq("user_id", userId)
+      .maybeSingle();
+    initialName = profile?.display_name ?? "";
+    if (profile?.avatar_asset_id) {
+      const { data: asset } = await supabase
+        .from("assets")
+        .select("object_key,status")
+        .eq("id", profile.avatar_asset_id)
+        .maybeSingle();
+      if (asset?.status === "ready" && asset.object_key) {
+        const { data: signed } = await supabase.storage
+          .from("room-media")
+          .createSignedUrl(asset.object_key, 60 * 30);
+        if (signed?.signedUrl) {
+          initialAvatarAssetId = profile.avatar_asset_id;
+          initialAvatarUrl = signed.signedUrl;
+        }
+      }
+    }
+  }
+
+  return <JoinRoomFlow publicId={publicId} token={token} code={code} invite={invite} authenticated={Boolean(userId)} initialName={initialName} initialAvatarAssetId={initialAvatarAssetId} initialAvatarUrl={initialAvatarUrl} />;
 }

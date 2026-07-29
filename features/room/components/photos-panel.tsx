@@ -35,7 +35,7 @@ export function PhotosPanel({
   readonly canAdd: boolean;
   readonly canModerate: boolean;
 }) {
-  const { session, dispatch } = useMockSession();
+  const { session, executeCommand } = useMockSession();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const panelRef = useRef<HTMLElement | null>(null);
   const [detailPhotoId, setDetailPhotoId] = useState<string | null>(null);
@@ -71,10 +71,12 @@ export function PhotosPanel({
     setError(selectedFiles.length > availableSlots ? `Only the first ${availableSlots} photos could be added.` : null);
 
     let failed = 0;
+    let lastFailure: string | null = null;
     for (const [index, file] of files.entries()) {
       const validation = validateImageFile(file);
       if (validation) {
         failed += 1;
+        lastFailure = validation;
         continue;
       }
       try {
@@ -94,20 +96,29 @@ export function PhotosPanel({
           rotation: 0,
           width: 24,
         };
-        dispatch({ type: "COMMAND", command: { type: "ADD_BOARD_ITEM", ...commandBase(), item } });
-      } catch {
+        const result = await executeCommand({ type: "ADD_BOARD_ITEM", ...commandBase(), item });
+        if (result.status === "error") {
+          failed += 1;
+          lastFailure = result.message;
+        }
+      } catch (caught) {
         failed += 1;
+        lastFailure = caught instanceof Error ? caught.message : null;
       }
     }
 
-    if (failed) setError(`${failed} ${failed === 1 ? "photo" : "photos"} could not be added. Use JPEG, PNG, WebP, or smaller originals.`);
+    if (failed) setError(lastFailure ?? `${failed} ${failed === 1 ? "photo" : "photos"} could not be added. Use JPEG, PNG, WebP, or smaller originals.`);
     setUploading(false);
   }
 
-  function removePhoto(itemId: string) {
+  async function removePhoto(itemId: string) {
     const index = photos.findIndex((photo) => photo.id === itemId);
     const adjacent = photos[index + 1] ?? photos[index - 1] ?? null;
-    dispatch({ type: "COMMAND", command: { type: "DELETE_BOARD_ITEM", ...commandBase(), itemId } });
+    const result = await executeCommand({ type: "DELETE_BOARD_ITEM", ...commandBase(), itemId });
+    if (result.status === "error") {
+      setError(result.message);
+      return;
+    }
     setDetailPhotoId(adjacent?.id ?? null);
   }
 
@@ -143,8 +154,13 @@ export function PhotosPanel({
       canDelete={detailPhoto.ownerActorId === viewerActorId || canModerate}
       onClose={() => setDetailPhotoId(null)}
       onPhotoChange={setDetailPhotoId}
-      onComment={(body) => dispatch({ type: "COMMAND", command: { type: "ADD_BOARD_COMMENT", ...commandBase(), itemId: detailPhoto.id, comment: { id: `photo_comment_${createUuid()}`, body } } })}
-      onDelete={() => removePhoto(detailPhoto.id)}
+      onComment={(body) => {
+        void executeCommand({ type: "ADD_BOARD_COMMENT", ...commandBase(), itemId: detailPhoto.id, comment: { id: `photo_comment_${createUuid()}`, body } })
+          .then((result) => {
+            if (result.status === "error") setError(result.message);
+          });
+      }}
+      onDelete={() => void removePhoto(detailPhoto.id)}
     /> : null}
   </section>;
 }

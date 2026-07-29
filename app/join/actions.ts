@@ -3,11 +3,13 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
+import { avatarVariants } from "@/core/domain/avatar";
 import {
   joinRoomWithInvite,
   resolveRoomInviteCode,
   RoomInviteError,
 } from "@/data/supabase/room-invites";
+import { createSupabaseServerClient } from "@/data/supabase/server-client";
 
 type JoinActionErrorCode =
   | "invalid_input"
@@ -24,7 +26,7 @@ export type ResolveInviteCodeResult =
 
 export type JoinRoomActionResult =
   | { readonly status: "joined"; readonly publicId: string }
-  | { readonly status: "pending"; readonly publicId: string }
+  | { readonly status: "pending"; readonly publicId: string; readonly requestId: string }
   | { readonly status: "error"; readonly code: JoinActionErrorCode; readonly message: string };
 
 const messages: Record<JoinActionErrorCode, string> = {
@@ -43,7 +45,7 @@ export async function resolveInviteCodeAction(code: unknown): Promise<ResolveInv
 
   try {
     const invite = await resolveRoomInviteCode(parsed.data);
-    if (!invite) return { status: "error", message: "That invite code isn’t active." };
+    if (!invite) return { status: "error", message: "That invite code isn't active." };
     return { status: "resolved", publicId: invite.public_id, code: parsed.data };
   } catch {
     return { status: "error", message: "That invite code could not be opened." };
@@ -57,6 +59,8 @@ export async function joinRoomAction(input: unknown): Promise<JoinRoomActionResu
     note: z.string().trim().max(240),
     token: z.string().regex(/^[A-Za-z0-9_-]{43}$/).optional(),
     code: z.string().regex(/^[A-Z0-9]{8}$/).optional(),
+    avatarVariant: z.enum(avatarVariants),
+    avatarAssetId: z.uuid().optional(),
   }).refine((value) => Number(Boolean(value.token)) + Number(Boolean(value.code)) === 1).safeParse(input);
 
   if (!parsed.success) {
@@ -64,10 +68,38 @@ export async function joinRoomAction(input: unknown): Promise<JoinRoomActionResu
   }
 
   try {
+    const supabase = await createSupabaseServerClient();
+    const { data: claims } = await supabase.auth.getClaims();
+    if (typeof claims?.claims?.sub !== "string") {
+      const { error: anonymousError } = await supabase.auth.signInAnonymously();
+      if (anonymousError) {
+        return {
+          status: "error",
+          code: "authentication_required",
+          message: "Guest access is not enabled right now.",
+        };
+      }
+    }
+
+    const { error: identityError } = await supabase.rpc("bootstrap_identity", {
+      requested_display_name: parsed.data.nickname,
+      requested_theme: "system",
+    });
+    if (identityError) {
+      return {
+        status: "error",
+        code: "authentication_required",
+        message: messages.authentication_required,
+      };
+    }
+
     const result = await joinRoomWithInvite(parsed.data);
     revalidatePath("/rooms");
     if (result.outcome === "pending") {
-      return { status: "pending", publicId: result.public_id };
+      if (!result.request_id) {
+        return { status: "error", code: "unavailable", message: messages.unavailable };
+      }
+      return { status: "pending", publicId: result.public_id, requestId: result.request_id };
     }
     revalidatePath(`/rooms/${result.public_id}`);
     return { status: "joined", publicId: result.public_id };

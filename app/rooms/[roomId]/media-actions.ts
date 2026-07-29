@@ -23,6 +23,10 @@ function failure(error: unknown): ActionResult<never> {
   console.error("Room media action failed", error);
   const message = error instanceof Error ? error.message : "Media is unavailable right now.";
   if (message === "photo_limit_reached") return { ok: false, message: "This room has reached its photo limit." };
+  if (message === "active_membership_required") return { ok: false, message: "Only active room members can upload photos." };
+  if (message === "invalid_image_upload") return { ok: false, message: "Use a JPEG, PNG, or WebP image under 10 MB." };
+  if (message === "media_upload_not_found") return { ok: false, message: "The upload did not reach storage. Please try again." };
+  if (message === "image_asset_not_ready") return { ok: false, message: "The photo upload is not ready yet. Please try again." };
   if (message.includes("SUPABASE_SECRET_KEY")) return { ok: false, message: "Media uploads are not configured for this environment yet." };
   return { ok: false, message: "Media is unavailable right now." };
 }

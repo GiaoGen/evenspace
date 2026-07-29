@@ -1,6 +1,6 @@
 # EventSpace 本地优先静态实现计划
 
-> 状态：2026-07-15 起执行。  
+> 状态：2026-07-30 历史计划；本地优先阶段已被 Supabase-backed 封闭 MVP 接线覆盖。
 > 目标：在不接入后端的前提下，将当前可操作 Mock 逐步改造成移动端优先、真实本地数据驱动、可被后端 Repository 替换的完整静态版本。  
 > 原则：不再把页面写死为样例 Mock；本地浏览器数据是当前真相来源，未来 Supabase/Postgres 是同一领域命令的远端真相来源。
 
@@ -178,3 +178,12 @@
 - `/rooms` 新增两个轻量 `sessionStorage` 键：`eventspace:rooms:grid` 记录当前标签页的 Grid/Magazine 偏好，`eventspace:rooms:active-room` 记录最近居中或打开的 Magazine 卡片。它们只服务阅读恢复，不进入 `MockSession`、不参与命令、不会替代 `localStorage` 的业务会话。
 - Room 的三页切换、Photos 初始滚动和行程编辑器 Portal 同样属于客户端呈现状态；没有新增本地 repository、持久化领域字段或可迁移的业务 mutation。
 - 后端接入时，如需要跨设备保存视图偏好，应另建用户偏好契约并由用户身份、同步策略和隐私规则决定；不得直接把现有浏览器键当作服务端字段。
+
+## 2026-07-30 当前同步：本地优先计划的收口状态
+
+- 本地优先计划不再是当前主实施计划；真实创建、加入、账号、Room、Chat、Photos、Itinerary、成员治理和 Realtime 已按 [`supabase-backend-integration-plan.md`](./supabase-backend-integration-plan.md) 接入 Supabase。
+- `MockSession` 和 IndexedDB 仍保留三类职责：本地 mock/fallback、旧数据兼容、以及图片/语音上传前的浏览器临时 Blob。它们不能再被描述为当前应用的业务真相来源。
+- 原 Phase A-D 的核心前端学习已经沉淀为云端接线边界：`AssetReference` 对应 `assets` / Storage object，Photos 评论对应 `photo_comments`，Room 命令通过 Server Action / RPC 事务化。
+- 本地创建草稿 `eventspace:create-room-draft:v1` 仍是 UI draft；创建成功后写入真实 Supabase room / invite，而不是写入本地 session。
+- `/rooms` 的 `sessionStorage` 视图偏好和最近卡片仍只是单标签 UI 状态，不进入 Supabase。
+- 后续本地侧优先级：继续保留上传前失败恢复、移动端 Blob 采集、旧 session 迁移和清站点数据后的可恢复错误提示；不再扩展本地-only 投票、Book 或自由 Board。

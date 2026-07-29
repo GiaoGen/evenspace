@@ -102,6 +102,16 @@ export function parseTrustedRequestOrigin(
   }
 }
 
+export function isLocalAuthOrigin(origin: string) {
+  try {
+    const parsed = new URL(origin);
+    return parsed.protocol === "http:" &&
+      (parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1");
+  } catch {
+    return false;
+  }
+}
+
 export function createAuthCallbackUrl(origin: string, destination: string) {
   const callbackUrl = new URL("/auth/callback", origin);
   callbackUrl.searchParams.set("next", destination);

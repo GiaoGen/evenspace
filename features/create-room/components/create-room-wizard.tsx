@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useReducer, useRef, useState, type FormEvent } from "react";
 import { createRoomAction } from "@/app/rooms/new/actions";
 import { Icon } from "@/components/ui/icon";
+import { useBrowserOrigin } from "@/core/web/use-browser-origin";
 import { clearCreateRoomDraft, loadCreateRoomDraft, saveCreateRoomDraft } from "../model/create-room-draft-storage";
 import { createRoomReducer, initialCreateRoomState, validateDraft } from "../model/create-room-machine";
 import { InvitationCard } from "./invitation-card";
@@ -18,6 +19,7 @@ export function CreateRoomWizard() {
   const [draftReady, setDraftReady] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submissionError, setSubmissionError] = useState("");
+  const origin = useBrowserOrigin();
   const submittingRef = useRef(false);
   const idempotencyKeyRef = useRef<string | null>(null);
   const inviteSecretsRef = useRef<{ token: string; code: string } | null>(null);
@@ -45,10 +47,12 @@ export function CreateRoomWizard() {
 
   if (state.status === "complete") {
     const endTime = new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit" }).format(new Date(state.room.endsAt));
+    const invitePath = `/join/${state.room.publicId}?token=${encodeURIComponent(state.room.inviteToken)}`;
+    const inviteUrl = origin ? `${origin}${invitePath}` : "";
     return <div className={styles.page}><WizardHeader title="Room ready" returnLabel="Return to rooms" /><main className={styles.complete}>
       <header><span><Icon name="check" /></span><div><small>Room created</small><h1>{state.room.name}</h1></div></header>
-      <InvitationCard name={state.room.name} draft={state.room.draft} endTime={endTime} inviteCode={state.room.inviteCode} />
-      <div className={styles.inviteActions}><button type="button" onClick={() => navigator.clipboard.writeText(`${window.location.origin}/join/${state.room.publicId}?token=${encodeURIComponent(state.room.inviteToken)}`)}><Icon name="share" />Copy invite link</button><Link href={`/rooms/${state.room.publicId}`}>View in your rooms <Icon name="arrow" /></Link></div>
+      <InvitationCard name={state.room.name} draft={state.room.draft} endTime={endTime} inviteCode={state.room.inviteCode} inviteUrl={inviteUrl} />
+      <div className={styles.inviteActions}><button type="button" onClick={() => navigator.clipboard.writeText(inviteUrl)} disabled={!inviteUrl}><Icon name="share" />Copy invite link</button><Link href={`/rooms/${state.room.publicId}`}>View in your rooms <Icon name="arrow" /></Link></div>
     </main></div>;
   }
 
