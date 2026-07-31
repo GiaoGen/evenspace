@@ -1,6 +1,8 @@
 "use client";
 
-import { useLayoutEffect, useRef, useState, type ChangeEvent } from "react";
+import { useCallback, useLayoutEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
+import Image from "next/image";
+import { useRouter } from "next/navigation";
 import { Icon } from "@/components/ui/icon";
 import type { ActorId, RoomPublicId } from "@/core/domain/ids";
 import type { ArtVariant, BoardComment, BoardItem, BoardPhoto, PersonSummary } from "@/core/domain/room";
@@ -8,11 +10,21 @@ import { createUuid } from "@/core/domain/uuid";
 import { LocalAssetImage } from "@/features/local-assets/components/local-asset-image";
 import { saveLocalAsset } from "@/features/local-assets/model/local-asset-repository";
 import { useMockSession } from "@/features/mock-session/components/mock-session-provider";
-import { compressImage, validateImageFile } from "./board/image-upload";
+import { blobToDataUrl, prepareImage, validateImageFile } from "./board/image-upload";
 import { PhotoDetailViewer } from "./board/photo-detail-viewer";
+import { useRoomPhotoCache } from "./board/use-photo-window-cache";
 import styles from "./photos-panel.module.css";
 
 const photoVariants: readonly ArtVariant[] = ["one", "two", "three", "four"];
+const PHOTO_PROCESS_CONCURRENCY = 2;
+
+type PendingPhoto = {
+  readonly id: string;
+  readonly file: File;
+  readonly previewUrl: string;
+  readonly state: "processing" | "uploading" | "failed";
+  readonly message?: string;
+};
 
 export function PhotosPanel({
   roomPublicId,
@@ -24,6 +36,7 @@ export function PhotosPanel({
   maxPhotos,
   canAdd,
   canModerate,
+  archived,
 }: {
   readonly roomPublicId: RoomPublicId;
   readonly items: readonly BoardItem[];
@@ -34,15 +47,34 @@ export function PhotosPanel({
   readonly maxPhotos: number;
   readonly canAdd: boolean;
   readonly canModerate: boolean;
+  readonly archived: boolean;
 }) {
   const { session, executeCommand } = useMockSession();
+  const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const panelRef = useRef<HTMLElement | null>(null);
+  const signedUrlRefreshPendingRef = useRef(false);
   const [detailPhotoId, setDetailPhotoId] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const photos = items.filter((item): item is BoardPhoto => item.kind === "photo");
+  const [pendingPhotos, setPendingPhotos] = useState<readonly PendingPhoto[]>([]);
+  const [syncingPhotoIds, setSyncingPhotoIds] = useState<ReadonlySet<string>>(() => new Set());
+  const photos = useMemo(() => items.filter((item): item is BoardPhoto => item.kind === "photo"), [items]);
   const detailPhoto = photos.find((photo) => photo.id === detailPhotoId) ?? null;
+  const refreshExpiredMediaUrls = useCallback(() => {
+    if (signedUrlRefreshPendingRef.current) return;
+    signedUrlRefreshPendingRef.current = true;
+    router.refresh();
+    window.setTimeout(() => { signedUrlRefreshPendingRef.current = false; }, 1_000);
+  }, [router]);
+  useRoomPhotoCache({
+    roomPublicId,
+    viewerCacheScope: viewerActorId,
+    photos,
+    selectedPhotoId: detailPhotoId,
+    archived,
+    onExpiredRemoteUrl: refreshExpiredMediaUrls,
+  });
   const commandBase = () => ({ roomPublicId, actorId: session.viewer.actorId, nowIso: new Date().toISOString() } as const);
 
   useLayoutEffect(() => {
@@ -55,6 +87,81 @@ export function PhotosPanel({
     return () => window.cancelAnimationFrame(frame);
   }, []);
 
+  function updatePendingPhoto(id: string, patch: Partial<PendingPhoto>) {
+    setPendingPhotos((current) => current.map((item) => item.id === id ? { ...item, ...patch } : item));
+  }
+
+  function removePendingPhoto(id: string) {
+    setPendingPhotos((current) => {
+      const target = current.find((item) => item.id === id);
+      if (target) URL.revokeObjectURL(target.previewUrl);
+      return current.filter((item) => item.id !== id);
+    });
+  }
+
+  async function processPhoto(pending: PendingPhoto, index: number) {
+    try {
+      const image = await prepareImage(pending.file);
+      const [asset, thumbnail, placeholderDataUrl] = await Promise.all([
+        saveLocalAsset(image.displayBlob, "image"),
+        saveLocalAsset(image.thumbnailBlob, "image"),
+        blobToDataUrl(image.placeholderBlob),
+      ]);
+      const item: BoardPhoto = {
+        id: `photo_${createUuid()}`,
+        kind: "photo",
+        ownerActorId: viewerActorId,
+        variant: photoVariants[(photoCount + index) % photoVariants.length],
+        asset: {
+          ...asset,
+          thumbnail: { id: thumbnail.id, mimeType: thumbnail.mimeType, byteSize: thumbnail.byteSize },
+          placeholderDataUrl,
+          width: image.displayWidth,
+          height: image.displayHeight,
+          revision: 1,
+        },
+        imageName: pending.file.name.slice(0, 120),
+        aspectRatio: image.aspectRatio,
+        note: null,
+        x: 0,
+        y: 0,
+        rotation: 0,
+        width: 24,
+      };
+      updatePendingPhoto(pending.id, { state: "uploading" });
+      const resultPromise = executeCommand({ type: "ADD_BOARD_ITEM", ...commandBase(), item });
+      removePendingPhoto(pending.id);
+      setSyncingPhotoIds((current) => new Set(current).add(item.id));
+      const result = await resultPromise;
+      setSyncingPhotoIds((current) => {
+        const next = new Set(current);
+        next.delete(item.id);
+        return next;
+      });
+      if (result.status === "error") {
+        const retryPreviewUrl = URL.createObjectURL(pending.file);
+        setPendingPhotos((current) => [...current, { ...pending, previewUrl: retryPreviewUrl, state: "failed", message: result.message }]);
+      }
+    } catch (caught) {
+      updatePendingPhoto(pending.id, {
+        state: "failed",
+        message: caught instanceof Error ? caught.message : "This photo could not be prepared.",
+      });
+    }
+  }
+
+  async function processPendingPhotos(pending: readonly PendingPhoto[], offset: number) {
+    let nextIndex = 0;
+    const worker = async () => {
+      while (nextIndex < pending.length) {
+        const index = nextIndex;
+        nextIndex += 1;
+        await processPhoto(pending[index], offset + index);
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(PHOTO_PROCESS_CONCURRENCY, pending.length) }, worker));
+  }
+
   async function uploadPhotos(event: ChangeEvent<HTMLInputElement>) {
     const selectedFiles = Array.from(event.target.files ?? []);
     event.target.value = "";
@@ -66,49 +173,30 @@ export function PhotosPanel({
       return;
     }
 
-    const files = selectedFiles.slice(0, availableSlots);
-    setUploading(true);
-    setError(selectedFiles.length > availableSlots ? `Only the first ${availableSlots} photos could be added.` : null);
-
-    let failed = 0;
-    let lastFailure: string | null = null;
-    for (const [index, file] of files.entries()) {
-      const validation = validateImageFile(file);
-      if (validation) {
-        failed += 1;
-        lastFailure = validation;
-        continue;
-      }
-      try {
-        const image = await compressImage(file);
-        const asset = await saveLocalAsset(image.blob, "image");
-        const item: BoardPhoto = {
-          id: `photo_${createUuid()}`,
-          kind: "photo",
-          ownerActorId: viewerActorId,
-          variant: photoVariants[(photoCount + index) % photoVariants.length],
-          asset,
-          imageName: file.name.slice(0, 120),
-          aspectRatio: image.aspectRatio,
-          note: null,
-          x: 0,
-          y: 0,
-          rotation: 0,
-          width: 24,
-        };
-        const result = await executeCommand({ type: "ADD_BOARD_ITEM", ...commandBase(), item });
-        if (result.status === "error") {
-          failed += 1;
-          lastFailure = result.message;
-        }
-      } catch (caught) {
-        failed += 1;
-        lastFailure = caught instanceof Error ? caught.message : null;
-      }
+    const validFiles = selectedFiles.slice(0, availableSlots).flatMap((file) => validateImageFile(file) ? [] : [file]);
+    const invalidCount = Math.min(selectedFiles.length, availableSlots) - validFiles.length;
+    const pending = validFiles.map((file) => ({
+      id: `pending_${createUuid()}`,
+      file,
+      previewUrl: URL.createObjectURL(file),
+      state: "processing" as const,
+    }));
+    if (!pending.length) {
+      setError("Choose JPEG, PNG, or WebP images under 12 MB.");
+      return;
     }
+    setUploading(true);
+    setPendingPhotos((current) => [...current, ...pending]);
+    setError(selectedFiles.length > availableSlots || invalidCount ? "Some photos were skipped. Choose JPEG, PNG, or WebP images under 12 MB." : null);
+    try { await processPendingPhotos(pending, photoCount); }
+    finally { setUploading(false); }
+  }
 
-    if (failed) setError(lastFailure ?? `${failed} ${failed === 1 ? "photo" : "photos"} could not be added. Use JPEG, PNG, WebP, or smaller originals.`);
-    setUploading(false);
+  function retryPendingPhoto(id: string) {
+    const pending = pendingPhotos.find((item) => item.id === id);
+    if (!pending || pending.state !== "failed") return;
+    updatePendingPhoto(id, { state: "processing", message: undefined });
+    void processPendingPhotos([pending], photoCount + photos.length);
   }
 
   async function removePhoto(itemId: string) {
@@ -136,8 +224,15 @@ export function PhotosPanel({
 
     <div className={styles.grid}>
       {photos.map((photo, index) => <button type="button" key={photo.id} className={styles.tile} onClick={() => setDetailPhotoId(photo.id)} aria-label={`Open ${photo.imageName ?? `photo ${index + 1}`}`}>
-        {photo.asset ? <LocalAssetImage asset={photo.asset} alt="" fill sizes="(max-width: 700px) 33vw, 300px" className={styles.image} /> : <span className={styles.placeholder}><Icon name="image" /></span>}
+        {photo.asset ? <LocalAssetImage asset={photo.asset} variant="thumbnail" alt="" fill sizes="(max-width: 700px) 33vw, 300px" className={styles.image} preferLocal cacheScope={viewerActorId} /> : <span className={styles.placeholder}><Icon name="image" /></span>}
+        {syncingPhotoIds.has(photo.id) ? <span className={styles.processingBadge}>Syncing</span> : null}
       </button>)}
+      {pendingPhotos.map((photo) => <div key={photo.id} className={`${styles.tile} ${styles.pendingTile}`} aria-live="polite">
+        <Image src={photo.previewUrl} alt="" fill sizes="(max-width: 700px) 33vw, 300px" className={styles.image} unoptimized />
+        <span className={styles.pendingShade} />
+        <span className={styles.processingBadge}>{photo.state === "processing" ? "Preparing" : photo.state === "uploading" ? "Uploading" : "Needs retry"}</span>
+        {photo.state === "failed" ? <button type="button" className={styles.retryButton} onClick={() => retryPendingPhoto(photo.id)}>{photo.message ?? "Retry"}</button> : null}
+      </div>)}
       {canAdd && photoCount < maxPhotos ? <button type="button" className={`${styles.tile} ${styles.addTile}`} disabled={uploading} onClick={() => fileInputRef.current?.click()} aria-label="Add photos"><Icon name={uploading ? "more" : "plus"} size={22} /></button> : null}
     </div><div className={styles.empty} hidden>
       <Icon name="image" size={25} />
@@ -152,6 +247,8 @@ export function PhotosPanel({
       comments={comments.filter((comment) => comment.photoId === detailPhoto.id).toSorted((left, right) => Number(right.kind === "caption") - Number(left.kind === "caption"))}
       members={members}
       canDelete={detailPhoto.ownerActorId === viewerActorId || canModerate}
+      preferLocalImage
+      cacheScope={viewerActorId}
       onClose={() => setDetailPhotoId(null)}
       onPhotoChange={setDetailPhotoId}
       onComment={(body) => {

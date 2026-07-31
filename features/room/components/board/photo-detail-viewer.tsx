@@ -14,12 +14,14 @@ function formatCommentTime(value: string) {
   return new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit" }).format(new Date(value));
 }
 
-export function PhotoDetailViewer({ photo, photos, comments, members, canDelete, onClose, onPhotoChange, onComment, onDelete }: {
+export function PhotoDetailViewer({ photo, photos, comments, members, canDelete, preferLocalImage = false, cacheScope, onClose, onPhotoChange, onComment, onDelete }: {
   readonly photo: BoardPhoto;
   readonly photos: readonly BoardPhoto[];
   readonly comments: readonly BoardComment[];
   readonly members: readonly PersonSummary[];
   readonly canDelete: boolean;
+  readonly preferLocalImage?: boolean;
+  readonly cacheScope?: string;
   readonly onClose: () => void;
   readonly onPhotoChange: (photoId: string) => void;
   readonly onComment: (body: string) => void;
@@ -76,7 +78,7 @@ export function PhotoDetailViewer({ photo, photos, comments, members, canDelete,
           <button type="button" className={`${styles.photoDetailArrow} ${styles.photoDetailPrevious}`} disabled={!previousPhoto} onClick={() => navigate(-1)} aria-label="Previous photo"><Icon name="chevron" /></button>
           <div key={photo.id} className={motionDirection === -1 ? styles.photoEnterFromLeft : motionDirection === 1 ? styles.photoEnterFromRight : undefined} style={photoStyle}>
             <div className={styles.photoDetailCanvas}>
-              {photo.asset ? <LocalAssetImage asset={photo.asset} alt={photo.imageName ? `Photo: ${photo.imageName}` : "Room photo"} fill sizes="(max-width: 700px) 100vw, 620px" className={styles.photoDetailObject} /> : <PinnedPhoto variant={photo.variant} note={null} bare className={styles.photoDetailImage} />}
+              {photo.asset ? <LocalAssetImage asset={photo.asset} alt={photo.imageName ? `Photo: ${photo.imageName}` : "Room photo"} fill sizes="(max-width: 700px) 100vw, 620px" className={styles.photoDetailObject} preferLocal={preferLocalImage} cacheScope={cacheScope} /> : <PinnedPhoto variant={photo.variant} note={null} bare className={styles.photoDetailImage} />}
             </div>
           </div>
           <button type="button" className={`${styles.photoDetailArrow} ${styles.photoDetailNext}`} disabled={!nextPhoto} onClick={() => navigate(1)} aria-label="Next photo"><Icon name="chevron" /></button>

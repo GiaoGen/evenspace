@@ -19,7 +19,7 @@ export async function generateMetadata({ params }: RoomRouteProps): Promise<Meta
 export default async function RoomRoute({ params }: RoomRouteProps) {
   const value = (await params).roomId;
   const publicId = parseRoomPublicId(value);
-  const payload = publicId ? await getBackendRoomSession(publicId) : null;
+  const payload = publicId ? await getBackendRoomSession(publicId, { deferSecondary: true }) : null;
 
   return <BackendRoomRoute payload={payload} />;
 }

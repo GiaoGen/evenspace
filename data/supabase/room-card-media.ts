@@ -5,10 +5,44 @@ import { parseActorId } from "@/core/domain/ids";
 import type { BoardItem, BoardPhoto } from "@/core/domain/room";
 import type { RoomReadPage } from "@/data/contracts/room-read-repository";
 import { createSupabaseServerClient } from "@/data/supabase/server-client";
+import { createSignedMediaUrls } from "@/data/supabase/signed-media-urls";
 
 export interface RoomCardMedia {
   readonly photoCount: number;
   readonly boardItems: readonly BoardItem[];
+}
+
+interface RoomCardMediaRow {
+  readonly photo_id: string;
+  readonly room_id: string;
+  readonly asset_id: string;
+  readonly owner_actor_id: string;
+  readonly original_name: string;
+  readonly aspect_ratio: number;
+  readonly note: string | null;
+  readonly photo_count: number;
+  readonly kind: string;
+  readonly status: string;
+  readonly object_key: string;
+  readonly mime_type: string;
+  readonly byte_size: number;
+  readonly thumbnail_object_key: string | null;
+  readonly thumbnail_byte_size: number | null;
+  readonly placeholder_data_url: string | null;
+  readonly image_width: number | null;
+  readonly image_height: number | null;
+  readonly media_revision: number;
+}
+
+function roomMediaRpc<T>(
+  client: Awaited<ReturnType<typeof createSupabaseServerClient>>,
+  name: string,
+  args: Record<string, unknown>,
+) {
+  return (client.rpc as unknown as (
+    rpcName: string,
+    rpcArgs: Record<string, unknown>,
+  ) => Promise<{ data: T | null; error: { message: string } | null }>)(name, args);
 }
 
 /**
@@ -23,52 +57,50 @@ export async function getRoomCardMedia(
   if (roomIds.length === 0) return new Map();
 
   const supabase = await createSupabaseServerClient();
-  const { data: photoRows, error: photosError } = await supabase
-    .from("photos")
-    .select("id,room_id,asset_id,owner_actor_id,original_name,aspect_ratio,note,created_at")
-    .in("room_id", roomIds)
-    .order("created_at", { ascending: false });
-  if (photosError) throw new Error("Room card photos unavailable");
-
-  const photos = photoRows ?? [];
-  const assetIds = [...new Set(photos.map((photo) => photo.asset_id))];
-  const { data: assetRows, error: assetsError } = assetIds.length === 0
-    ? { data: [], error: null }
-    : await supabase.from("assets")
-      .select("id,kind,status,object_key,mime_type,byte_size")
-      .in("id", assetIds);
-  if (assetsError) throw new Error("Room card media unavailable");
-
-  const readyAssets = (assetRows ?? []).filter((asset) =>
-    asset.kind === "image" && asset.status === "ready" && asset.object_key
-      && asset.mime_type && asset.byte_size !== null,
-  );
-  const signedUrls = new Map<string, string>();
-  await Promise.all(readyAssets.map(async (asset) => {
-    const { data } = await supabase.storage
-      .from("room-media")
-      .createSignedUrl(asset.object_key!, 60 * 30);
-    if (data?.signedUrl) signedUrls.set(asset.id, data.signedUrl);
-  }));
-  const assetsById = new Map(readyAssets.map((asset) => [asset.id, asset]));
+  const { data, error } = await roomMediaRpc<readonly RoomCardMediaRow[]>(supabase, "list_room_card_media", {
+    requested_room_ids: roomIds,
+  });
+  if (error) throw new Error("Room card media unavailable");
+  const rows = data ?? [];
+  // Room cards only ever render thumbnails. For modern media, avoid also
+  // signing the display original; legacy rows without a thumbnail retain the
+  // display URL as their safe fallback.
+  const signedUrls = await createSignedMediaUrls(supabase, rows.map((row) => ({
+    id: row.asset_id,
+    object_key: row.thumbnail_object_key ? null : row.object_key,
+    thumbnail_object_key: row.thumbnail_object_key,
+  })));
 
   const media = new Map<string, RoomCardMedia>();
   for (const roomId of roomIds) {
-    const roomPhotos = photos.filter((photo) => photo.room_id === roomId);
-    const boardItems: BoardPhoto[] = roomPhotos.slice(0, 5).flatMap((photo, index) => {
+    const roomPhotos = rows.filter((photo) => photo.room_id === roomId);
+    const boardItems: BoardPhoto[] = roomPhotos.flatMap((photo, index) => {
       const ownerActorId = parseActorId(photo.owner_actor_id);
-      const asset = assetsById.get(photo.asset_id);
-      const remoteUrl = signedUrls.get(photo.asset_id);
-      if (!ownerActorId || !asset || !remoteUrl) return [];
+      const thumbnailUrl = photo.thumbnail_object_key
+        ? signedUrls.thumbnail.get(photo.asset_id)
+        : signedUrls.display.get(photo.asset_id);
+      if (!ownerActorId || !thumbnailUrl) return [];
       const assetReference: AssetReference = {
-        id: asset.id,
+        id: photo.asset_id,
         kind: "image",
-        mimeType: asset.mime_type!,
-        byteSize: asset.byte_size!,
-        remoteUrl,
+        mimeType: photo.mime_type,
+        byteSize: photo.byte_size,
+        ...(photo.thumbnail_object_key ? {} : { remoteUrl: thumbnailUrl }),
+        ...(photo.thumbnail_object_key && photo.thumbnail_byte_size !== null
+          ? {
+            thumbnail: {
+              id: photo.asset_id,
+              mimeType: "image/jpeg",
+              byteSize: photo.thumbnail_byte_size,
+              remoteUrl: thumbnailUrl,
+            },
+          }
+          : {}),
+        ...(photo.placeholder_data_url ? { placeholderDataUrl: photo.placeholder_data_url } : {}),
+        ...(photo.image_width && photo.image_height ? { width: photo.image_width, height: photo.image_height, revision: photo.media_revision } : {}),
       };
       return [{
-        id: photo.id,
+        id: photo.photo_id,
         kind: "photo" as const,
         ownerActorId,
         variant: (["one", "two", "three", "four"] as const)[index % 4],
@@ -82,7 +114,7 @@ export async function getRoomCardMedia(
         width: 24,
       }];
     });
-    media.set(roomId, { photoCount: roomPhotos.length, boardItems });
+    media.set(roomId, { photoCount: roomPhotos[0]?.photo_count ?? 0, boardItems });
   }
   return media;
 }

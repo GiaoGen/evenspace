@@ -53,36 +53,54 @@ export type Database = {
           created_at: string
           duration_ms: number | null
           id: string
+          image_height: number | null
+          image_width: number | null
           kind: string
+          media_revision: number
           mime_type: string | null
           object_key: string | null
           owner_actor_id: string
+          placeholder_data_url: string | null
           ready_at: string | null
           status: string
+          thumbnail_byte_size: number | null
+          thumbnail_object_key: string | null
         }
         Insert: {
           byte_size?: number | null
           created_at?: string
           duration_ms?: number | null
           id?: string
+          image_height?: number | null
+          image_width?: number | null
           kind: string
+          media_revision?: number
           mime_type?: string | null
           object_key?: string | null
           owner_actor_id: string
+          placeholder_data_url?: string | null
           ready_at?: string | null
           status?: string
+          thumbnail_byte_size?: number | null
+          thumbnail_object_key?: string | null
         }
         Update: {
           byte_size?: number | null
           created_at?: string
           duration_ms?: number | null
           id?: string
+          image_height?: number | null
+          image_width?: number | null
           kind?: string
+          media_revision?: number
           mime_type?: string | null
           object_key?: string | null
           owner_actor_id?: string
+          placeholder_data_url?: string | null
           ready_at?: string | null
           status?: string
+          thumbnail_byte_size?: number | null
+          thumbnail_object_key?: string | null
         }
         Relationships: [
           {

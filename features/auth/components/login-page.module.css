@@ -160,13 +160,6 @@
 }
 .primaryButton { width: 100%; margin-top: 32px; }
 .confirmation form { margin-top: 12px; }
-.confirmation .textButton {
-  min-height: 38px;
-  justify-content: center;
-  background: transparent;
-  color: var(--muted);
-  text-decoration: underline;
-}
 
 .notice {
   margin: 13px 3px 0;

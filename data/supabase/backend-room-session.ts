@@ -7,7 +7,9 @@ import type { AssetReference } from "@/core/domain/asset";
 import type { BoardComment, BoardPhoto, ChatMessage, ItineraryItem, PersonSummary, RoomCapabilities } from "@/core/domain/room";
 import type { MembershipState } from "@/core/domain/room";
 import { SupabaseRoomReadRepository } from "@/data/supabase/supabase-room-read-repository";
+import { getMediaAssetRows } from "@/data/supabase/media-variant-compat";
 import { createSupabaseServerClient } from "@/data/supabase/server-client";
+import { createSignedMediaUrls } from "@/data/supabase/signed-media-urls";
 import {
   MOCK_SESSION_VERSION,
   type MockJoinRequest,
@@ -20,6 +22,13 @@ export interface BackendRoomSession {
   readonly room: MockRoom;
   readonly capabilities: RoomCapabilities;
   readonly realtimeTopic: `room:${string}:events`;
+}
+
+export interface BackendRoomSessionOptions {
+  /** Lets the first room paint prioritize the default photo experience. */
+  readonly deferSecondary?: boolean;
+  /** Lets live secondary updates avoid querying and re-signing unchanged photos. */
+  readonly deferPhotos?: boolean;
 }
 
 function initialsFor(value: string, variant: string = "initials") {
@@ -36,53 +45,74 @@ function actorId(value: string): ActorId {
 
 export async function getBackendRoomSession(
   publicId: Parameters<SupabaseRoomReadRepository["findCurrentViewerRoom"]>[0],
+  options: BackendRoomSessionOptions = {},
 ): Promise<BackendRoomSession | null> {
-  const repository = new SupabaseRoomReadRepository();
+  const supabase = await createSupabaseServerClient();
+  const repository = new SupabaseRoomReadRepository(supabase);
   const roomRead = await repository.findCurrentViewerRoom(publicId);
   if (!roomRead) return null;
+  const deferSecondary = options.deferSecondary === true;
+  const deferPhotos = options.deferPhotos === true;
 
-  const supabase = await createSupabaseServerClient();
   const [
     membersResult,
     messagesResult,
-    reactionsResult,
     pinResult,
     itinerariesResult,
     photosResult,
     photoCommentsResult,
-    assetsResult,
     pendingRequestsResult,
-    claimsResult,
   ] = await Promise.all([
     supabase.from("room_members").select("actor_id,nickname,role,state,archive_eligible,avatar_variant,avatar_asset_id").eq("room_id", roomRead.id),
-    supabase.from("messages").select("id,author_actor_id,kind,body,asset_id,reply_to_message_id,created_at,recalled_at,moderated_at").eq("room_id", roomRead.id).order("created_at", { ascending: true }).limit(500),
-    supabase.from("message_reactions").select("message_id,actor_id,emoji"),
-    supabase.from("message_pins").select("message_id").eq("room_id", roomRead.id).maybeSingle(),
-    supabase.from("itineraries").select("id,title,description,starts_at,end_mode,planned_ends_at,ended_at,location_label,responsible_actor_id,created_by_actor_id,created_at,updated_at,revision").eq("room_id", roomRead.id).order("starts_at", { ascending: true }),
-    supabase.from("photos").select("id,asset_id,owner_actor_id,original_name,aspect_ratio,note,created_at").eq("room_id", roomRead.id).order("created_at", { ascending: true }),
-    supabase.from("photo_comments").select("id,photo_id,actor_id,body,created_at").eq("room_id", roomRead.id).order("created_at", { ascending: true }),
-    supabase.from("assets").select("id,kind,status,object_key,mime_type,byte_size,duration_ms"),
-    roomRead.viewer.role === "host"
+    deferSecondary
+      ? Promise.resolve({ data: [], error: null })
+      : supabase.from("messages").select("id,author_actor_id,kind,body,asset_id,reply_to_message_id,created_at,recalled_at,moderated_at").eq("room_id", roomRead.id).order("created_at", { ascending: true }).limit(500),
+    deferSecondary
+      ? Promise.resolve({ data: null, error: null })
+      : supabase.from("message_pins").select("message_id").eq("room_id", roomRead.id).maybeSingle(),
+    deferSecondary
+      ? Promise.resolve({ data: [], error: null })
+      : supabase.from("itineraries").select("id,title,description,starts_at,end_mode,planned_ends_at,ended_at,location_label,responsible_actor_id,created_by_actor_id,created_at,updated_at,revision").eq("room_id", roomRead.id).order("starts_at", { ascending: true }),
+    deferPhotos
+      ? Promise.resolve({ data: [], error: null })
+      : supabase.from("photos").select("id,asset_id,owner_actor_id,original_name,aspect_ratio,note,created_at").eq("room_id", roomRead.id).order("created_at", { ascending: true }),
+    deferSecondary
+      ? Promise.resolve({ data: [], error: null })
+      : supabase.from("photo_comments").select("id,photo_id,actor_id,body,created_at").eq("room_id", roomRead.id).order("created_at", { ascending: true }),
+    !deferSecondary && roomRead.viewer.role === "host"
       ? supabase.rpc("list_pending_join_requests_with_avatar", { requested_room_public_id: publicId })
       : Promise.resolve({ data: [], error: null }),
-    supabase.auth.getClaims(),
   ]);
 
   const firstError = [
     membersResult.error,
     messagesResult.error,
-    reactionsResult.error,
     pinResult.error,
     itinerariesResult.error,
     photosResult.error,
     photoCommentsResult.error,
-    assetsResult.error,
     pendingRequestsResult.error,
-    claimsResult.error,
   ].find(Boolean);
   if (firstError) throw new Error("Backend room snapshot unavailable");
 
   const memberRows = membersResult.data ?? [];
+  const messageRows = messagesResult.data ?? [];
+  const photoRows = photosResult.data ?? [];
+  const pendingRequestRows = pendingRequestsResult.data ?? [];
+  const assetIds = [...new Set([
+    ...memberRows.flatMap((member) => member.avatar_asset_id ? [member.avatar_asset_id] : []),
+    ...messageRows.flatMap((message) => message.asset_id ? [message.asset_id] : []),
+    ...photoRows.map((photo) => photo.asset_id),
+    ...pendingRequestRows.flatMap((request) => request.avatar_asset_id ? [request.avatar_asset_id] : []),
+  ])];
+  const messageIds = messageRows.map((message) => message.id);
+  const [assetsResult, reactionsResult] = await Promise.all([
+    assetIds.length ? getMediaAssetRows(supabase, assetIds) : Promise.resolve({ data: [], error: null }),
+    !deferSecondary && messageIds.length
+      ? supabase.from("message_reactions").select("message_id,actor_id,emoji").in("message_id", messageIds)
+      : Promise.resolve({ data: [], error: null }),
+  ]);
+  if (assetsResult.error || reactionsResult.error) throw new Error("Backend room snapshot unavailable");
   const viewerActorId = actorId(roomRead.viewer.actorId);
   let members: PersonSummary[] = memberRows.map((member) => ({
     actorId: actorId(member.actor_id),
@@ -100,19 +130,16 @@ export async function getBackendRoomSession(
       isGuest: false,
     });
   }
-  const assetUrls = new Map<string, string>();
-  await Promise.all((assetsResult.data ?? [])
-    .filter((asset) => asset.status === "ready" && asset.object_key)
-    .map(async (asset) => {
-      const { data } = await supabase.storage.from("room-media").createSignedUrl(asset.object_key!, 60 * 30);
-      if (data?.signedUrl) assetUrls.set(asset.id, data.signedUrl);
-    }));
+  const signedUrls = await createSignedMediaUrls(
+    supabase,
+    (assetsResult.data ?? []).filter((asset) => asset.status === "ready" && asset.object_key),
+  );
   members = members.map((member) => {
     const row = memberRows.find((item) => item.actor_id === member.actorId);
     return {
       ...member,
       avatarUrl: row?.avatar_asset_id
-        ? assetUrls.get(row.avatar_asset_id) ?? null
+        ? signedUrls.display.get(row.avatar_asset_id) ?? null
         : null,
     };
   });
@@ -122,7 +149,7 @@ export async function getBackendRoomSession(
     if (!id) return null;
     const asset = assetsById.get(id);
     if (!asset || asset.status !== "ready" || !asset.mime_type || asset.byte_size === null) return null;
-    const remoteUrl = assetUrls.get(id);
+    const remoteUrl = signedUrls.display.get(id);
     if (!remoteUrl) return null;
     return {
       id: asset.id,
@@ -130,6 +157,22 @@ export async function getBackendRoomSession(
       mimeType: asset.mime_type,
       byteSize: asset.byte_size,
       remoteUrl,
+      ...(asset.kind === "image" && asset.thumbnail_object_key && asset.thumbnail_byte_size !== null
+        ? {
+          thumbnail: {
+            id: asset.id,
+            mimeType: "image/jpeg",
+            byteSize: asset.thumbnail_byte_size,
+            remoteUrl: signedUrls.thumbnail.get(id) ?? remoteUrl,
+          },
+        }
+        : {}),
+      ...(asset.kind === "image" && asset.placeholder_data_url
+        ? { placeholderDataUrl: asset.placeholder_data_url }
+        : {}),
+      ...(asset.kind === "image" && asset.image_width && asset.image_height
+        ? { width: asset.image_width, height: asset.image_height, revision: asset.media_revision }
+        : {}),
     };
   };
 
@@ -140,7 +183,7 @@ export async function getBackendRoomSession(
     reactionCounts.set(reaction.message_id, byEmoji);
   }
 
-  const messages: ChatMessage[] = (messagesResult.data ?? [])
+  const messages: ChatMessage[] = messageRows
     .filter((message) => !message.recalled_at && !message.moderated_at)
     .map((message) => {
       const authorActorId = actorId(message.author_actor_id);
@@ -166,7 +209,7 @@ export async function getBackendRoomSession(
       };
     });
 
-  const photos: BoardPhoto[] = (photosResult.data ?? []).flatMap((photo, index) => {
+  const photos: BoardPhoto[] = photoRows.flatMap((photo, index) => {
     const asset = assetReference(photo.asset_id);
     if (!asset) return [];
     return [{
@@ -220,13 +263,13 @@ export async function getBackendRoomSession(
     };
   });
 
-  const joinRequests: MockJoinRequest[] = (pendingRequestsResult.data ?? []).map((request) => ({
+  const joinRequests: MockJoinRequest[] = pendingRequestRows.map((request) => ({
     id: request.request_id,
     actorId: actorId(request.actor_id),
     displayName: request.nickname,
     initials: initialsFor(request.nickname, request.avatar_variant),
     avatarUrl: request.avatar_asset_id
-      ? assetUrls.get(request.avatar_asset_id) ?? null
+      ? signedUrls.display.get(request.avatar_asset_id) ?? null
       : null,
     note: request.note,
     requestedAt: request.requested_at,
@@ -300,8 +343,6 @@ export async function getBackendRoomSession(
     canChangeDuration: false,
     canEndRoom: writable && host,
   };
-  const claims = claimsResult.data?.claims;
-  const email = typeof claims?.email === "string" ? claims.email : null;
   const session: MockSession = {
     version: MOCK_SESSION_VERSION,
     sessionId: `supabase:${roomRead.id}`,
@@ -310,8 +351,8 @@ export async function getBackendRoomSession(
       displayName: roomRead.viewer.nickname,
       initials: membersByActor.get(viewerActorId)?.initials ?? initialsFor(roomRead.viewer.nickname),
       avatarUrl: membersByActor.get(viewerActorId)?.avatarUrl ?? null,
-      email,
-      authState: claims?.is_anonymous ? "guest" : "signed-in",
+      email: null,
+      authState: "signed-in",
       theme: "system",
     },
     rooms: [room],

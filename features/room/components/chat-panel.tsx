@@ -1,47 +1,35 @@
 "use client";
 
 import NextImage from "next/image";
-import { useEffect, useMemo, useRef, useState, type CSSProperties, type FormEvent, type PointerEvent, type UIEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent, type PointerEvent, type UIEvent } from "react";
 import { createPortal } from "react-dom";
 import { Icon, type IconName } from "@/components/ui/icon";
 import type { ActorId, RoomPublicId } from "@/core/domain/ids";
-import type { ChatMessage, ItineraryItem, PersonSummary } from "@/core/domain/room";
+import type { ChatMessage, PersonSummary } from "@/core/domain/room";
 import { createUuid } from "@/core/domain/uuid";
 import { useMockSession } from "@/features/mock-session/components/mock-session-provider";
-import type { MockPoll } from "@/features/mock-session/model/mock-session";
 import { useLocalAssetUrl } from "@/features/local-assets/components/use-local-asset-url";
 import { getLocalAssetBlob, saveLocalAsset } from "@/features/local-assets/model/local-asset-repository";
 import { ChatMessageItem } from "./chat-message";
-import { usePollClock } from "../model/use-poll-clock";
-import { useInlinePollVisibility } from "../model/use-inline-poll-visibility";
-import roomStyles from "./room-experience.module.css";
 import styles from "./chat-panel.module.css";
 
 interface ChatPanelProps {
   readonly roomPublicId: RoomPublicId;
   readonly messages: readonly ChatMessage[];
-  readonly poll: MockPoll | null;
   readonly pinnedMessageId: string | null;
   readonly members: readonly PersonSummary[];
   readonly viewerActorId: ActorId;
   readonly timeZone: string;
   readonly canChat: boolean;
-  readonly canVote: boolean;
   readonly canModerate: boolean;
   readonly archived: boolean;
 }
 
-type PollKind = "yes-no" | "options" | "itinerary";
 type ToolId = "search";
 type Tool = { readonly id: ToolId; readonly label: string; readonly icon: IconName };
 
 const LONG_PRESS_MS = 380;
 const MAX_VOICE_BYTES = 900_000;
-const pollKinds: readonly { readonly kind: PollKind; readonly label: string; readonly summary: string }[] = [
-  { kind: "yes-no", label: "Yes / No", summary: "A fast binary vote for simple decisions." },
-  { kind: "options", label: "Options", summary: "Let the room choose between up to five answers." },
-  { kind: "itinerary", label: "Itinerary", summary: "Approve a plan and add it to the schedule." },
-];
 const chatTools: readonly Tool[] = [
   { id: "search", label: "Search", icon: "search" },
 ];
@@ -54,7 +42,7 @@ function preferredAudioMimeType() {
   return ["audio/webm;codecs=opus", "audio/mp4", "audio/webm"].find((type) => MediaRecorder.isTypeSupported(type)) ?? "";
 }
 
-export function ChatPanel({ roomPublicId, messages, poll, pinnedMessageId, members, viewerActorId, timeZone, canChat, canVote, canModerate, archived }: ChatPanelProps) {
+export function ChatPanel({ roomPublicId, messages, pinnedMessageId, members, viewerActorId, timeZone, canChat, canModerate, archived }: ChatPanelProps) {
   const { session, dispatch } = useMockSession();
   const [draft, setDraft] = useState("");
   const [query, setQuery] = useState("");
@@ -69,18 +57,6 @@ export function ChatPanel({ roomPublicId, messages, poll, pinnedMessageId, membe
   const [recording, setRecording] = useState(false);
   const [recordingCanceled, setRecordingCanceled] = useState(false);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
-  const [pollOpen, setPollOpen] = useState(false);
-  const [voteArchiveOpen, setVoteArchiveOpen] = useState(false);
-  const [pollKind, setPollKind] = useState<PollKind>("yes-no");
-  const [pollQuestion, setPollQuestion] = useState("");
-  const [pollOptions, setPollOptions] = useState(["", ""]);
-  const [itineraryTitle, setItineraryTitle] = useState("");
-  const [itineraryStartsAt, setItineraryStartsAt] = useState("");
-  const [itineraryLocation, setItineraryLocation] = useState("");
-  const [itineraryDuration, setItineraryDuration] = useState("60");
-  const [pollResponsibleId, setPollResponsibleId] = useState("");
-  const [pollOpenMinutes, setPollOpenMinutes] = useState("30");
-  const [anonymousPoll, setAnonymousPoll] = useState(false);
 
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
@@ -97,17 +73,12 @@ export function ChatPanel({ roomPublicId, messages, poll, pinnedMessageId, membe
   const recordingChunksRef = useRef<Blob[]>([]);
   const recordingCanceledRef = useRef(false);
 
-  const pollNow = usePollClock(poll);
   const viewer = useMemo(() => members.find((member) => member.actorId === viewerActorId) ?? null, [members, viewerActorId]);
-  const pollResponsible = useMemo(() => members.find((member) => member.actorId === pollResponsibleId) ?? viewer, [members, pollResponsibleId, viewer]);
   const pinned = messages.find((message) => message.id === pinnedMessageId);
   const selectedMessage = messages.find((message) => message.id === selectedMessageId) ?? null;
   const viewerImage = messages.find((message) => message.id === imageViewerId && message.content?.type === "image") ?? null;
   const viewerImageUrl = useLocalAssetUrl(viewerImage?.content?.type === "image" ? viewerImage.content.asset : null);
   const visibleMessages = useMemo(() => query.trim() ? messages.filter((message) => `${messageLabel(message)} ${message.author?.displayName ?? ""}`.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase())) : messages, [messages, query]);
-  const room = useMemo(() => session.rooms.find((item) => item.publicId === roomPublicId) ?? null, [roomPublicId, session.rooms]);
-  const voteCards = useMemo(() => [], []);
-  const { showInlinePoll, markVoteSubmitted } = useInlinePollVisibility(poll, session.viewer.actorId);
 
   const scrollToLatest = (smooth = true) => {
     const scroll = scrollRef.current;
@@ -336,89 +307,18 @@ export function ChatPanel({ roomPublicId, messages, poll, pinnedMessageId, membe
     if (recorder?.state === "recording") recorder.stop();
   }
 
-  function createPoll(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const currentRoom = session.rooms.find((item) => item.publicId === roomPublicId);
-    if (!currentRoom || !viewer) return;
-    const activeMembers = currentRoom.members.filter((member) => !["removed", "banned"].includes(currentRoom.membershipStates[member.actorId] ?? "active")).length;
-    const minutes = Math.min(Math.max(Math.round(Number(pollOpenMinutes)), 1), 240);
-    const openMs = minutes * 60_000;
-    const closesAt = new Date(Math.min(Date.now() + openMs, Date.parse(currentRoom.endsAt ?? new Date(Date.now() + openMs).toISOString()))).toISOString();
-    const optionLabels = pollOptions.map((option) => option.trim()).filter(Boolean).slice(0, 5);
-    const startsAt = Date.parse(itineraryStartsAt);
-    const durationMinutes = Math.min(Math.max(Math.round(Number(itineraryDuration) / 5) * 5, 5), 720);
-    const endsAt = startsAt + durationMinutes * 60_000;
-    const itineraryItem: ItineraryItem | null = pollKind === "itinerary" && itineraryTitle.trim() && Number.isFinite(startsAt) && pollResponsible
-      ? { id: `itinerary_${createUuid()}`, title: itineraryTitle.trim().slice(0, 80), description: "Created from a chat vote.", startsAt: new Date(startsAt).toISOString(), endMode: "scheduled", endsAt: new Date(endsAt).toISOString(), endedAt: null, locationLabel: itineraryLocation.trim() || null, mapsUrl: null, responsible: pollResponsible, createdByActorId: viewer.actorId, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }
-      : null;
-    if (pollKind === "yes-no" && !pollQuestion.trim() || pollKind === "options" && (!pollQuestion.trim() || optionLabels.length < 2) || pollKind === "itinerary" && !itineraryItem) return;
-    const newPoll: MockPoll = {
-      id: `poll_${createUuid()}`,
-      question: pollKind === "itinerary" ? `Add “${itineraryItem!.title}” to the itinerary?` : pollQuestion.trim().slice(0, 160),
-      closesAt,
-      memberSnapshot: activeMembers,
-      requiredVotes: Math.floor(activeMembers / 2) + 1,
-      visibility: anonymousPoll ? "anonymous" : "public",
-      choices: pollKind === "options" ? optionLabels.map((label, index) => ({ id: `option_${index + 1}`, label: label.slice(0, 120), votes: 0 })) : [{ id: "yes", label: pollKind === "itinerary" ? "Add this plan" : "Yes", votes: 0 }, { id: "no", label: pollKind === "itinerary" ? "Not this time" : "No", votes: 0 }],
-      voterActorIds: [], resolvedChoiceId: null, ...(itineraryItem ? { proposal: { kind: "itinerary" as const, item: itineraryItem } } : {}),
-    };
-    dispatch({ type: "COMMAND", command: { type: "CREATE_POLL", ...commandBase(), poll: newPoll } });
-    setPollQuestion(""); setPollOptions(["", ""]); setItineraryTitle(""); setItineraryStartsAt(""); setItineraryLocation(""); setItineraryDuration("60"); setPollOpen(false);
-  }
-
-  function pollReady(kind: PollKind) {
-    if (pollKind !== kind) return false;
-    if (kind === "yes-no") return Boolean(pollQuestion.trim());
-    if (kind === "options") return Boolean(pollQuestion.trim()) && pollOptions.filter((option) => option.trim()).length >= 2;
-    return Boolean(itineraryTitle.trim()) && Boolean(itineraryStartsAt) && Number(itineraryDuration) >= 5;
-  }
-
-  function pollChoicePercent(targetPoll: MockPoll, votes: number) {
-    const total = targetPoll.choices.reduce((sum, choice) => sum + choice.votes, 0);
-    return total > 0 ? Math.round(votes / total * 100) : 0;
-  }
-
-  function castVote(targetPoll: MockPoll, choiceId: string) {
-    markVoteSubmitted(targetPoll.id);
-    dispatch({ type: "COMMAND", command: { type: "CAST_VOTE", ...commandBase(), choiceId } });
-  }
-
-  function renderVoteCard(targetPoll: MockPoll) {
-    const active = poll?.id === targetPoll.id;
-    const closed = Date.parse(targetPoll.closesAt) <= pollNow;
-    const voted = targetPoll.voterActorIds.includes(session.viewer.actorId);
-    const canCastVote = canVote && active && !voted && !targetPoll.resolvedChoiceId && !closed;
-    const state = targetPoll.resolvedChoiceId ? "Resolved" : closed ? "Closed" : "Open";
-    return <article key={targetPoll.id} className={roomStyles.poll}><header><span>{targetPoll.visibility === "anonymous" ? "Anonymous vote" : "Public vote"}</span><time>{state}</time></header><h2>{targetPoll.question}</h2>{targetPoll.choices.map((choice) => {
-      const percent = pollChoicePercent(targetPoll, choice.votes);
-      const showResults = voted || Boolean(targetPoll.resolvedChoiceId) || closed;
-      return <button key={choice.id} className={targetPoll.resolvedChoiceId === choice.id ? roomStyles.pollSelected : ""} style={{ "--poll-progress": `${showResults ? percent : 0}%` } as CSSProperties} disabled={!canCastVote} onClick={() => castVote(targetPoll, choice.id)}><span><em>{choice.label}</em>{showResults ? <strong>{percent}%</strong> : null}</span><b>{choice.votes}</b></button>;
-    })}<p>{targetPoll.memberSnapshot} members · {targetPoll.requiredVotes} votes needed{voted ? " · Your vote is counted" : ""}</p></article>;
-  }
-
   function openSearch() { setSearching(true); setToolTrayOpen(false); }
   function toolDisabled() {
     return false;
   }
-  function activateTool(id: ToolId) {
+  function activateTool() {
     openSearch();
   }
 
   return <div className={styles.chatPanel}>
     {searching ? <div className={styles.roomSearch}><Icon name="search" size={15} /><input autoFocus value={query} onChange={(event) => setQuery(event.target.value.slice(0, 80))} placeholder="Search this room" /><button type="button" onClick={() => { setQuery(""); setSearching(false); }} aria-label="Close search"><Icon name="close" size={15} /></button></div> : null}
 
-    {false ? <form className="" onSubmit={createPoll} noValidate>
-      <div className={roomStyles.pollTypeRail} aria-label="Poll type">
-        {pollKinds.map((item) => <section key={item.kind} className={`${roomStyles.pollTypeCard} ${pollKind === item.kind ? roomStyles.pollTypeSelected : ""}`} onClick={() => setPollKind(item.kind)}>
-          <header><span>{item.label}</span><button type="button" aria-label="Close poll composer" onClick={(event) => { event.stopPropagation(); setPollOpen(false); }}><Icon name="close" size={15} /></button></header>
-          <div className={roomStyles.pollCardHero}><Icon name={item.kind === "itinerary" ? "calendar" : item.kind === "options" ? "list" : "check"} /><h2>{item.kind === "yes-no" ? "A clean yes, or a clean no." : item.kind === "options" ? "Let the room choose one path." : "Turn a plan into the schedule."}</h2><p>{item.summary}</p></div>
-          {item.kind === "yes-no" ? <div className={roomStyles.pollFields}><label>Question<input value={pollKind === "yes-no" ? pollQuestion : ""} onChange={(event) => { setPollKind("yes-no"); setPollQuestion(event.target.value.slice(0, 160)); }} placeholder="Should we head out now?" /></label></div> : null}
-          {item.kind === "options" ? <div className={roomStyles.pollFields}><label>Question<input value={pollKind === "options" ? pollQuestion : ""} onChange={(event) => { setPollKind("options"); setPollQuestion(event.target.value.slice(0, 160)); }} placeholder="Whose place tonight?" /></label><div className={roomStyles.pollOptionGrid}>{pollOptions.map((option, index) => <label key={index}>Option {index + 1}<input value={option} onChange={(event) => { setPollKind("options"); setPollOptions((current) => current.map((value, valueIndex) => valueIndex === index ? event.target.value.slice(0, 120) : value)); }} placeholder={index === 0 ? "A's place" : index === 1 ? "B's place" : "Another option"} /></label>)}</div>{pollOptions.length < 5 ? <button type="button" className={roomStyles.addPollOption} onClick={() => { setPollKind("options"); setPollOptions((current) => [...current, ""]); }}>Add option</button> : null}</div> : null}
-          {item.kind === "itinerary" ? <div className={roomStyles.pollFields}><label>Plan<input value={itineraryTitle} onChange={(event) => { setPollKind("itinerary"); setItineraryTitle(event.target.value.slice(0, 80)); }} placeholder="Late dinner" /></label><div className={roomStyles.pollOptionGrid}><label>Start time<input type="datetime-local" value={itineraryStartsAt} onChange={(event) => { setPollKind("itinerary"); setItineraryStartsAt(event.target.value); }} /></label><label>Duration<input inputMode="numeric" value={itineraryDuration} onChange={(event) => { setPollKind("itinerary"); setItineraryDuration(event.target.value.replace(/\D/g, "").slice(0, 3)); }} placeholder="60" /></label></div><label>Responsible<select value={pollResponsible?.actorId ?? ""} onChange={(event) => { setPollKind("itinerary"); setPollResponsibleId(event.target.value); }}>{members.map((member) => <option value={member.actorId} key={member.actorId}>{member.displayName}{member.isGuest ? " · guest" : ""}</option>)}</select></label><label>Location<input value={itineraryLocation} onChange={(event) => { setPollKind("itinerary"); setItineraryLocation(event.target.value.slice(0, 120)); }} placeholder="Optional" /></label></div> : null}
-          <footer><label className={roomStyles.pollDuration}><span>Open</span><input inputMode="numeric" value={pollOpenMinutes} onChange={(event) => setPollOpenMinutes(event.target.value.replace(/\D/g, "").slice(0, 3))} placeholder="30" /><span>min</span></label><label className={roomStyles.pollPrivacy}><button type="button" className={anonymousPoll ? roomStyles.pollPrivacyOn : ""} onClick={(event) => { event.stopPropagation(); setAnonymousPoll(!anonymousPoll); }}><i /></button><span>{anonymousPoll ? "Anonymous" : "Public"}</span></label><button type="submit" disabled={!pollReady(item.kind)}>Open poll</button></footer>
-        </section>)}
-      </div>
-    </form> : null}
+
 
     <div ref={scrollRef} className={styles.chatScroll} onScroll={handleScroll} onPointerDown={() => { setToolTrayOpen(false); textareaRef.current?.blur(); }}>
       {pinned && !archived ? <button className={styles.pinned} onClick={() => document.getElementById(pinned.id)?.scrollIntoView({ behavior: "smooth", block: "center" })}><span><Icon name="pin" size={13} />Pinned</span><strong>{messageLabel(pinned)}</strong><Icon name="chevron" size={14} /></button> : null}
@@ -445,7 +345,7 @@ export function ChatPanel({ roomPublicId, messages, poll, pinnedMessageId, membe
       {draft.trim() ? <button className={styles.sendButton} type="submit" disabled={!canChat} aria-label="Send message"><Icon name="send" size={16} /></button> : <button type="button" className={`${styles.voiceButton} ${recording ? styles.voiceButtonRecording : ""}`} disabled={!canChat} aria-label="Hold to record" onPointerDown={beginRecording} onPointerMove={moveRecording} onPointerUp={endRecording} onPointerCancel={() => { recordingCanceledRef.current = true; endRecording(); }} onContextMenu={(event) => event.preventDefault()}><Icon name="voice" size={17} /></button>}
     </form>}
 
-    {typeof document !== "undefined" && toolTrayOpen ? createPortal(<div className={styles.sheetBackdrop} onPointerDown={() => setToolTrayOpen(false)}><section className={styles.toolSheet} aria-label="Chat attachments" onPointerDown={(event) => event.stopPropagation()}><i className={styles.sheetHandle} /><div>{chatTools.map((tool) => <button type="button" key={tool.id} onClick={() => activateTool(tool.id)} disabled={toolDisabled()}><span><Icon name={tool.icon} size={21} /></span><b>{tool.label}</b></button>)}</div></section></div>, document.body) : null}
+    {typeof document !== "undefined" && toolTrayOpen ? createPortal(<div className={styles.sheetBackdrop} onPointerDown={() => setToolTrayOpen(false)}><section className={styles.toolSheet} aria-label="Chat attachments" onPointerDown={(event) => event.stopPropagation()}><i className={styles.sheetHandle} /><div>{chatTools.map((tool) => <button type="button" key={tool.id} onClick={activateTool} disabled={toolDisabled()}><span><Icon name={tool.icon} size={21} /></span><b>{tool.label}</b></button>)}</div></section></div>, document.body) : null}
 
     {typeof document !== "undefined" && selectedMessage ? createPortal(<div className={styles.sheetBackdrop} onPointerDown={() => setSelectedMessageId(null)}><section className={styles.messageSheet} aria-label="Message actions" onPointerDown={(event) => event.stopPropagation()}><div className={styles.quickReactions}>{["♥", "👍", "✨"].map((emoji) => <button key={emoji} type="button" onClick={() => messageCommand("REACT_MESSAGE", selectedMessage.id, emoji)}>{emoji}</button>)}</div><div className={styles.actionList}>
       <button type="button" onClick={() => { setReplyTo(selectedMessage.id); setSelectedMessageId(null); textareaRef.current?.focus(); }}><Icon name="reply" />Reply</button>

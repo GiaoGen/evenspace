@@ -15,6 +15,8 @@ import type {
   RoomReadRepository,
 } from "@/data/contracts/room-read-repository";
 import { createSupabaseServerClient } from "@/data/supabase/server-client";
+import type { Database } from "@/data/supabase/database.types";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 const DEFAULT_PAGE_SIZE = 20;
 const MAX_PAGE_SIZE = 50;
@@ -156,6 +158,8 @@ function parsePageInput(input: {
 }
 
 export class SupabaseRoomReadRepository implements RoomReadRepository {
+  constructor(private readonly suppliedClient?: SupabaseClient<Database>) {}
+
   async listCurrentViewerRooms(
     input: {
       readonly limit?: number;
@@ -163,7 +167,7 @@ export class SupabaseRoomReadRepository implements RoomReadRepository {
     } = {},
   ): Promise<RoomReadPage> {
     const parsed = parsePageInput(input);
-    const supabase = await createSupabaseServerClient();
+    const supabase = this.suppliedClient ?? await createSupabaseServerClient();
     const { data, error } = await supabase.rpc("list_current_user_rooms", {
       requested_limit: parsed.limit,
       requested_cursor_updated_at: parsed.cursor?.updatedAt,
@@ -197,7 +201,7 @@ export class SupabaseRoomReadRepository implements RoomReadRepository {
       throw new RoomReadError("invalid_input");
     }
 
-    const supabase = await createSupabaseServerClient();
+    const supabase = this.suppliedClient ?? await createSupabaseServerClient();
     const { data, error } = await supabase.rpc("get_current_user_room", {
       requested_public_id: publicId,
     });

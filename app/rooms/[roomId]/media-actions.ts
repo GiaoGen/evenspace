@@ -9,7 +9,6 @@ import { createSupabaseServerClient } from "@/data/supabase/server-client";
 
 const roomPublicId = z.string().regex(/^room_[a-z0-9_]{3,40}$/);
 const uuid = z.uuid();
-const imageMime = z.enum(["image/jpeg", "image/png", "image/webp"]);
 const voiceMime = z.enum(["audio/webm", "audio/ogg", "audio/mp4"]);
 
 type ActionResult<T> = { readonly ok: true; readonly data: T } | { readonly ok: false; readonly message: string };
@@ -38,20 +37,62 @@ function createStorageSigningClient() {
   });
 }
 
-export async function prepareRoomMediaUploadAction(input: unknown): Promise<ActionResult<{ assetId: string; objectKey: string; token: string }>> {
-  const parsed = z.object({
-    roomPublicId,
-    kind: z.enum(["image", "voice"]),
-    mimeType: z.string(),
-    byteSize: z.number().int().positive(),
-    durationMs: z.number().int().positive().max(60_000).optional(),
-  }).safeParse(input);
+export async function prepareRoomMediaUploadAction(input: unknown): Promise<ActionResult<{ assetId: string; objectKey: string; token: string; thumbnailObjectKey?: string; thumbnailToken?: string }>> {
+  const parsed = z.discriminatedUnion("kind", [
+    z.object({
+      roomPublicId,
+      kind: z.literal("image"),
+      mimeType: z.literal("image/jpeg"),
+      byteSize: z.number().int().positive().max(2_250_000),
+      thumbnailByteSize: z.number().int().positive().max(184_320),
+      placeholderDataUrl: z.string().regex(/^data:image\/jpeg;base64,/).max(10_000),
+      width: z.number().int().positive().max(1600),
+      height: z.number().int().positive().max(1600),
+    }),
+    z.object({
+      roomPublicId,
+      kind: z.literal("voice"),
+      mimeType: z.string(),
+      byteSize: z.number().int().positive(),
+      durationMs: z.number().int().positive().max(60_000).optional(),
+    }),
+  ]).safeParse(input);
   if (!parsed.success) return { ok: false, message: "This media file is not supported." };
-  if (parsed.data.kind === "image" ? !imageMime.safeParse(parsed.data.mimeType).success : !voiceMime.safeParse(parsed.data.mimeType).success) {
+  if (parsed.data.kind === "voice" && !voiceMime.safeParse(parsed.data.mimeType).success) {
     return { ok: false, message: "This media format is not supported." };
   }
   try {
     const supabase = await createSupabaseServerClient();
+    if (parsed.data.kind === "image") {
+      const { data, error } = await mediaRpc<{ asset_id: string; object_key: string; thumbnail_object_key: string }[]>(supabase, "prepare_room_media_upload_v2", {
+        requested_room_public_id: parsed.data.roomPublicId,
+        requested_display_byte_size: parsed.data.byteSize,
+        requested_thumbnail_byte_size: parsed.data.thumbnailByteSize,
+        requested_placeholder_data_url: parsed.data.placeholderDataUrl,
+        requested_image_width: parsed.data.width,
+        requested_image_height: parsed.data.height,
+      });
+      if (error || !data?.[0]) throw new Error(error?.message ?? "media_prepare_failed");
+      const prepared = data[0];
+      const signing = createStorageSigningClient().storage.from("room-media");
+      const [display, thumbnail] = await Promise.all([
+        signing.createSignedUploadUrl(prepared.object_key),
+        signing.createSignedUploadUrl(prepared.thumbnail_object_key),
+      ]);
+      if (display.error || !display.data?.token || thumbnail.error || !thumbnail.data?.token) {
+        throw new Error(display.error?.message ?? thumbnail.error?.message ?? "media_upload_url_failed");
+      }
+      return {
+        ok: true,
+        data: {
+          assetId: prepared.asset_id,
+          objectKey: prepared.object_key,
+          token: display.data.token,
+          thumbnailObjectKey: prepared.thumbnail_object_key,
+          thumbnailToken: thumbnail.data.token,
+        },
+      };
+    }
     const { data, error } = await mediaRpc<{ asset_id: string; object_key: string }[]>(supabase, "prepare_room_media_upload", {
       requested_room_public_id: parsed.data.roomPublicId,
       requested_kind: parsed.data.kind,
@@ -71,11 +112,37 @@ export async function prepareRoomMediaUploadAction(input: unknown): Promise<Acti
   } catch (error) { return failure(error); }
 }
 
-export async function finalizeRoomMediaUploadAction(input: unknown): Promise<ActionResult<{ id: string; kind: "image" | "audio"; mimeType: string; byteSize: number; durationSeconds: number; signedUrl: string }>> {
-  const parsed = z.object({ assetId: uuid }).safeParse(input);
+export async function finalizeRoomMediaUploadAction(input: unknown): Promise<ActionResult<{ id: string; kind: "image" | "audio"; mimeType: string; byteSize: number; durationSeconds: number; signedUrl: string; thumbnailByteSize?: number; thumbnailSignedUrl?: string; placeholderDataUrl?: string }>> {
+  const parsed = z.object({ assetId: uuid, kind: z.enum(["image", "voice"]) }).safeParse(input);
   if (!parsed.success) return { ok: false, message: "This upload is invalid." };
   try {
     const supabase = await createSupabaseServerClient();
+    if (parsed.data.kind === "image") {
+      const { data, error } = await mediaRpc<{ asset_id: string; object_key: string; thumbnail_object_key: string; mime_type: string; byte_size: number; thumbnail_byte_size: number; placeholder_data_url: string }[]>(supabase, "finalize_room_media_upload_v2", { requested_asset_id: parsed.data.assetId });
+      if (error || !data?.[0]) throw new Error(error?.message ?? "media_finalize_failed");
+      const asset = data[0];
+      const [display, thumbnail] = await Promise.all([
+        supabase.storage.from("room-media").createSignedUrl(asset.object_key, 60 * 30),
+        supabase.storage.from("room-media").createSignedUrl(asset.thumbnail_object_key, 60 * 30),
+      ]);
+      if (display.error || !display.data?.signedUrl || thumbnail.error || !thumbnail.data?.signedUrl) {
+        throw new Error(display.error?.message ?? thumbnail.error?.message ?? "media_read_url_failed");
+      }
+      return {
+        ok: true,
+        data: {
+          id: asset.asset_id,
+          kind: "image",
+          mimeType: asset.mime_type,
+          byteSize: asset.byte_size,
+          durationSeconds: 0,
+          signedUrl: display.data.signedUrl,
+          thumbnailByteSize: asset.thumbnail_byte_size,
+          thumbnailSignedUrl: thumbnail.data.signedUrl,
+          placeholderDataUrl: asset.placeholder_data_url,
+        },
+      };
+    }
     const { data, error } = await mediaRpc<{ asset_id: string; object_key: string; kind: string; mime_type: string; byte_size: number; duration_ms: number | null }[]>(supabase, "finalize_room_media_upload", { requested_asset_id: parsed.data.assetId });
     if (error || !data?.[0]) throw new Error(error?.message ?? "media_finalize_failed");
     const asset = data[0];

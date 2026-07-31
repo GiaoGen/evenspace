@@ -106,7 +106,7 @@ export function BackendSessionProvider({
   readonly initialSession: MockSession;
   readonly children: ReactNode;
   readonly onCommand: (command: MockCommand) => Promise<{ readonly status: string }>;
-  readonly onSettled: () => void;
+  readonly onSettled: (command: MockCommand) => void;
 }) {
   const [session, baseDispatch] = useReducer(mockSessionReducer, initialSession);
 
@@ -134,13 +134,27 @@ export function BackendSessionProvider({
       return result.status === "ok" ? { status: "ok" } : { status: "error", message: "This voice message could not be sent." };
     }
     if (command.type === "ADD_BOARD_ITEM" && command.item.kind === "photo" && command.item.asset) {
-      const blob = await getLocalAssetBlob(command.item.asset);
-      if (!blob) return { status: "error", message: "This photo is no longer available locally." };
+      const [blob, thumbnailBlob] = await Promise.all([
+        getLocalAssetBlob(command.item.asset),
+        command.item.asset.thumbnail ? getLocalAssetBlob({
+          id: command.item.asset.thumbnail.id,
+          kind: "image",
+          mimeType: command.item.asset.thumbnail.mimeType,
+          byteSize: command.item.asset.thumbnail.byteSize,
+        }) : Promise.resolve(null),
+      ]);
+      if (!blob || !thumbnailBlob || !command.item.asset.placeholderDataUrl) {
+        return { status: "error", message: "This photo is no longer available locally." };
+      }
       const asset = await uploadRoomMedia({
         roomPublicId: command.roomPublicId,
         kind: "image",
         file: blob,
-        mimeType: blob.type || "image/jpeg",
+        mimeType: "image/jpeg",
+        thumbnailFile: thumbnailBlob,
+        placeholderDataUrl: command.item.asset.placeholderDataUrl,
+        width: command.item.asset.width,
+        height: command.item.asset.height,
       });
       const created = await createRoomPhotoAction({
         roomPublicId: command.roomPublicId,
@@ -180,7 +194,7 @@ export function BackendSessionProvider({
         message: error instanceof Error ? error.message : "This room action could not be completed.",
       };
     } finally {
-      onSettled();
+      onSettled(command);
     }
   }, [executeCloudMediaCommand, initialSession, onSettled]);
 

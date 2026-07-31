@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
 import { PinnedPhoto } from "@/components/pinboard/pinned-photo";
 import { Icon } from "@/components/ui/icon";
@@ -12,7 +13,7 @@ function formatRoomMeta(room: RoomSummary) {
   return room.status === "active" ? `Ends ${formatted} · ${room.memberCount} people` : `Archived ${formatted} · ${room.memberCount} people`;
 }
 
-function PhotoStack({ items, compact = false, roomHref, onOpen }: { readonly items: readonly BoardItem[]; readonly compact?: boolean; readonly roomHref?: string; readonly onOpen?: () => void }) {
+function PhotoStack({ items, compact = false, roomHref, onOpen, prefetchRoom, cacheScope }: { readonly items: readonly BoardItem[]; readonly compact?: boolean; readonly roomHref?: string; readonly onOpen?: () => void; readonly prefetchRoom?: () => void; readonly cacheScope?: string }) {
   const photos = useMemo(() => items.filter((item): item is BoardPhoto => item.kind === "photo"), [items]);
   const source = photos;
   const [view, setView] = useState(() => Math.floor(Math.max(0, source.length - 1) / 2));
@@ -155,22 +156,25 @@ function PhotoStack({ items, compact = false, roomHref, onOpen }: { readonly ite
   const offsets = source.length === 0 ? [] : Array.from({ length: renderRadius * 2 + 1 }, (_, index) => index - renderRadius).filter((offset) => normalizedView + offset >= 0 && normalizedView + offset < source.length);
 
   return <div ref={deckRef} className={styles.photoStack} aria-label="Swipe room photos" onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={finishPointer} onPointerCancel={finishPointer} onClickCapture={(event) => { if (dragged.current) { event.preventDefault(); event.stopPropagation(); dragged.current = false; } }}>
-    <div className={styles.photoStackPreload} aria-hidden="true">{source.map((photo) => <PinnedPhoto key={photo.id} variant={photo.variant} asset={photo.asset} imageName={photo.imageName} bare />)}</div>
+    <div className={styles.photoStackPreload} aria-hidden="true">{source.map((photo) => <PinnedPhoto key={photo.id} variant={photo.variant} asset={photo.asset} imageName={photo.imageName} bare preferLocal={Boolean(cacheScope)} cacheScope={cacheScope} />)}</div>
     {source.length === 0 ? <span className={styles.photoStackEmpty}>No photos yet.</span> : null}
     <div className={styles.photoStackDeck}>{offsets.map((offset) => {
       const photo = source[normalizedView + offset];
-      return <div className={styles.photoStackCard} ref={(element) => { if (element) cardRefs.current.set(offset, element); else cardRefs.current.delete(offset); }} key={offset}>{roomHref ? <Link href={roomHref} scroll={false} onClick={onOpen} className={styles.photoStackPhotoLink} aria-label={`Open room photo: ${photo.imageName ?? "photo"}`}><PinnedPhoto variant={photo.variant} asset={photo.asset} imageName={photo.imageName} bare className={styles.photoStackImage} /></Link> : <PinnedPhoto variant={photo.variant} asset={photo.asset} imageName={photo.imageName} bare className={styles.photoStackImage} />}</div>;
+      return <div className={styles.photoStackCard} ref={(element) => { if (element) cardRefs.current.set(offset, element); else cardRefs.current.delete(offset); }} key={offset}>{roomHref ? <Link href={roomHref} scroll={false} prefetch onPointerEnter={prefetchRoom} onFocus={prefetchRoom} onClick={onOpen} className={styles.photoStackPhotoLink} aria-label={`Open room photo: ${photo.imageName ?? "photo"}`}><PinnedPhoto variant={photo.variant} asset={photo.asset} imageName={photo.imageName} bare className={styles.photoStackImage} preferLocal={Boolean(cacheScope)} cacheScope={cacheScope} /></Link> : <PinnedPhoto variant={photo.variant} asset={photo.asset} imageName={photo.imageName} bare className={styles.photoStackImage} preferLocal={Boolean(cacheScope)} cacheScope={cacheScope} />}</div>;
     })}</div>
   </div>;
 }
 
-export function RoomCard({ room, boardItems, grid, editing, active, index, toggleFavorite, requestDelete, rememberRoom }: { readonly room: RoomSummary; readonly boardItems: readonly BoardItem[]; readonly grid: boolean; readonly editing: boolean; readonly active: boolean; readonly index: number; readonly toggleFavorite: () => void; readonly requestDelete: () => void; readonly rememberRoom: () => void }) {
+export function RoomCard({ room, boardItems, grid, editing, active, index, toggleFavorite, requestDelete, rememberRoom, cacheScope }: { readonly room: RoomSummary; readonly boardItems: readonly BoardItem[]; readonly grid: boolean; readonly editing: boolean; readonly active: boolean; readonly index: number; readonly toggleFavorite: () => void; readonly requestDelete: () => void; readonly rememberRoom: () => void; readonly cacheScope?: string }) {
+  const router = useRouter();
+  const roomHref = `/rooms/${room.publicId}`;
+  const prefetchRoom = () => router.prefetch(roomHref);
   return (
     <article data-room-card className={`${styles.card} ${grid ? styles.cardGrid : ""} ${editing ? styles.cardEditing : ""} ${active ? styles.cardActive : styles.cardInactive}`} style={{ "--card-index": Math.min(index, 5) } as CSSProperties}>
       {editing ? <button className={`${styles.favorite} ${room.isFavorite ? styles.favoriteActive : ""}`} onClick={toggleFavorite} aria-label={room.isFavorite ? `Remove ${room.name} from favorites` : `Favorite ${room.name}`}><Icon name="heart" size={16} /><span>Favorite</span></button> : null}
       {editing ? <button className={styles.deleteRoom} onClick={requestDelete} aria-label={`Delete ${room.name}`}><Icon name="minus" size={16} /></button> : null}
-      {grid ? <PhotoStack items={boardItems} compact roomHref={`/rooms/${room.publicId}`} onOpen={rememberRoom} /> : <Link href={`/rooms/${room.publicId}`} scroll={false} onClick={rememberRoom} className={styles.cardLink}>
-        <PhotoStack items={boardItems} />
+      {grid ? <PhotoStack items={boardItems} compact roomHref={roomHref} onOpen={rememberRoom} prefetchRoom={prefetchRoom} cacheScope={cacheScope} /> : <Link href={roomHref} scroll={false} prefetch onPointerEnter={prefetchRoom} onFocus={prefetchRoom} onClick={rememberRoom} className={styles.cardLink}>
+        <PhotoStack items={boardItems} prefetchRoom={prefetchRoom} cacheScope={cacheScope} />
         <div className={styles.cardInfo}><div><h2>{room.name}</h2><p><i className={room.status === "active" ? styles.liveDot : ""} />{formatRoomMeta(room)}</p></div><span><Icon name="arrow" /></span></div>
       </Link>}
     </article>

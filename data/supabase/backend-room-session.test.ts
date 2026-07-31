@@ -6,6 +6,7 @@ vi.mock("server-only", () => ({}));
 const mocks = vi.hoisted(() => ({
   findCurrentViewerRoom: vi.fn(),
   createSupabaseServerClient: vi.fn(),
+  from: vi.fn(),
 }));
 vi.mock("@/data/supabase/supabase-room-read-repository", () => ({
   SupabaseRoomReadRepository: class {
@@ -22,6 +23,7 @@ function query(result: unknown) {
     eq: () => builder,
     order: () => builder,
     limit: () => builder,
+    in: () => builder,
     maybeSingle: () => Promise.resolve(result),
     then: (resolve: (value: unknown) => unknown) => Promise.resolve(result).then(resolve),
   };
@@ -81,8 +83,9 @@ beforeEach(() => {
     photo_comments: { data: [], error: null },
     assets: { data: [], error: null },
   };
+  mocks.from.mockImplementation((table: string) => query(rows[table]));
   mocks.createSupabaseServerClient.mockResolvedValue({
-    from: (table: string) => query(rows[table]),
+    from: mocks.from,
     rpc: vi.fn().mockResolvedValue({ data: [], error: null }),
     auth: { getClaims: vi.fn().mockResolvedValue({
       data: { claims: { email: "host@example.com" } },
@@ -110,5 +113,35 @@ describe("getBackendRoomSession", () => {
     });
     expect(result?.realtimeTopic)
       .toBe("room:31000000-0000-4000-8000-000000000001:events");
+  });
+
+  it("defers chat and other secondary reads until after the photo-first route is visible", async () => {
+    const result = await getBackendRoomSession("room_wiring_main" as never, {
+      deferSecondary: true,
+    });
+
+    expect(result?.room).toMatchObject({
+      boardItems: [],
+      messages: [],
+      boardComments: [],
+      itinerary: [],
+    });
+    const queriedTables = mocks.from.mock.calls.map(([table]) => table);
+    expect(queriedTables).toContain("room_members");
+    expect(queriedTables).toContain("photos");
+    expect(queriedTables).not.toContain("messages");
+    expect(queriedTables).not.toContain("photo_comments");
+    expect(queriedTables).not.toContain("itineraries");
+  });
+
+  it("does not query or re-sign photos for a secondary live update", async () => {
+    await getBackendRoomSession("room_wiring_main" as never, {
+      deferPhotos: true,
+    });
+
+    const queriedTables = mocks.from.mock.calls.map(([table]) => table);
+    expect(queriedTables).not.toContain("photos");
+    expect(queriedTables).toContain("messages");
+    expect(queriedTables).toContain("itineraries");
   });
 });

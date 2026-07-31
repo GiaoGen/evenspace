@@ -8,7 +8,7 @@ import type { RoomCapabilities } from "@/core/domain/room";
 import type { MockRoom } from "@/features/mock-session/model/mock-session";
 import { useMockSession } from "@/features/mock-session/components/mock-session-provider";
 import { ChatPanel } from "./chat-panel";
-import { ItineraryPanel } from "./itinerary-panel";
+import { ItineraryPanel } from "./itinerary/itinerary-panel";
 import { PhotosPanel } from "./photos-panel";
 import { RoomControls, type RoomControl } from "./room-controls";
 import styles from "./room-experience.module.css";
@@ -25,7 +25,6 @@ const pageIcons: Readonly<Record<RoomPage, IconName>> = {
 
 const SCROLL_SETTLE_DELAY_MS = 140;
 const PAGE_JUMP_FEEDBACK_MS = 240;
-const INITIAL_PAGE_GUARD_MS = 600;
 
 function formatEnd(value: string | null, timeZone: string) {
   return value ? new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit", timeZone }).format(new Date(value)) : null;
@@ -53,7 +52,6 @@ export function RoomExperience({ room, capabilities, viewerActorId }: { readonly
   const pagesRef = useRef<HTMLDivElement | null>(null);
   const pagesReadyRef = useRef(false);
   const initialPageGuardRef = useRef(true);
-  const initialPageGuardTimerRef = useRef<number | null>(null);
   const pagePositionFrameRef = useRef<number | null>(null);
   const pageJumpTimerRef = useRef<number | null>(null);
   const scrollSettleTimerRef = useRef<number | null>(null);
@@ -104,13 +102,8 @@ export function RoomExperience({ room, capabilities, viewerActorId }: { readonly
     const pagesElement = pagesRef.current;
     initialPageGuardRef.current = true;
     alignPageImmediately(INITIAL_ROOM_PAGE, true);
-    initialPageGuardTimerRef.current = window.setTimeout(() => {
-      initialPageGuardRef.current = false;
-      initialPageGuardTimerRef.current = null;
-    }, INITIAL_PAGE_GUARD_MS);
 
     return () => {
-      if (initialPageGuardTimerRef.current !== null) window.clearTimeout(initialPageGuardTimerRef.current);
       if (pagePositionFrameRef.current !== null) window.cancelAnimationFrame(pagePositionFrameRef.current);
       pagesElement?.style.removeProperty("overflow-x");
       pagesElement?.style.removeProperty("scroll-snap-type");
@@ -141,14 +134,11 @@ export function RoomExperience({ room, capabilities, viewerActorId }: { readonly
     const container = pagesRef.current;
     if (!container?.clientWidth) return;
     if (!pagesReadyRef.current) return;
-    if (initialPageGuardRef.current) {
-      alignPageImmediately(INITIAL_ROOM_PAGE);
-      return;
-    }
+    if (initialPageGuardRef.current) return;
     const index = Math.max(0, Math.min(pages.length - 1, Math.round(container.scrollLeft / container.clientWidth)));
     const nextPage = pages[index];
     setPage((current) => current === nextPage ? current : nextPage);
-  }, [alignPageImmediately]);
+  }, []);
 
   useEffect(() => {
     const container = pagesRef.current;
@@ -186,10 +176,7 @@ export function RoomExperience({ room, capabilities, viewerActorId }: { readonly
 
   function schedulePageSettlement() {
     if (!pagesReadyRef.current) return;
-    if (initialPageGuardRef.current) {
-      alignPageImmediately(INITIAL_ROOM_PAGE);
-      return;
-    }
+    if (initialPageGuardRef.current) return;
     if (scrollSettleTimerRef.current !== null) window.clearTimeout(scrollSettleTimerRef.current);
     scrollSettleTimerRef.current = window.setTimeout(() => {
       scrollSettleTimerRef.current = null;
@@ -215,10 +202,6 @@ export function RoomExperience({ room, capabilities, viewerActorId }: { readonly
 
   function releaseInitialPageGuard() {
     initialPageGuardRef.current = false;
-    if (initialPageGuardTimerRef.current !== null) {
-      window.clearTimeout(initialPageGuardTimerRef.current);
-      initialPageGuardTimerRef.current = null;
-    }
     if (pagePositionFrameRef.current !== null) {
       window.cancelAnimationFrame(pagePositionFrameRef.current);
       pagePositionFrameRef.current = null;
@@ -240,8 +223,8 @@ export function RoomExperience({ room, capabilities, viewerActorId }: { readonly
       <div className={styles.roomBody}>
         <main className={styles.roomContent}>
           <div ref={pagesRef} className={styles.roomPages} onPointerDown={releaseInitialPageGuard} onWheel={releaseInitialPageGuard} onScroll={schedulePageSettlement}>
-            <section className={`${styles.roomPage} ${jumpingPage === "chat" ? styles.roomPageJumping : ""}`} aria-hidden={page !== "chat"} inert={page !== "chat"}><ChatPanel roomPublicId={room.publicId} messages={room.messages} poll={null} pinnedMessageId={room.pinnedMessageId} members={room.members} viewerActorId={viewerActorId} timeZone={room.timeZone} canChat={capabilities.canChat} canVote={false} canModerate={capabilities.canModerate} archived={room.lifecycle !== "active"} /></section>
-            <section className={`${styles.roomPage} ${jumpingPage === "photos" ? styles.roomPageJumping : ""}`} aria-hidden={page !== "photos"} inert={page !== "photos"}><PhotosPanel roomPublicId={room.publicId} items={room.boardItems} comments={room.boardComments} members={room.members} viewerActorId={viewerActorId} photoCount={room.photoCount} maxPhotos={room.maxPhotos} canAdd={capabilities.canAddBoardItem} canModerate={capabilities.canModerate} /></section>
+            <section className={`${styles.roomPage} ${jumpingPage === "chat" ? styles.roomPageJumping : ""}`} aria-hidden={page !== "chat"} inert={page !== "chat"}><ChatPanel roomPublicId={room.publicId} messages={room.messages} pinnedMessageId={room.pinnedMessageId} members={room.members} viewerActorId={viewerActorId} timeZone={room.timeZone} canChat={capabilities.canChat} canModerate={capabilities.canModerate} archived={room.lifecycle !== "active"} /></section>
+            <section className={`${styles.roomPage} ${jumpingPage === "photos" ? styles.roomPageJumping : ""}`} aria-hidden={page !== "photos"} inert={page !== "photos"}><PhotosPanel roomPublicId={room.publicId} items={room.boardItems} comments={room.boardComments} members={room.members} viewerActorId={viewerActorId} photoCount={room.photoCount} maxPhotos={room.maxPhotos} canAdd={capabilities.canAddBoardItem} canModerate={capabilities.canModerate} archived={room.lifecycle !== "active"} /></section>
             <section className={`${styles.roomPage} ${jumpingPage === "itinerary" ? styles.roomPageJumping : ""}`} aria-hidden={page !== "itinerary"} inert={page !== "itinerary"}><ItineraryPanel roomPublicId={room.publicId} items={room.itinerary} timeZone={room.timeZone} canCreate={capabilities.canCreateItinerary} canModerate={capabilities.canModerate} members={room.members} /></section>
           </div>
         </main>

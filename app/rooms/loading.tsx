@@ -1,5 +1,5 @@
-import styles from "./route-states.module.css";
+import { RoomsRouteLoading } from "@/features/rooms/components/rooms-route-loading";
 
 export default function RoomsLoading() {
-  return <main className={styles.state}><span className={styles.pulse} /><p>Opening your rooms…</p></main>;
+  return <RoomsRouteLoading />;
 }

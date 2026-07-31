@@ -165,6 +165,11 @@
   object-fit: cover;
 }
 
+.pendingTile { cursor: default; }
+.pendingShade { position: absolute; inset: 0; background: rgba(26,24,21,.42); }
+.processingBadge { position: absolute; z-index: 2; right: 8px; bottom: 8px; padding: 4px 6px; border-radius: 7px; background: rgba(24,22,19,.8); color: #fff; font-size: 8px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+.retryButton { position: absolute; z-index: 3; inset: auto 8px 8px; min-height: 32px; padding: 5px 7px; border: 0; border-radius: 7px; background: #fff; color: #292620; font-size: 9px; font-weight: 700; }
+
 .placeholder {
   position: absolute;
   inset: 0;
