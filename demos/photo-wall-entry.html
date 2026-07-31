@@ -1,0 +1,493 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>EventSpace · 照片墙入场动效 Demo</title>
+    <style>
+      @font-face {
+        font-family: "Geist";
+        src: url("../public/fonts/geist.woff2") format("woff2");
+        font-display: swap;
+      }
+
+      @font-face {
+        font-family: "Bodoni Moda";
+        src: url("../public/fonts/bodoni-moda.woff2") format("woff2");
+        font-display: swap;
+      }
+
+      :root {
+        color-scheme: light;
+        --canvas: #f3f0ea;
+        --surface: #fffcf7;
+        --surface-muted: #eae5dd;
+        --ink: #171613;
+        --muted: #6e6a63;
+        --line: #d8d2c9;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        min-width: 320px;
+        min-height: 100vh;
+        margin: 0;
+        color: var(--ink);
+        background: var(--canvas);
+        font-family: "Geist", ui-sans-serif, system-ui, sans-serif;
+      }
+
+      button {
+        font: inherit;
+      }
+
+      figure {
+        margin: 0;
+      }
+
+      .page {
+        min-height: 100vh;
+        display: grid;
+        grid-template-columns: minmax(0, 460px) minmax(260px, 390px);
+        align-items: center;
+        justify-content: center;
+        gap: clamp(36px, 7vw, 108px);
+        padding: 48px 28px;
+      }
+
+      .room-shell {
+        width: min(100%, 440px);
+        min-height: min(780px, calc(100vh - 64px));
+        overflow: hidden;
+        border: 1px solid rgba(23, 22, 19, 0.1);
+        border-radius: 34px;
+        background: var(--surface);
+        box-shadow:
+          0 28px 70px rgba(38, 33, 27, 0.12),
+          0 4px 16px rgba(38, 33, 27, 0.06);
+      }
+
+      .room-header {
+        min-height: 76px;
+        display: grid;
+        grid-template-columns: 48px 1fr 48px;
+        align-items: center;
+        padding: 10px 14px 8px;
+      }
+
+      .icon-button {
+        width: 44px;
+        height: 44px;
+        display: grid;
+        place-items: center;
+        border: 0;
+        border-radius: 50%;
+        color: var(--ink);
+        background: transparent;
+      }
+
+      .icon-button svg {
+        width: 21px;
+        height: 21px;
+        fill: none;
+        stroke: currentColor;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        stroke-width: 1.7;
+      }
+
+      .room-title {
+        min-width: 0;
+        text-align: center;
+      }
+
+      .room-title strong,
+      .room-title span {
+        display: block;
+      }
+
+      .room-title strong {
+        overflow: hidden;
+        font-size: 15px;
+        font-weight: 620;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .room-title span {
+        margin-top: 3px;
+        color: var(--muted);
+        font-size: 11px;
+        letter-spacing: 0.02em;
+      }
+
+      .photo-section {
+        padding: 10px 14px 18px;
+      }
+
+      .photo-section-heading {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        padding: 0 4px 14px;
+      }
+
+      .photo-section-heading h2 {
+        margin: 0;
+        font-family: "Bodoni Moda", Georgia, serif;
+        font-size: 34px;
+        font-weight: 600;
+        letter-spacing: -0.045em;
+      }
+
+      .photo-section-heading span {
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .photo-wall {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 5px;
+      }
+
+      .photo {
+        position: relative;
+        aspect-ratio: 1;
+        overflow: hidden;
+        border-radius: 8px;
+        background: var(--surface-muted);
+        opacity: 0;
+        transform: scale(0.86);
+        transform-origin: center;
+      }
+
+      .photo img {
+        width: 100%;
+        height: 100%;
+        display: block;
+        object-fit: cover;
+        pointer-events: none;
+        user-select: none;
+      }
+
+      .photo::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        border: 1px solid rgba(255, 255, 255, 0.16);
+        border-radius: inherit;
+        pointer-events: none;
+      }
+
+      .explanation {
+        align-self: center;
+      }
+
+      .eyebrow {
+        margin: 0 0 14px;
+        color: var(--muted);
+        font-size: 11px;
+        font-weight: 650;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+      }
+
+      .explanation h1 {
+        max-width: 360px;
+        margin: 0;
+        font-family: "Bodoni Moda", Georgia, serif;
+        font-size: clamp(48px, 6vw, 76px);
+        font-weight: 600;
+        letter-spacing: -0.055em;
+        line-height: 0.92;
+      }
+
+      .description {
+        max-width: 350px;
+        margin: 22px 0 0;
+        color: var(--muted);
+        font-size: 15px;
+        line-height: 1.65;
+      }
+
+      .motion-notes {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin: 24px 0 0;
+        padding: 0;
+        list-style: none;
+      }
+
+      .motion-notes li {
+        padding: 8px 11px;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        color: var(--muted);
+        background: rgba(255, 252, 247, 0.5);
+        font-size: 12px;
+      }
+
+      .replay {
+        min-height: 50px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        margin-top: 28px;
+        padding: 0 20px;
+        border: 0;
+        border-radius: 17px;
+        color: #fffdf8;
+        background: var(--ink);
+        cursor: pointer;
+        transition: transform 140ms ease-out, opacity 140ms ease-out;
+      }
+
+      .replay:hover {
+        transform: translateY(-1px);
+      }
+
+      .replay:active {
+        transform: scale(0.97);
+      }
+
+      .replay svg {
+        width: 17px;
+        height: 17px;
+        fill: none;
+        stroke: currentColor;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        stroke-width: 1.8;
+      }
+
+      @media (max-width: 850px) {
+        .page {
+          grid-template-columns: 1fr;
+          justify-items: center;
+          padding: 28px 16px 44px;
+        }
+
+        .explanation {
+          width: min(100%, 440px);
+          order: -1;
+        }
+
+        .explanation h1 {
+          font-size: clamp(44px, 14vw, 66px);
+        }
+
+        .room-shell {
+          min-height: 0;
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .replay {
+          display: none;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="page">
+      <section class="room-shell" aria-label="照片墙动效预览">
+        <header class="room-header">
+          <button class="icon-button" type="button" aria-label="前往聊天">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M5 17.5 3.8 21l4.1-1.8c1.2.5 2.6.8 4.1.8 5 0 9-3.6 9-8s-4-8-9-8-9 3.6-9 8c0 2.1.8 4 2 5.5Z" />
+            </svg>
+          </button>
+          <div class="room-title">
+            <strong>Summer Afterglow</strong>
+            <span>2h 18m left</span>
+          </div>
+          <button class="icon-button" type="button" aria-label="前往行程">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <rect x="4" y="5.5" width="16" height="15" rx="3" />
+              <path d="M8 3.5v4M16 3.5v4M4 10h16" />
+            </svg>
+          </button>
+        </header>
+
+        <div class="photo-section">
+          <div class="photo-section-heading">
+            <h2>Photos</h2>
+            <span id="photoStatus" aria-live="polite">正在准备照片…</span>
+          </div>
+          <div class="photo-wall" id="photoWall" aria-busy="true">
+            <figure class="photo"><img alt="朋友们在室外相聚" data-src="https://images.unsplash.com/photo-1511632765486-a01980e01a18?auto=format&fit=crop&w=800&q=90" /></figure>
+            <figure class="photo"><img alt="朋友聚会中的笑脸" data-src="https://images.unsplash.com/photo-1529156069898-49953e39b3ac?auto=format&fit=crop&w=800&q=90" /></figure>
+            <figure class="photo"><img alt="夜晚活动现场" data-src="https://images.unsplash.com/photo-1492684223066-81342ee5ff30?auto=format&fit=crop&w=800&q=90" /></figure>
+            <figure class="photo"><img alt="节庆中的人群" data-src="https://images.unsplash.com/photo-1501386761578-eac5c94b800a?auto=format&fit=crop&w=800&q=90" /></figure>
+            <figure class="photo"><img alt="一起庆祝的朋友" data-src="https://images.unsplash.com/photo-1527529482837-4698179dc6ce?auto=format&fit=crop&w=800&q=90" /></figure>
+            <figure class="photo"><img alt="演出现场的灯光" data-src="https://images.unsplash.com/photo-1519671482749-fd09be7ccebf?auto=format&fit=crop&w=800&q=90" /></figure>
+            <figure class="photo"><img alt="朋友在阳光下交谈" data-src="https://images.unsplash.com/photo-1517457373958-b7bdd4587205?auto=format&fit=crop&w=800&q=90" /></figure>
+            <figure class="photo"><img alt="聚会上的餐桌" data-src="https://images.unsplash.com/photo-1515003197210-e0cd71810b5f?auto=format&fit=crop&w=800&q=90" /></figure>
+            <figure class="photo"><img alt="晚间派对时刻" data-src="https://images.unsplash.com/photo-1505236858219-8359eb29e329?auto=format&fit=crop&w=800&q=90" /></figure>
+            <figure class="photo"><img alt="朋友举杯庆祝" data-src="https://images.unsplash.com/photo-1530103862676-de8c9debad1d?auto=format&fit=crop&w=800&q=90" /></figure>
+            <figure class="photo"><img alt="活动中的欢呼" data-src="https://images.unsplash.com/photo-1523580494863-6f3031224c94?auto=format&fit=crop&w=800&q=90" /></figure>
+            <figure class="photo"><img alt="一起享受音乐的朋友" data-src="https://images.unsplash.com/photo-1524368535928-5b5e00ddc76b?auto=format&fit=crop&w=800&q=90" /></figure>
+          </div>
+        </div>
+      </section>
+
+      <aside class="explanation">
+        <p class="eyebrow">Room entrance · Motion study 01</p>
+        <h1>Moments,<br />one by one.</h1>
+        <p class="description">进入房间后，只有已经加载并完成解码的清晰照片才会进入随机队列。每张轻微超出最终尺寸，然后一次回弹停稳。</p>
+        <ul class="motion-notes" aria-label="动效参数">
+          <li>随机顺序</li>
+          <li>90ms 错峰</li>
+          <li>460ms 轻弹性</li>
+          <li>解码后入场</li>
+          <li>正方形预览</li>
+        </ul>
+        <button class="replay" id="replayButton" type="button">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M4 11a8 8 0 1 1 2.3 6.7M4 5v6h6" />
+          </svg>
+          重新播放
+        </button>
+      </aside>
+    </main>
+
+    <script>
+      const photoWall = document.querySelector("#photoWall");
+      const photoStatus = document.querySelector("#photoStatus");
+      const photoItems = [...document.querySelectorAll(".photo")];
+      const replayButton = document.querySelector("#replayButton");
+      const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+      let readyPhotos = [];
+      let runningAnimations = [];
+
+      function shuffledIndices(length) {
+        const indices = Array.from({ length }, (_, index) => index);
+        for (let index = indices.length - 1; index > 0; index -= 1) {
+          const target = Math.floor(Math.random() * (index + 1));
+          [indices[index], indices[target]] = [indices[target], indices[index]];
+        }
+        return indices;
+      }
+
+      function replayEntrance() {
+        if (reduceMotion.matches || readyPhotos.length === 0) return;
+
+        runningAnimations.forEach((animation) => animation.cancel());
+        runningAnimations = [];
+
+        readyPhotos.forEach((photo) => {
+          photo.style.opacity = "0";
+          photo.style.transform = "scale(0.86)";
+          photo.style.willChange = "transform, opacity";
+        });
+
+        shuffledIndices(readyPhotos.length).forEach((photoIndex, order) => {
+          const photo = readyPhotos[photoIndex];
+          const delay = 100 + order * 90;
+
+          const animation = photo.animate(
+            [
+              { opacity: 0, transform: "scale(0.86)", offset: 0 },
+              { opacity: 1, transform: "scale(1.035)", offset: 0.72 },
+              { opacity: 1, transform: "scale(1)", offset: 1 }
+            ],
+            {
+              duration: 460,
+              delay,
+              easing: "cubic-bezier(.2,.8,.2,1)",
+              fill: "forwards"
+            }
+          );
+
+          animation.addEventListener("finish", () => {
+            photo.style.opacity = "1";
+            photo.style.transform = "scale(1)";
+            photo.style.willChange = "auto";
+          }, { once: true });
+
+          runningAnimations.push(animation);
+        });
+      }
+
+      function waitForImageLoad(image, timeoutMs = 8000) {
+        if (image.complete) {
+          return image.naturalWidth > 0
+            ? Promise.resolve()
+            : Promise.reject(new Error("Image failed to load"));
+        }
+
+        return new Promise((resolve, reject) => {
+          const timeout = window.setTimeout(() => finish(reject, new Error("Image timed out")), timeoutMs);
+
+          function finish(callback, value) {
+            window.clearTimeout(timeout);
+            image.removeEventListener("load", handleLoad);
+            image.removeEventListener("error", handleError);
+            callback(value);
+          }
+
+          function handleLoad() {
+            finish(resolve);
+          }
+
+          function handleError() {
+            finish(reject, new Error("Image failed to load"));
+          }
+
+          image.addEventListener("load", handleLoad);
+          image.addEventListener("error", handleError);
+        });
+      }
+
+      async function preparePhoto(photo) {
+        const image = photo.querySelector("img");
+        image.decoding = "async";
+        image.src = image.dataset.src;
+
+        try {
+          await waitForImageLoad(image);
+          await image.decode();
+          return photo;
+        } catch {
+          photo.hidden = true;
+          return null;
+        }
+      }
+
+      function waitForPaint() {
+        return new Promise((resolve) => {
+          requestAnimationFrame(() => requestAnimationFrame(resolve));
+        });
+      }
+
+      async function prepareWall() {
+        const results = await Promise.all(photoItems.map(preparePhoto));
+        readyPhotos = results.filter(Boolean);
+        photoWall.setAttribute("aria-busy", "false");
+        photoStatus.textContent = `${readyPhotos.length} moments`;
+        replayButton.disabled = readyPhotos.length === 0;
+
+        if (reduceMotion.matches) {
+          readyPhotos.forEach((photo) => {
+            photo.style.opacity = "1";
+            photo.style.transform = "none";
+          });
+          return;
+        }
+
+        await waitForPaint();
+        replayEntrance();
+      }
+
+      replayButton.addEventListener("click", replayEntrance);
+      prepareWall();
+      reduceMotion.addEventListener("change", () => window.location.reload());
+    </script>
+  </body>
+</html>

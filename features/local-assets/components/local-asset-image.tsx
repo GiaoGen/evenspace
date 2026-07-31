@@ -1,12 +1,63 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef, useState, type SyntheticEvent } from "react";
 import Image from "next/image";
 import type { AssetReference } from "@/core/domain/asset";
+import { getImageReadinessKey, isImageDecoded, markImageDecoded } from "../model/image-readiness";
 import type { CachedImageVariant } from "../model/local-asset-repository";
 import { useLocalAssetUrl } from "./use-local-asset-url";
 
 export type ImageVariant = "thumbnail" | "display";
+export type ImageRevealMode = "fade" | "manual";
+
+function Placeholder({ asset, fill }: { readonly asset: AssetReference; readonly fill?: boolean }) {
+  if (!asset.placeholderDataUrl) return null;
+  return <span
+    aria-hidden="true"
+    className={fill ? "localAssetPlaceholder localAssetPlaceholderFill" : "localAssetPlaceholder"}
+    style={{ backgroundImage: `url(${JSON.stringify(asset.placeholderDataUrl)})` }}
+  />;
+}
+
+function ReadyImage({ url, readinessKey, asset, alt, fill, width, height, sizes, className, loading, reveal, onDecoded }: { readonly url: string; readonly readinessKey: string; readonly asset: AssetReference; readonly alt: string; readonly fill?: boolean; readonly width?: number; readonly height?: number; readonly sizes?: string; readonly className?: string; readonly loading?: "eager" | "lazy"; readonly reveal: ImageRevealMode; readonly onDecoded?: () => void }) {
+  const [loaded, setLoaded] = useState(() => isImageDecoded(readinessKey));
+  const onDecodedRef = useRef(onDecoded);
+
+  useEffect(() => {
+    onDecodedRef.current = onDecoded;
+  }, [onDecoded]);
+
+  useEffect(() => {
+    if (loaded) onDecodedRef.current?.();
+  }, [loaded]);
+
+  function handleLoad(event: SyntheticEvent<HTMLImageElement>) {
+    const image = event.currentTarget;
+    const finish = () => {
+      markImageDecoded(readinessKey);
+      setLoaded(true);
+    };
+    if (typeof image.decode !== "function") { finish(); return; }
+    void image.decode().then(finish).catch(() => undefined);
+  }
+
+  return <>
+    {reveal === "fade" && !loaded ? <Placeholder asset={asset} fill={fill} /> : null}
+    <Image
+      src={url}
+      alt={alt}
+      fill={fill}
+      width={fill ? undefined : width}
+      height={fill ? undefined : height}
+      sizes={sizes}
+      loading={loading}
+      decoding="async"
+      className={`${className ?? ""} ${reveal === "manual" ? "localAssetImageManual" : `localAssetImage ${loaded ? "localAssetImageLoaded" : ""}`}`}
+      onLoad={handleLoad}
+      unoptimized
+    />
+  </>;
+}
 
 function resolveVariant(asset: AssetReference, variant: ImageVariant): AssetReference {
   if (variant !== "thumbnail" || !asset.thumbnail) return asset;
@@ -20,29 +71,14 @@ function resolveVariant(asset: AssetReference, variant: ImageVariant): AssetRefe
   };
 }
 
-export function LocalAssetImage({ asset, alt, fill, width, height, sizes, className, variant = "display", preferLocal = false, cacheScope }: { readonly asset: AssetReference; readonly alt: string; readonly fill?: boolean; readonly width?: number; readonly height?: number; readonly sizes?: string; readonly className?: string; readonly variant?: ImageVariant; readonly preferLocal?: boolean; readonly cacheScope?: string }) {
+export function LocalAssetImage({ asset, alt, fill, width, height, sizes, className, variant = "display", preferLocal = false, cacheScope, loading, reveal = "fade", onDecoded }: { readonly asset: AssetReference; readonly alt: string; readonly fill?: boolean; readonly width?: number; readonly height?: number; readonly sizes?: string; readonly className?: string; readonly variant?: ImageVariant; readonly preferLocal?: boolean; readonly cacheScope?: string; readonly loading?: "eager" | "lazy"; readonly reveal?: ImageRevealMode; readonly onDecoded?: () => void }) {
   const cacheVariant: CachedImageVariant = variant === "thumbnail" && asset.thumbnail ? "thumbnail" : "display";
   const reference = useMemo(() => resolveVariant(asset, variant), [asset, variant]);
   const cachedOptions = useMemo(() => cacheScope ? { scope: cacheScope, variant: cacheVariant } : undefined, [cacheScope, cacheVariant]);
   const url = useLocalAssetUrl(reference, preferLocal, cachedOptions);
-  const placeholderStyle = asset.placeholderDataUrl
-    ? { backgroundImage: `url(${JSON.stringify(asset.placeholderDataUrl)})` }
-    : undefined;
-  const placeholderClassName = fill ? "localAssetPlaceholder localAssetPlaceholderFill" : "localAssetPlaceholder";
+  const readinessKey = getImageReadinessKey(asset, cacheVariant, cacheScope);
 
-  return <>
-    {asset.placeholderDataUrl ? <span aria-hidden="true" className={placeholderClassName} style={placeholderStyle} /> : null}
-    {url ? <Image
-      src={url}
-      alt={alt}
-      fill={fill}
-      width={fill ? undefined : width}
-      height={fill ? undefined : height}
-      sizes={sizes}
-      className={className}
-      placeholder={asset.placeholderDataUrl ? "blur" : "empty"}
-      blurDataURL={asset.placeholderDataUrl}
-      unoptimized
-    /> : null}
-  </>;
+  return url
+    ? <ReadyImage key={readinessKey} url={url} readinessKey={readinessKey} asset={asset} alt={alt} fill={fill} width={width} height={height} sizes={sizes} className={className} loading={loading} reveal={reveal} onDecoded={onDecoded} />
+    : reveal === "fade" ? <Placeholder asset={asset} fill={fill} /> : null;
 }

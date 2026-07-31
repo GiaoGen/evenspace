@@ -232,6 +232,45 @@
 }
 .savedNoticeVisible { opacity: 1; transform: translateY(0); }
 
+.accountLoading i,
+.accountLoading b {
+  display: block;
+  border-radius: 999px;
+  background: currentColor;
+  opacity: .13;
+  animation: accountPulse 1.15s ease-in-out infinite alternate;
+}
+.loadingIdentity { color: var(--account-sage-ink); }
+.loadingIdentityTop { display: grid; grid-template-columns: 64px minmax(0, 1fr) 42px; align-items: center; gap: 14px; }
+.loadingIdentityTop > i:first-child { width: 64px; height: 64px; }
+.loadingIdentityTop > i:last-child { width: 42px; height: 42px; }
+.loadingIdentityTop > span { display: grid; gap: 9px; }
+.loadingIdentityTop > span b:first-child { width: min(66%, 220px); height: 29px; }
+.loadingIdentityTop > span b:last-child { width: min(52%, 170px); height: 9px; }
+.loadingStats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 57px; padding-top: 14px; border-top: 1px solid rgba(28, 48, 35, .15); }
+.loadingStats i { width: 46%; height: 27px; border-radius: 4px; }
+.loadingMode,
+.loadingData { display: grid; align-items: center; gap: 13px; margin-top: 10px; padding: 15px; border-radius: 8px; }
+.loadingMode { grid-template-columns: 44px minmax(0, 1fr) 20px; min-height: 96px; background: var(--account-graphite); color: var(--account-graphite-ink); }
+.loadingMode > i:first-child { width: 44px; height: 44px; }
+.loadingMode > i:last-child { width: 14px; height: 14px; }
+.loadingMode span,
+.loadingData span { display: grid; gap: 8px; }
+.loadingMode b:first-child { width: 42%; height: 14px; }
+.loadingMode b:last-child { width: 76%; height: 8px; }
+.loadingAppearance { padding: 27px 0 4px; }
+.loadingAppearance > span { display: grid; gap: 7px; margin: 0 3px 12px; }
+.loadingAppearance > span i { width: 76px; height: 8px; }
+.loadingAppearance > span b { width: 170px; height: 24px; }
+.loadingAppearance > div { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; }
+.loadingAppearance > div i { height: 100px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); opacity: 1; }
+.loadingData { grid-template-columns: 48px minmax(0, 1fr); min-height: 110px; margin-top: 24px; padding: 17px; background: var(--account-clay); color: var(--account-clay-ink); }
+.loadingData > i { width: 48px; height: 52px; border-radius: 6px; }
+.loadingData b:first-child { width: 58%; height: 14px; }
+.loadingData b:last-child { width: 82%; height: 8px; }
+.loadingLinks { display: grid; gap: 0; padding-top: 28px; }
+.loadingLinks i { width: 100%; height: 49px; border-bottom: 1px solid var(--line); border-radius: 0; background: linear-gradient(90deg, currentColor 0 26%, transparent 26%); }
+
 .modeCard,
 .dataCard {
   width: 100%;
@@ -428,6 +467,7 @@
 .inlineEditor button:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
 
 @keyframes accountReveal { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes accountPulse { from { opacity: .08; } to { opacity: .18; } }
 @keyframes backdropIn { from { opacity: 0; } to { opacity: 1; } }
 @keyframes sheetIn { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes backdropOut { from { opacity: 1; } to { opacity: 0; } }

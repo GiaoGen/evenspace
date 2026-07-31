@@ -25,6 +25,7 @@ export interface PersonSummary {
   readonly displayName: string;
   readonly initials: string;
   readonly avatarUrl?: string | null;
+  readonly avatarAsset?: AssetReference | null;
   readonly role: RoomRole;
   readonly isGuest: boolean;
 }

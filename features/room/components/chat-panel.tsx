@@ -19,10 +19,12 @@ interface ChatPanelProps {
   readonly pinnedMessageId: string | null;
   readonly members: readonly PersonSummary[];
   readonly viewerActorId: ActorId;
+  readonly cacheScope?: string;
   readonly timeZone: string;
   readonly canChat: boolean;
   readonly canModerate: boolean;
   readonly archived: boolean;
+  readonly dataState?: "loading" | "ready" | "stale" | "error";
 }
 
 type ToolId = "search";
@@ -42,7 +44,7 @@ function preferredAudioMimeType() {
   return ["audio/webm;codecs=opus", "audio/mp4", "audio/webm"].find((type) => MediaRecorder.isTypeSupported(type)) ?? "";
 }
 
-export function ChatPanel({ roomPublicId, messages, pinnedMessageId, members, viewerActorId, timeZone, canChat, canModerate, archived }: ChatPanelProps) {
+export function ChatPanel({ roomPublicId, messages, pinnedMessageId, members, viewerActorId, cacheScope = viewerActorId, timeZone, canChat, canModerate, archived, dataState = "ready" }: ChatPanelProps) {
   const { session, dispatch } = useMockSession();
   const [draft, setDraft] = useState("");
   const [query, setQuery] = useState("");
@@ -329,9 +331,9 @@ export function ChatPanel({ roomPublicId, messages, pinnedMessageId, members, vi
         const grouped = Boolean(previous && previous.kind === "message" && message.kind === "message" && previous.author?.actorId === message.author?.actorId && Date.parse(message.sentAt) - Date.parse(previous.sentAt) < 3 * 60_000 && !showDay);
         return <div key={message.id} id={message.id} className={styles.messageSlot}>
           {showDay ? <p className={styles.dayLabel}>{formatDay(message.sentAt, timeZone)}</p> : null}
-          {message.kind === "system" ? <p className={styles.systemMessage}>{message.body}</p> : <ChatMessageItem message={message} own={own} grouped={grouped} timeZone={timeZone} replyBody={message.replyToId ? messageLabel(messages.find((item) => item.id === message.replyToId) ?? message) : null} onPointerDown={beginMessagePress} onPointerMove={moveMessagePress} onPointerEnd={endMessagePress} onContextMenu={(event, target) => { event.preventDefault(); setSelectedMessageId(target.id); }} onOpenImage={openImage} />}
+          {message.kind === "system" ? <p className={styles.systemMessage}>{message.body}</p> : <ChatMessageItem message={message} own={own} grouped={grouped} timeZone={timeZone} cacheScope={cacheScope} replyBody={message.replyToId ? messageLabel(messages.find((item) => item.id === message.replyToId) ?? message) : null} onPointerDown={beginMessagePress} onPointerMove={moveMessagePress} onPointerEnd={endMessagePress} onContextMenu={(event, target) => { event.preventDefault(); setSelectedMessageId(target.id); }} onOpenImage={openImage} />}
         </div>;
-      }) : <div className={styles.empty}><p>{query ? "No messages found." : "No messages yet."}</p></div>}
+      }) : dataState === "loading" ? <div className={styles.chatLoading} aria-label="Restoring messages"><i /><i /><i /></div> : <div className={styles.empty}><p>{query ? "No messages found." : dataState === "error" ? "Messages are temporarily unavailable." : "No messages yet."}</p></div>}
     </div>
 
     {!atBottom ? <button type="button" className={styles.latestButton} onClick={() => scrollToLatest(true)} aria-label="Jump to latest messages"><Icon name="chevron" size={15} />{unreadCount ? <b>{unreadCount}</b> : null}</button> : null}

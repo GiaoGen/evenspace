@@ -6,11 +6,12 @@ import type { RoomPublicId } from "@/core/domain/ids";
 import type { ItineraryItem, PersonSummary } from "@/core/domain/room";
 import { useMockSession } from "@/features/mock-session/components/mock-session-provider";
 import { getItinerarySummary } from "../../model/itinerary";
+import { getCenteredScrollTop } from "../../model/itinerary-scroll";
 import { ItineraryComposer } from "./itinerary-composer";
 import { ItineraryTimeline } from "./itinerary-timeline";
 import styles from "./itinerary.module.css";
 
-export function ItineraryPanel({ roomPublicId, items, timeZone, canCreate, canModerate, members }: { readonly roomPublicId: RoomPublicId; readonly items: readonly ItineraryItem[]; readonly timeZone: string; readonly canCreate: boolean; readonly canModerate: boolean; readonly members: readonly PersonSummary[] }) {
+export function ItineraryPanel({ roomPublicId, items, timeZone, canCreate, canModerate, members, active }: { readonly roomPublicId: RoomPublicId; readonly items: readonly ItineraryItem[]; readonly timeZone: string; readonly canCreate: boolean; readonly canModerate: boolean; readonly members: readonly PersonSummary[]; readonly active: boolean }) {
   const { session, dispatch } = useMockSession();
   const [now, setNow] = useState(() => Date.now());
   const [editor, setEditor] = useState<ItineraryItem | "new" | null>(null);
@@ -26,11 +27,28 @@ export function ItineraryPanel({ roomPublicId, items, timeZone, canCreate, canMo
   }, []);
 
   useEffect(() => {
-    if (didInitialScroll.current || !items.length) return;
+    if (!active || didInitialScroll.current || !items.length) return;
     didInitialScroll.current = true;
-    const frame = window.requestAnimationFrame(() => scrollRef.current?.querySelector<HTMLElement>("[data-itinerary-target='true']")?.scrollIntoView({ block: "center", behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" }));
+    const frame = window.requestAnimationFrame(() => {
+      const container = scrollRef.current;
+      const target = container?.querySelector<HTMLElement>("[data-itinerary-target='true']");
+      if (!container || !target) return;
+      const containerRect = container.getBoundingClientRect();
+      const targetRect = target.getBoundingClientRect();
+      const top = getCenteredScrollTop({
+        scrollTop: container.scrollTop,
+        containerTop: containerRect.top,
+        containerHeight: container.clientHeight,
+        targetTop: targetRect.top,
+        targetHeight: targetRect.height,
+      });
+      container.scrollTo({
+        top,
+        behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+      });
+    });
     return () => window.cancelAnimationFrame(frame);
-  }, [items.length]);
+  }, [active, items.length]);
 
   function save(item: ItineraryItem) {
     dispatch({ type: "COMMAND", command: editor === "new" ? { type: "ADD_ITINERARY", ...base(), item } : { type: "UPDATE_ITINERARY", ...base(), item } });

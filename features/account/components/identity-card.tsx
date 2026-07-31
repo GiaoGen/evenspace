@@ -5,7 +5,7 @@ import type { MockViewer } from "@/features/mock-session/model/mock-session";
 import type { AccountSummary } from "../model/account-summary";
 import styles from "./account-page.module.css";
 
-export function IdentityCard({ viewer, summary, nameAvailable, saveName, uploadAvatar }: { readonly viewer: MockViewer; readonly summary: AccountSummary; readonly nameAvailable: (name: string) => boolean; readonly saveName: (name: string) => void; readonly uploadAvatar: (file: File) => Promise<{ readonly ok: boolean; readonly message?: string }> }) {
+export function IdentityCard({ viewer, summary, cacheScope, nameAvailable, saveName, uploadAvatar }: { readonly viewer: MockViewer; readonly summary: AccountSummary; readonly cacheScope: string; readonly nameAvailable: (name: string) => boolean; readonly saveName: (name: string) => void; readonly uploadAvatar: (file: File) => Promise<{ readonly ok: boolean; readonly message?: string }> }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(viewer.displayName);
   const [feedback, setFeedback] = useState<"saved" | "unavailable" | null>(null);
@@ -55,6 +55,8 @@ export function IdentityCard({ viewer, summary, nameAvailable, saveName, uploadA
           <Avatar
             className={styles.avatar}
             src={viewer.avatarUrl}
+            asset={viewer.avatarAsset}
+            cacheScope={cacheScope}
             text={viewer.initials}
             displayName={viewer.displayName}
           />

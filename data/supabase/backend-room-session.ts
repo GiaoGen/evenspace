@@ -18,6 +18,7 @@ import {
 } from "@/features/mock-session/model/mock-session";
 
 export interface BackendRoomSession {
+  readonly cacheScope: string;
   readonly session: MockSession;
   readonly room: MockRoom;
   readonly capabilities: RoomCapabilities;
@@ -49,7 +50,10 @@ export async function getBackendRoomSession(
 ): Promise<BackendRoomSession | null> {
   const supabase = await createSupabaseServerClient();
   const repository = new SupabaseRoomReadRepository(supabase);
-  const roomRead = await repository.findCurrentViewerRoom(publicId);
+  const [roomRead, claimsResult] = await Promise.all([
+    repository.findCurrentViewerRoom(publicId),
+    supabase.auth.getClaims(),
+  ]);
   if (!roomRead) return null;
   const deferSecondary = options.deferSecondary === true;
   const deferPhotos = options.deferPhotos === true;
@@ -143,7 +147,6 @@ export async function getBackendRoomSession(
         : null,
     };
   });
-  const membersByActor = new Map(members.map((member) => [member.actorId, member]));
   const assetsById = new Map((assetsResult.data ?? []).map((asset) => [asset.id, asset]));
   const assetReference = (id: string | null): AssetReference | null => {
     if (!id) return null;
@@ -175,6 +178,12 @@ export async function getBackendRoomSession(
         : {}),
     };
   };
+
+  members = members.map((member) => {
+    const row = memberRows.find((item) => item.actor_id === member.actorId);
+    return { ...member, avatarAsset: assetReference(row?.avatar_asset_id ?? null) };
+  });
+  const membersByActor = new Map(members.map((member) => [member.actorId, member]));
 
   const reactionCounts = new Map<string, Map<string, number>>();
   for (const reaction of reactionsResult.data ?? []) {
@@ -271,6 +280,7 @@ export async function getBackendRoomSession(
     avatarUrl: request.avatar_asset_id
       ? signedUrls.display.get(request.avatar_asset_id) ?? null
       : null,
+    avatarAsset: assetReference(request.avatar_asset_id),
     note: request.note,
     requestedAt: request.requested_at,
     state: "pending",
@@ -351,6 +361,7 @@ export async function getBackendRoomSession(
       displayName: roomRead.viewer.nickname,
       initials: membersByActor.get(viewerActorId)?.initials ?? initialsFor(roomRead.viewer.nickname),
       avatarUrl: membersByActor.get(viewerActorId)?.avatarUrl ?? null,
+      avatarAsset: membersByActor.get(viewerActorId)?.avatarAsset ?? null,
       email: null,
       authState: "signed-in",
       theme: "system",
@@ -359,6 +370,7 @@ export async function getBackendRoomSession(
   };
 
   return {
+    cacheScope: typeof claimsResult.data?.claims?.sub === "string" ? claimsResult.data.claims.sub : viewerActorId,
     session,
     room,
     capabilities,

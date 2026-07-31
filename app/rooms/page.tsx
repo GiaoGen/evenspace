@@ -45,6 +45,7 @@ export default async function RoomsRoute() {
       viewerInitials={initials(identity)}
       viewerAvatarUrl={null}
       viewerCacheScope={page.items[0]?.viewer.actorId}
+      viewerAccountScope={data.claims.sub}
     />
   );
 }

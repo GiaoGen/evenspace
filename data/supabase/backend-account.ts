@@ -4,6 +4,7 @@ import type { MockViewer } from "@/features/mock-session/model/mock-session";
 import { createSupabaseServerClient } from "@/data/supabase/server-client";
 
 export interface BackendAccount {
+  readonly cacheScope: string;
   readonly viewer: MockViewer;
   readonly summary: { readonly activeRooms: number; readonly memories: number; readonly boardItems: number; readonly storedRooms: number };
 }
@@ -14,13 +15,13 @@ export async function getBackendAccount(): Promise<BackendAccount | null> {
   const userId = claimsData?.claims?.sub;
   if (claimsError || typeof userId !== "string") return null;
   const [profileResult, roomsResult, photosResult] = await Promise.all([
-    supabase.from("profiles").select("display_name,theme,avatar_asset_id").eq("user_id", userId).maybeSingle(),
+    supabase.from("profiles").select("display_name,theme").eq("user_id", userId).maybeSingle(),
     supabase.rpc("list_current_user_rooms", {
-      requested_limit: 100,
+      requested_limit: 50,
       requested_cursor_updated_at: undefined,
       requested_cursor_id: undefined,
     }),
-    supabase.from("photos").select("id"),
+    supabase.from("photos").select("id", { count: "exact", head: true }),
   ]);
   // Profile and summary cards are supplementary. An isolated read failure must
   // never prevent a signed-in person from opening their account page.
@@ -30,32 +31,19 @@ export async function getBackendAccount(): Promise<BackendAccount | null> {
   const email = typeof claimsData?.claims?.email === "string" ? claimsData.claims.email : null;
   const displayName = profileResult.error ? email?.split("@", 1)[0] ?? "EventSpace member" : profileResult.data?.display_name ?? email?.split("@", 1)[0] ?? "EventSpace member";
   const theme = !profileResult.error && (profileResult.data?.theme === "light" || profileResult.data?.theme === "dark") ? profileResult.data.theme : "system";
-  let avatarUrl: string | null = null;
-  if (!profileResult.error && profileResult.data?.avatar_asset_id) {
-    const { data: asset } = await supabase
-      .from("assets")
-      .select("object_key,status")
-      .eq("id", profileResult.data.avatar_asset_id)
-      .maybeSingle();
-    if (asset?.status === "ready" && asset.object_key) {
-      const { data: signed } = await supabase.storage
-        .from("room-media")
-        .createSignedUrl(asset.object_key, 60 * 30);
-      avatarUrl = signed?.signedUrl ?? null;
-    }
-  }
   const rooms = roomsResult.error ? [] : roomsResult.data ?? [];
   const visible = rooms.filter((room) => room.viewer_state === "active" || room.viewer_state === "muted");
   return {
+    cacheScope: userId,
     viewer: {
       actorId: (rooms[0]?.viewer_actor_id ?? "00000000-0000-4000-8000-000000000000") as MockViewer["actorId"],
       displayName,
       initials: displayName.split(/\s+/).slice(0, 2).map((part) => part[0]?.toUpperCase() ?? "").join("") || "?",
-      avatarUrl,
+      avatarUrl: null,
       email,
       authState: claimsData?.claims?.is_anonymous ? "guest" : "signed-in",
       theme,
     },
-    summary: { activeRooms: visible.filter((room) => room.status === "active").length, memories: visible.filter((room) => room.status === "archived" && room.viewer_archive_eligible).length, boardItems: photosResult.error ? 0 : (photosResult.data ?? []).length, storedRooms: visible.length },
+    summary: { activeRooms: visible.filter((room) => room.status === "active").length, memories: visible.filter((room) => room.status === "archived" && room.viewer_archive_eligible).length, boardItems: photosResult.error ? 0 : photosResult.count ?? 0, storedRooms: visible.length },
   };
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useLayoutEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ChangeEvent, type CSSProperties } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/ui/icon";
@@ -13,10 +13,12 @@ import { useMockSession } from "@/features/mock-session/components/mock-session-
 import { blobToDataUrl, prepareImage, validateImageFile } from "./board/image-upload";
 import { PhotoDetailViewer } from "./board/photo-detail-viewer";
 import { useRoomPhotoCache } from "./board/use-photo-window-cache";
+import { schedulePhotoEntryBatch } from "../model/photo-wall-entry";
 import styles from "./photos-panel.module.css";
 
 const photoVariants: readonly ArtVariant[] = ["one", "two", "three", "four"];
 const PHOTO_PROCESS_CONCURRENCY = 2;
+const PHOTO_ENTRY_BATCH_WINDOW_MS = 160;
 
 type PendingPhoto = {
   readonly id: string;
@@ -24,6 +26,11 @@ type PendingPhoto = {
   readonly previewUrl: string;
   readonly state: "processing" | "uploading" | "failed";
   readonly message?: string;
+};
+
+type PhotoEntryState = {
+  readonly phase: "entering" | "visible";
+  readonly delayMs: number;
 };
 
 export function PhotosPanel({
@@ -60,6 +67,15 @@ export function PhotosPanel({
   const [pendingPhotos, setPendingPhotos] = useState<readonly PendingPhoto[]>([]);
   const [syncingPhotoIds, setSyncingPhotoIds] = useState<ReadonlySet<string>>(() => new Set());
   const photos = useMemo(() => items.filter((item): item is BoardPhoto => item.kind === "photo"), [items]);
+  const entranceCandidateIdsRef = useRef<ReadonlySet<string> | null>(null);
+  const queuedDecodedIdsRef = useRef<Set<string>>(new Set());
+  const scheduledPhotoIdsRef = useRef<Set<string>>(new Set());
+  const entryBatchTimerRef = useRef<number | null>(null);
+  const nextEntrySlotAtRef = useRef(0);
+  const [photoEntries, setPhotoEntries] = useState<ReadonlyMap<string, PhotoEntryState>>(() => new Map());
+  if (entranceCandidateIdsRef.current === null) {
+    entranceCandidateIdsRef.current = new Set(photos.flatMap((photo) => photo.asset ? [photo.id] : []));
+  }
   const detailPhoto = photos.find((photo) => photo.id === detailPhotoId) ?? null;
   const refreshExpiredMediaUrls = useCallback(() => {
     if (signedUrlRefreshPendingRef.current) return;
@@ -85,6 +101,62 @@ export function PhotosPanel({
       panel.scrollTop = panel.scrollHeight;
     });
     return () => window.cancelAnimationFrame(frame);
+  }, []);
+
+  const flushDecodedPhotoEntries = useCallback(() => {
+    entryBatchTimerRef.current = null;
+    const queuedIds = [...queuedDecodedIdsRef.current];
+    queuedDecodedIdsRef.current.clear();
+    if (!queuedIds.length) return;
+
+    const schedule = schedulePhotoEntryBatch({
+      ids: queuedIds,
+      nowMs: performance.now(),
+      nextSlotAtMs: nextEntrySlotAtRef.current,
+    });
+    nextEntrySlotAtRef.current = schedule.nextSlotAtMs;
+    setPhotoEntries((current) => {
+      const next = new Map(current);
+      schedule.entries.forEach((entry) => {
+        next.set(entry.id, { phase: "entering", delayMs: entry.delayMs });
+      });
+      return next;
+    });
+  }, []);
+
+  const markPhotoDecoded = useCallback((photoId: string) => {
+    if (scheduledPhotoIdsRef.current.has(photoId)) return;
+    scheduledPhotoIdsRef.current.add(photoId);
+
+    const shouldAnimate = entranceCandidateIdsRef.current?.has(photoId)
+      && !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (!shouldAnimate) {
+      setPhotoEntries((current) => {
+        const next = new Map(current);
+        next.set(photoId, { phase: "visible", delayMs: 0 });
+        return next;
+      });
+      return;
+    }
+
+    queuedDecodedIdsRef.current.add(photoId);
+    if (entryBatchTimerRef.current === null) {
+      entryBatchTimerRef.current = window.setTimeout(flushDecodedPhotoEntries, PHOTO_ENTRY_BATCH_WINDOW_MS);
+    }
+  }, [flushDecodedPhotoEntries]);
+
+  const markPhotoVisible = useCallback((photoId: string) => {
+    setPhotoEntries((current) => {
+      const entry = current.get(photoId);
+      if (!entry || entry.phase === "visible") return current;
+      const next = new Map(current);
+      next.set(photoId, { phase: "visible", delayMs: 0 });
+      return next;
+    });
+  }, []);
+
+  useEffect(() => () => {
+    if (entryBatchTimerRef.current !== null) window.clearTimeout(entryBatchTimerRef.current);
   }, []);
 
   function updatePendingPhoto(id: string, patch: Partial<PendingPhoto>) {
@@ -223,10 +295,32 @@ export function PhotosPanel({
     {error ? <div className={styles.notice} role="status">{error}<button type="button" onClick={() => setError(null)} aria-label="Dismiss"><Icon name="close" size={13} /></button></div> : null}
 
     <div className={styles.grid}>
-      {photos.map((photo, index) => <button type="button" key={photo.id} className={styles.tile} onClick={() => setDetailPhotoId(photo.id)} aria-label={`Open ${photo.imageName ?? `photo ${index + 1}`}`}>
-        {photo.asset ? <LocalAssetImage asset={photo.asset} variant="thumbnail" alt="" fill sizes="(max-width: 700px) 33vw, 300px" className={styles.image} preferLocal cacheScope={viewerActorId} /> : <span className={styles.placeholder}><Icon name="image" /></span>}
-        {syncingPhotoIds.has(photo.id) ? <span className={styles.processingBadge}>Syncing</span> : null}
-      </button>)}
+      {photos.map((photo, index) => {
+        const entry = photoEntries.get(photo.id);
+        const entryClassName = !photo.asset
+          ? ""
+          : entry?.phase === "entering"
+            ? styles.tileEntering
+            : entry?.phase === "visible"
+              ? styles.tileVisible
+              : styles.tileWaiting;
+        const entryStyle = entry?.phase === "entering"
+          ? { "--photo-entry-delay": `${entry.delayMs}ms` } as CSSProperties
+          : undefined;
+        return <button
+          type="button"
+          key={photo.id}
+          className={`${styles.tile} ${entryClassName}`}
+          style={entryStyle}
+          disabled={Boolean(photo.asset && entry?.phase !== "visible")}
+          onAnimationEnd={() => markPhotoVisible(photo.id)}
+          onClick={() => setDetailPhotoId(photo.id)}
+          aria-label={`Open ${photo.imageName ?? `photo ${index + 1}`}`}
+        >
+          {photo.asset ? <LocalAssetImage asset={photo.asset} variant="thumbnail" alt="" fill sizes="(max-width: 700px) 33vw, 300px" className={styles.image} preferLocal cacheScope={viewerActorId} reveal="manual" onDecoded={() => markPhotoDecoded(photo.id)} /> : <span className={styles.placeholder}><Icon name="image" /></span>}
+          {syncingPhotoIds.has(photo.id) ? <span className={styles.processingBadge}>Syncing</span> : null}
+        </button>;
+      })}
       {pendingPhotos.map((photo) => <div key={photo.id} className={`${styles.tile} ${styles.pendingTile}`} aria-live="polite">
         <Image src={photo.previewUrl} alt="" fill sizes="(max-width: 700px) 33vw, 300px" className={styles.image} unoptimized />
         <span className={styles.pendingShade} />

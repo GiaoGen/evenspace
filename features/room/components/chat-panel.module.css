@@ -12,6 +12,10 @@
 .dayLabel { position: sticky; z-index: 2; top: 5px; width: fit-content; margin: 6px auto 18px; padding: 5px 9px; border: 1px solid color-mix(in srgb,var(--line) 76%,transparent); border-radius: 12px; background: color-mix(in srgb,var(--surface) 92%,transparent); color: var(--muted); font-size: 8px; font-weight: 700; backdrop-filter: blur(8px); }
 .systemMessage { width: fit-content; max-width: 82%; margin: 15px auto; color: var(--muted); font-size: 9px; line-height: 1.45; text-align: center; }
 .empty { min-height: 52%; display: grid; place-items: center; color: var(--muted); font-size: 10px; }
+.chatLoading { min-height: 52%; display: grid; align-content: center; gap: 12px; }
+.chatLoading i { width: min(86%,540px); height: 104px; border-radius: 42px; background: color-mix(in srgb,var(--message-tint) 76%,var(--surface)); opacity: .72; animation: chat-loading 1.35s ease-in-out infinite alternate; }
+.chatLoading i:nth-child(2) { justify-self: end; width: min(72%,460px); animation-delay: -450ms; }
+.chatLoading i:nth-child(3) { width: min(80%,500px); animation-delay: -900ms; }
 
 .pinned { position: sticky; z-index: 3; top: 4px; width: 100%; min-height: 48px; display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 3px 10px; align-items: center; margin: 0 0 16px; padding: 8px 11px; border: 1px solid var(--line); border-radius: 8px; background: color-mix(in srgb,var(--surface) 94%,transparent); color: inherit; text-align: left; box-shadow: 0 8px 18px rgba(35,31,26,.07); backdrop-filter: blur(10px); }
 .pinned span { display: flex; align-items: center; gap: 5px; color: var(--muted); font-size: 7px; font-weight: 750; text-transform: uppercase; }
@@ -114,6 +118,7 @@
 @keyframes record-pulse { 50% { opacity: .28; transform: scale(.75); } }
 @keyframes image-in { from { opacity: 0; transform: scale(.96); } }
 @keyframes notice-in { from { opacity: 0; transform: translate(-50%,8px); } }
+@keyframes chat-loading { to { opacity: .4; } }
 
 @media (max-width: 600px) {
   .chatScroll { padding: calc(var(--room-floating-header-offset) + 12px) 11px 22px; }
@@ -128,7 +133,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .roomSearch,.message,.reactions span,.latestButton,.toolSheet,.messageSheet,.sheetBackdrop,.mediaComposer,.imageViewer,.imageViewer img,.notice,.replyPreview,.sendButton { animation: none; }
+  .roomSearch,.message,.reactions span,.latestButton,.toolSheet,.messageSheet,.sheetBackdrop,.mediaComposer,.imageViewer,.imageViewer img,.notice,.replyPreview,.sendButton,.chatLoading i { animation: none; }
   .composer > button,.toolSheet button > span,.quickReactions button { transition: none; }
   .recordingStatus i { animation: none; }
   .chatScroll { scroll-behavior: auto; }

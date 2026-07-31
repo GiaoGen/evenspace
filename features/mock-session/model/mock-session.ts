@@ -1,5 +1,5 @@
 import { parseActorId, parseRoomId, parseRoomPublicId, type ActorId, type RoomPublicId } from "@/core/domain/ids";
-import { isAssetReference } from "@/core/domain/asset";
+import { isAssetReference, type AssetReference } from "@/core/domain/asset";
 import { getBoardItemUnitSize } from "@/core/domain/board-layout";
 import type { BoardBackground, BoardComment, BoardItem, ChatMessage, ItineraryItem, MembershipState, PersonSummary, RoomCapabilities, RoomDetail, RoomSummary } from "@/core/domain/room";
 import type { CreateRoomDraft } from "@/features/create-room/model/create-room-machine";
@@ -13,6 +13,7 @@ export interface MockViewer {
   readonly displayName: string;
   readonly initials: string;
   readonly avatarUrl?: string | null;
+  readonly avatarAsset?: AssetReference | null;
   readonly email: string | null;
   readonly authState: "guest" | "signed-in";
   readonly theme: "system" | "light" | "dark";
@@ -24,6 +25,7 @@ export interface MockJoinRequest {
   readonly displayName: string;
   readonly initials: string;
   readonly avatarUrl?: string | null;
+  readonly avatarAsset?: AssetReference | null;
   readonly note: string;
   readonly requestedAt: string;
   readonly state: JoinRequestState;

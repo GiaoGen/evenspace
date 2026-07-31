@@ -13,6 +13,7 @@ interface ChatMessageItemProps {
   readonly own: boolean;
   readonly grouped: boolean;
   readonly timeZone: string;
+  readonly cacheScope: string;
   readonly replyBody: string | null;
   readonly onPointerDown: (event: PointerEvent<HTMLElement>, message: ChatMessage) => void;
   readonly onPointerMove: (event: PointerEvent<HTMLElement>) => void;
@@ -76,7 +77,7 @@ function VoiceMessage({ message }: { readonly message: ChatMessage }) {
   </div>;
 }
 
-export function ChatMessageItem({ message, own, grouped, timeZone, replyBody, onPointerDown, onPointerMove, onPointerEnd, onContextMenu, onOpenImage }: ChatMessageItemProps) {
+export function ChatMessageItem({ message, own, grouped, timeZone, cacheScope, replyBody, onPointerDown, onPointerMove, onPointerEnd, onContextMenu, onOpenImage }: ChatMessageItemProps) {
   const content = message.content;
   const className = [styles.message, own ? styles.ownMessage : "", grouped ? styles.groupedMessage : ""].filter(Boolean).join(" ");
   const cardStyle = { "--message-tint": messageTint(message.id) } as CSSProperties;
@@ -90,7 +91,7 @@ export function ChatMessageItem({ message, own, grouped, timeZone, replyBody, on
     onPointerCancel={onPointerEnd}
     onContextMenu={(event) => onContextMenu(event, message)}
   >
-    <Avatar className={styles.messageAvatar} src={message.author?.avatarUrl} text={message.author?.initials ?? "?"} displayName={message.author?.displayName ?? "Room member"} decorative />
+    <Avatar className={styles.messageAvatar} src={message.author?.avatarUrl} asset={message.author?.avatarAsset} cacheScope={cacheScope} text={message.author?.initials ?? "?"} displayName={message.author?.displayName ?? "Room member"} decorative />
     <div className={styles.messageBody}>
       <p className={styles.messageMeta}><strong>{own ? "You" : message.author?.displayName}</strong><time>{formatTime(message.sentAt, timeZone)}</time></p>
       <div className={`${styles.bubble} ${content ? styles.mediaBubble : ""}`}>

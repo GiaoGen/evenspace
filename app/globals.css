@@ -17,6 +17,23 @@
   inset: 0;
 }
 
+.localAssetImage {
+  opacity: 0;
+  transition: opacity 140ms ease-out;
+}
+
+.localAssetImageLoaded {
+  opacity: 1;
+}
+
+.localAssetImageManual {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .localAssetImage { transition: none; }
+}
+
 @font-face {
   font-family: "Geist";
   src: url("/fonts/geist.woff2") format("woff2");

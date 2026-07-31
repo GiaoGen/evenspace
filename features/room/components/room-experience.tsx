@@ -12,6 +12,7 @@ import { ItineraryPanel } from "./itinerary/itinerary-panel";
 import { PhotosPanel } from "./photos-panel";
 import { RoomControls, type RoomControl } from "./room-controls";
 import styles from "./room-experience.module.css";
+import type { RoomSecondaryState } from "./backend-room-route";
 
 type RoomPage = "chat" | "photos" | "itinerary";
 
@@ -42,7 +43,7 @@ function formatCountdown(value: string | null, now: number) {
   return `${days}d ${hours % 24}h left`;
 }
 
-export function RoomExperience({ room, capabilities, viewerActorId }: { readonly room: MockRoom; readonly capabilities: RoomCapabilities; readonly viewerActorId: ActorId }) {
+export function RoomExperience({ room, capabilities, viewerActorId, cacheScope = viewerActorId, secondaryState = "ready" }: { readonly room: MockRoom; readonly capabilities: RoomCapabilities; readonly viewerActorId: ActorId; readonly cacheScope?: string; readonly secondaryState?: RoomSecondaryState }) {
   const { dispatch } = useMockSession();
   const [page, setPage] = useState<RoomPage>(INITIAL_ROOM_PAGE);
   const [control, setControl] = useState<RoomControl | null>(null);
@@ -64,7 +65,7 @@ export function RoomExperience({ room, capabilities, viewerActorId }: { readonly
   const leftPage = alternatePages[0];
   const rightPage = alternatePages[1];
 
-  const alignPageImmediately = useCallback((targetPage: RoomPage, concealUntilStable = false) => {
+  const alignPageImmediately = useCallback((targetPage: RoomPage) => {
     const container = pagesRef.current;
     const target = container?.children.item(pages.indexOf(targetPage));
     if (!container || !(target instanceof HTMLElement)) return;
@@ -75,7 +76,6 @@ export function RoomExperience({ room, capabilities, viewerActorId }: { readonly
     pagesReadyRef.current = false;
     pagesElement.style.overflowX = "hidden";
     pagesElement.style.scrollSnapType = "none";
-    if (concealUntilStable) pagesElement.style.visibility = "hidden";
 
     function align() {
       pagesElement.scrollLeft = targetElement.offsetLeft;
@@ -85,29 +85,21 @@ export function RoomExperience({ room, capabilities, viewerActorId }: { readonly
     pagePositionFrameRef.current = window.requestAnimationFrame(() => {
       align();
       pagesElement.style.removeProperty("overflow-x");
-      pagePositionFrameRef.current = window.requestAnimationFrame(() => {
-        align();
-        pagePositionFrameRef.current = window.requestAnimationFrame(() => {
-          align();
-          pagesElement.style.removeProperty("scroll-snap-type");
-          pagesElement.style.removeProperty("visibility");
-          pagesReadyRef.current = true;
-          pagePositionFrameRef.current = null;
-        });
-      });
+      pagesElement.style.removeProperty("scroll-snap-type");
+      pagesReadyRef.current = true;
+      pagePositionFrameRef.current = null;
     });
   }, []);
 
   useLayoutEffect(() => {
     const pagesElement = pagesRef.current;
     initialPageGuardRef.current = true;
-    alignPageImmediately(INITIAL_ROOM_PAGE, true);
+    alignPageImmediately(INITIAL_ROOM_PAGE);
 
     return () => {
       if (pagePositionFrameRef.current !== null) window.cancelAnimationFrame(pagePositionFrameRef.current);
       pagesElement?.style.removeProperty("overflow-x");
       pagesElement?.style.removeProperty("scroll-snap-type");
-      pagesElement?.style.removeProperty("visibility");
       pagesReadyRef.current = false;
     };
   }, [alignPageImmediately]);
@@ -208,7 +200,6 @@ export function RoomExperience({ room, capabilities, viewerActorId }: { readonly
       const container = pagesRef.current;
       container?.style.removeProperty("overflow-x");
       container?.style.removeProperty("scroll-snap-type");
-      container?.style.removeProperty("visibility");
       pagesReadyRef.current = true;
     }
   }
@@ -223,12 +214,12 @@ export function RoomExperience({ room, capabilities, viewerActorId }: { readonly
       <div className={styles.roomBody}>
         <main className={styles.roomContent}>
           <div ref={pagesRef} className={styles.roomPages} onPointerDown={releaseInitialPageGuard} onWheel={releaseInitialPageGuard} onScroll={schedulePageSettlement}>
-            <section className={`${styles.roomPage} ${jumpingPage === "chat" ? styles.roomPageJumping : ""}`} aria-hidden={page !== "chat"} inert={page !== "chat"}><ChatPanel roomPublicId={room.publicId} messages={room.messages} pinnedMessageId={room.pinnedMessageId} members={room.members} viewerActorId={viewerActorId} timeZone={room.timeZone} canChat={capabilities.canChat} canModerate={capabilities.canModerate} archived={room.lifecycle !== "active"} /></section>
+            <section className={`${styles.roomPage} ${jumpingPage === "chat" ? styles.roomPageJumping : ""}`} aria-hidden={page !== "chat"} inert={page !== "chat"}><ChatPanel roomPublicId={room.publicId} messages={room.messages} pinnedMessageId={room.pinnedMessageId} members={room.members} viewerActorId={viewerActorId} cacheScope={cacheScope} timeZone={room.timeZone} canChat={capabilities.canChat} canModerate={capabilities.canModerate} archived={room.lifecycle !== "active"} dataState={secondaryState} /></section>
             <section className={`${styles.roomPage} ${jumpingPage === "photos" ? styles.roomPageJumping : ""}`} aria-hidden={page !== "photos"} inert={page !== "photos"}><PhotosPanel roomPublicId={room.publicId} items={room.boardItems} comments={room.boardComments} members={room.members} viewerActorId={viewerActorId} photoCount={room.photoCount} maxPhotos={room.maxPhotos} canAdd={capabilities.canAddBoardItem} canModerate={capabilities.canModerate} archived={room.lifecycle !== "active"} /></section>
-            <section className={`${styles.roomPage} ${jumpingPage === "itinerary" ? styles.roomPageJumping : ""}`} aria-hidden={page !== "itinerary"} inert={page !== "itinerary"}><ItineraryPanel roomPublicId={room.publicId} items={room.itinerary} timeZone={room.timeZone} canCreate={capabilities.canCreateItinerary} canModerate={capabilities.canModerate} members={room.members} /></section>
+            <section className={`${styles.roomPage} ${jumpingPage === "itinerary" ? styles.roomPageJumping : ""}`} aria-hidden={page !== "itinerary"} inert={page !== "itinerary"}><ItineraryPanel roomPublicId={room.publicId} items={room.itinerary} timeZone={room.timeZone} canCreate={capabilities.canCreateItinerary} canModerate={capabilities.canModerate} members={room.members} active={page === "itinerary"} /></section>
           </div>
         </main>
-        <aside className={styles.sidebar}><section><p>About</p><span>{room.description}</span></section><section><p>{room.status === "active" ? "Ends at" : "Archived"}</p><strong>{room.status === "active" ? endTime : room.archivedAt ? new Intl.DateTimeFormat("en-US", { month: "long", day: "numeric", timeZone: room.timeZone }).format(new Date(room.archivedAt)) : "—"}</strong><span>{room.timeZone.replace("_", " ")}</span></section><section><p>People · {room.memberCount}</p><div className={styles.avatarStack}>{room.members.slice(0,4).map((member) => <Avatar key={member.actorId} src={member.avatarUrl} text={member.initials} displayName={member.displayName} decorative />)}{room.memberCount > 4 ? <b>+{room.memberCount - 4}</b> : null}</div></section>{room.itinerary[0] ? <section><p>Next</p><div className={styles.next}><time>{formatEnd(room.itinerary[0].startsAt, room.timeZone)}</time><div><strong>{room.itinerary[0].title}</strong><span>{room.itinerary[0].locationLabel ?? "No fixed location"}</span></div><Icon name="chevron" /></div></section> : null}</aside>
+        <aside className={styles.sidebar}><section><p>About</p><span>{room.description}</span></section><section><p>{room.status === "active" ? "Ends at" : "Archived"}</p><strong>{room.status === "active" ? endTime : room.archivedAt ? new Intl.DateTimeFormat("en-US", { month: "long", day: "numeric", timeZone: room.timeZone }).format(new Date(room.archivedAt)) : "—"}</strong><span>{room.timeZone.replace("_", " ")}</span></section><section><p>People · {room.memberCount}</p><div className={styles.avatarStack}>{room.members.slice(0,4).map((member) => <Avatar key={member.actorId} src={member.avatarUrl} asset={member.avatarAsset} cacheScope={cacheScope} text={member.initials} displayName={member.displayName} decorative />)}{room.memberCount > 4 ? <b>+{room.memberCount - 4}</b> : null}</div></section>{room.itinerary[0] ? <section><p>Next</p><div className={styles.next}><time>{formatEnd(room.itinerary[0].startsAt, room.timeZone)}</time><div><strong>{room.itinerary[0].title}</strong><span>{room.itinerary[0].locationLabel ?? "No fixed location"}</span></div><Icon name="chevron" /></div></section> : null}</aside>
       </div>
       {room.lifecycle === "freezing" || room.lifecycle === "archiving" ? <div className={styles.lifecycle}><span /><div><strong>{room.lifecycle === "freezing" ? "Freezing the room…" : "Keeping this moment…"}</strong><p>Every write is now disabled while the read-only archive is prepared.</p></div></div> : null}
       {control ? <RoomControls active={control} room={room} capabilities={capabilities} close={() => setControl(null)} openControl={setControl} /> : null}

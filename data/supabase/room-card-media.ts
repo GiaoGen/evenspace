@@ -46,9 +46,9 @@ function roomMediaRpc<T>(
 }
 
 /**
- * Fetches the small, private media projection needed by the existing Rooms
- * cards. The card UI remains unchanged; only signed, room-authorized previews
- * are supplied to it.
+ * Fetches the complete private photo projection for Rooms cards. The client
+ * keeps the rendered stack bounded while retaining every signed,
+ * room-authorized thumbnail for finite swipe navigation.
  */
 export async function getRoomCardMedia(
   page: RoomReadPage,

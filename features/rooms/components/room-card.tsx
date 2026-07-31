@@ -4,6 +4,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperti
 import { PinnedPhoto } from "@/components/pinboard/pinned-photo";
 import { Icon } from "@/components/ui/icon";
 import type { BoardItem, BoardPhoto, RoomSummary } from "@/core/domain/room";
+import { getPhotoStackVisibleRadius, getPhotoStackWindow } from "@/features/rooms/model/photo-stack-window";
 import styles from "./rooms-page.module.css";
 
 function formatRoomMeta(room: RoomSummary) {
@@ -27,13 +28,12 @@ function PhotoStack({ items, compact = false, roomHref, onOpen, prefetchRoom, ca
   const resetAfterShuffle = useRef(false);
 
   useEffect(() => () => { timers.current.forEach(window.clearTimeout); }, []);
-  useEffect(() => { compactRef.current = compact; }, [compact]);
 
   const normalizedView = Math.max(0, Math.min(view, Math.max(0, source.length - 1)));
 
   function applyLayout(xPosition: number, duration = 0, locked = false, shifted = false) {
     const width = Math.max(1, pointer.current.width || deckRef.current?.clientWidth || 1);
-    const visibleRadius = compactRef.current ? 2 : 4;
+    const visibleRadius = getPhotoStackVisibleRadius(compactRef.current);
     const reserveLevel = visibleRadius + 1;
     const layerLift = compactRef.current ? 4 : 8;
     const dragLift = compactRef.current ? 3 : 7;
@@ -41,6 +41,7 @@ function PhotoStack({ items, compact = false, roomHref, onOpen, prefetchRoom, ca
     const direction = factor >= 0 ? "left" : "right";
     const incomingSide = direction === "left" ? -1 : 1;
     const transition = duration ? `transform ${duration}ms linear` : "none";
+    const hasIncomingReserve = cardRefs.current.has(incomingSide * reserveLevel);
     cardRefs.current.forEach((card, offset) => {
       const side = Math.sign(offset);
       const level = Math.abs(offset);
@@ -68,20 +69,14 @@ function PhotoStack({ items, compact = false, roomHref, onOpen, prefetchRoom, ca
         xOffset = sideSign * (8 * baseLevel + 2) + sideFactor * 3;
         yOffset = -layerLift * baseLevel + (sideSign < 0 ? sideFactor : -sideFactor) * dragLift;
         zIndex = level === 1 ? (direction === (sideSign < 0 ? "left" : "right") ? 3 : 1) : 0;
-        if (compactRef.current && level === visibleRadius && sideSign === -incomingSide && Math.abs(factor) > .01) visible = false;
+        if (hasIncomingReserve && level === visibleRadius && sideSign === -incomingSide && Math.abs(factor) > .01) visible = false;
         if (isReserve) {
           visible = direction === (sideSign < 0 ? "left" : "right") && Math.abs(factor) > .01;
           if (shifted) {
-            if (compactRef.current) {
-              scale = 1 - .085 * visibleRadius;
-              degree = sideSign * 2.8 * visibleRadius;
-              xOffset = sideSign * (8 * visibleRadius + 2);
-              yOffset = -layerLift * visibleRadius;
-            } else {
-              xOffset = sideSign * 34;
-              yOffset = -layerLift * 3;
-              degree = sideSign * 11.2;
-            }
+            scale = 1 - .085 * visibleRadius;
+            degree = sideSign * 2.8 * visibleRadius;
+            xOffset = sideSign * (8 * visibleRadius + 2);
+            yOffset = -layerLift * visibleRadius;
           }
           zIndex = -2;
         }
@@ -95,9 +90,10 @@ function PhotoStack({ items, compact = false, roomHref, onOpen, prefetchRoom, ca
   }
 
   useLayoutEffect(() => {
+    compactRef.current = compact;
     if (!animating.current || resetAfterShuffle.current) applyLayout(0);
     resetAfterShuffle.current = false;
-  }, [view]);
+  }, [view, compact, source.length]);
 
   function finishShuffle(direction: -1 | 1) {
     const width = pointer.current.width;
@@ -152,15 +148,14 @@ function PhotoStack({ items, compact = false, roomHref, onOpen, prefetchRoom, ca
     else applyLayout(0, 100);
   }
 
-  const renderRadius = compact ? 3 : 5;
-  const offsets = source.length === 0 ? [] : Array.from({ length: renderRadius * 2 + 1 }, (_, index) => index - renderRadius).filter((offset) => normalizedView + offset >= 0 && normalizedView + offset < source.length);
+  const { visibleRadius, offsets } = getPhotoStackWindow(source.length, normalizedView, compact);
 
   return <div ref={deckRef} className={styles.photoStack} aria-label="Swipe room photos" onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={finishPointer} onPointerCancel={finishPointer} onClickCapture={(event) => { if (dragged.current) { event.preventDefault(); event.stopPropagation(); dragged.current = false; } }}>
-    <div className={styles.photoStackPreload} aria-hidden="true">{source.map((photo) => <PinnedPhoto key={photo.id} variant={photo.variant} asset={photo.asset} imageName={photo.imageName} bare preferLocal={Boolean(cacheScope)} cacheScope={cacheScope} />)}</div>
     {source.length === 0 ? <span className={styles.photoStackEmpty}>No photos yet.</span> : null}
     <div className={styles.photoStackDeck}>{offsets.map((offset) => {
       const photo = source[normalizedView + offset];
-      return <div className={styles.photoStackCard} ref={(element) => { if (element) cardRefs.current.set(offset, element); else cardRefs.current.delete(offset); }} key={offset}>{roomHref ? <Link href={roomHref} scroll={false} prefetch onPointerEnter={prefetchRoom} onFocus={prefetchRoom} onClick={onOpen} className={styles.photoStackPhotoLink} aria-label={`Open room photo: ${photo.imageName ?? "photo"}`}><PinnedPhoto variant={photo.variant} asset={photo.asset} imageName={photo.imageName} bare className={styles.photoStackImage} preferLocal={Boolean(cacheScope)} cacheScope={cacheScope} /></Link> : <PinnedPhoto variant={photo.variant} asset={photo.asset} imageName={photo.imageName} bare className={styles.photoStackImage} preferLocal={Boolean(cacheScope)} cacheScope={cacheScope} />}</div>;
+      const eager = Math.abs(offset) <= visibleRadius;
+      return <div className={styles.photoStackCard} ref={(element) => { if (element) cardRefs.current.set(offset, element); else cardRefs.current.delete(offset); }} key={photo.id}>{roomHref ? <Link href={roomHref} scroll={false} prefetch onPointerEnter={prefetchRoom} onFocus={prefetchRoom} onClick={onOpen} className={styles.photoStackPhotoLink} aria-label={`Open room photo: ${photo.imageName ?? "photo"}`}><PinnedPhoto variant={photo.variant} asset={photo.asset} imageName={photo.imageName} bare eager={eager} className={styles.photoStackImage} preferLocal={Boolean(cacheScope)} cacheScope={cacheScope} /></Link> : <PinnedPhoto variant={photo.variant} asset={photo.asset} imageName={photo.imageName} bare eager={eager} className={styles.photoStackImage} preferLocal={Boolean(cacheScope)} cacheScope={cacheScope} />}</div>;
     })}</div>
   </div>;
 }

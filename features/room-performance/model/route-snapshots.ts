@@ -39,7 +39,7 @@ function removeSignedUrls(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(removeSignedUrls);
   if (!value || typeof value !== "object") return value;
   return Object.fromEntries(Object.entries(value).flatMap(([key, child]) =>
-    key === "remoteUrl" ? [] : [[key, removeSignedUrls(child)]],
+    key === "remoteUrl" || key === "avatarUrl" ? [] : [[key, removeSignedUrls(child)]],
   ));
 }
 
