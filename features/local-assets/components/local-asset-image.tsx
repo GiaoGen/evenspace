@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type SyntheticEvent } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type SyntheticEvent } from "react";
 import Image from "next/image";
 import type { AssetReference } from "@/core/domain/asset";
 import { getImageReadinessKey, isImageDecoded, markImageDecoded } from "../model/image-readiness";
@@ -9,6 +9,8 @@ import { useLocalAssetUrl } from "./use-local-asset-url";
 
 export type ImageVariant = "thumbnail" | "display";
 export type ImageRevealMode = "fade" | "manual";
+
+const useBrowserLayoutEffect = typeof window === "undefined" ? useEffect : useLayoutEffect;
 
 function Placeholder({ asset, fill }: { readonly asset: AssetReference; readonly fill?: boolean }) {
   if (!asset.placeholderDataUrl) return null;
@@ -32,7 +34,7 @@ function ReadyImage({ url, readinessKey, asset, alt, fill, width, height, sizes,
     onErrorRef.current = onError;
   }, [onError]);
 
-  useEffect(() => {
+  useBrowserLayoutEffect(() => {
     if (loaded) onDecodedRef.current?.();
   }, [loaded]);
 

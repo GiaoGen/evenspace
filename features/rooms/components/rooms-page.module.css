@@ -5,7 +5,7 @@
 .avatar:active { transform: scale(.92); }
 
 .main { width: min(1380px, calc(100% - 48px)); height: calc(100dvh - 72px); display: flex; flex-direction: column; box-sizing: border-box; margin: 0 auto; padding: 24px 0 18px; overflow: hidden; }
-.toolbarWrap { position: relative; z-index: 20; margin-bottom: 18px; animation: toolbarIn 360ms cubic-bezier(.2,.72,.25,1) both; }
+.toolbarWrap { position: relative; z-index: 20; margin-bottom: 18px; }
 .toolbar {
   min-height: 50px;
   display: flex;
@@ -60,9 +60,10 @@
 .toolbarActions button:active,
 .doneButton:active,
 .searchMode button:active { transform: scale(.92); }
+.toolbarActions button:disabled { cursor: default; opacity: .45; }
 .toolbarActions .editAction { color: var(--ink); }
 .createMenuWrap { position: relative; z-index: 92; }
-.topCreateAction { width: 40px; height: 40px; display: grid; place-items: center; padding: 0; border: 0; border-radius: 50%; background: var(--ink); color: var(--canvas); text-decoration: none; cursor: pointer; transition: transform 160ms ease-out, opacity 160ms ease-out; }
+.topCreateAction { position: relative; z-index: 92; width: 40px; height: 40px; display: grid; place-items: center; padding: 0; border: 0; border-radius: 50%; background: var(--ink); color: var(--canvas); text-decoration: none; cursor: pointer; transition: transform 160ms ease-out, opacity 160ms ease-out; }
 .topCreateAction:hover { opacity: .84; }
 .topCreateAction:active { transform: scale(.92); }
 .createMenuDismiss { position: fixed; z-index: 90; inset: 0; }
@@ -170,6 +171,9 @@
 }
 .cards::-webkit-scrollbar { display: none; }
 .cardsGrid { grid-auto-flow: initial; grid-auto-columns: initial; grid-auto-rows: 390px; grid-template-columns: repeat(2,minmax(0,1fr)); overflow-x: hidden; overflow-y: auto; overscroll-behavior-y: contain; padding: 4px 0 24px; }
+.cardsLayoutFading { pointer-events: none; }
+.cardsFadeOut { animation: roomsLayoutFadeOut 110ms ease-out both; }
+.cardsFadeIn { animation: roomsLayoutFadeIn 170ms ease-out both; }
 
 .card {
   min-height: 0;
@@ -296,11 +300,12 @@
 .mobileCreate:focus-visible,
 .deleteSheet button:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
 
-@keyframes toolbarIn { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes filterIn { from { opacity: 0; transform: translateY(-5px) scale(.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
 @keyframes modeIn { from { opacity: 0; transform: translateX(5px); } to { opacity: 1; transform: translateX(0); } }
 @keyframes cardActionIn { from { opacity: 0; transform: scale(.72); } to { opacity: 1; transform: scale(1); } }
 @keyframes countIn { from { opacity: 0; transform: translateY(3px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes roomsLayoutFadeOut { from { opacity: 1; } to { opacity: 0; } }
+@keyframes roomsLayoutFadeIn { from { opacity: 0; } to { opacity: 1; } }
 @keyframes emptyIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes backdropIn { from { opacity: 0; } to { opacity: 1; } }
 @keyframes sheetIn { from { opacity: 0; transform: translateY(22px); } to { opacity: 1; transform: translateY(0); } }
@@ -357,5 +362,5 @@
 
 
 @media (min-width: 700px) { .sheetBackdrop { align-items: center; } }
-@media (prefers-reduced-motion: reduce) { .photoStackCard { transition: none !important; }.photoStackSurfaceEntering { animation:none; opacity:1; transform:none; } }
+@media (prefers-reduced-motion: reduce) { .cardsFadeOut,.cardsFadeIn { animation:none; }.photoStackCard { transition: none !important; }.photoStackSurfaceEntering { animation:none; opacity:1; transform:none; } }
 @keyframes createIn { from { opacity: 0; transform: translateY(10px) scale(.94); } to { opacity: 1; transform: translateY(0) scale(1); } }

@@ -7,6 +7,7 @@ import { Avatar } from "@/components/ui/avatar";
 import { Icon } from "@/components/ui/icon";
 import { filterRoomCollection, getRoomFilterCounts, type RoomCollectionItem, type RoomFilter } from "../model/room-collection";
 import { rememberRoomCarouselItem, useRoomCarousel } from "../model/use-room-carousel";
+import { useRoomsLayoutFade } from "../model/use-rooms-layout-fade";
 import { RoomCard } from "./room-card";
 import { RoomsCreateMenu } from "./rooms-create-menu";
 import { RoomProgress } from "./room-progress";
@@ -66,6 +67,13 @@ export function RoomsPage({ initialRooms, viewerInitials, viewerAvatarUrl, viewe
   const visibleRooms = useMemo(() => filterRoomCollection(initialRooms, filter, query), [filter, initialRooms, query]);
   const roomKeys = useMemo(() => visibleRooms.map((item) => item.room.publicId), [visibleRooms]);
   const { containerRef, activeIndex, progress } = useRoomCarousel(roomKeys, !grid);
+  const activeRoomKey = roomKeys[activeIndex];
+  const { isTransitioning, phase: layoutFadePhase, toggleLayout } = useRoomsLayoutFade({
+    containerRef,
+    grid,
+    activeRoomKey,
+    setGrid: updateGridPreference,
+  });
   useEffect(() => {
     if (loading) return;
     rememberViewerCacheScope(viewerCacheScope);
@@ -117,8 +125,8 @@ export function RoomsPage({ initialRooms, viewerInitials, viewerAvatarUrl, viewe
     <div className={styles.page}>
       <AppHeader leading={<Link href="/account" className={styles.avatar} aria-label="Open account"><Avatar src={avatarUrl} asset={avatarAsset} cacheScope={viewerAccountScope} text={viewerInitials} displayName="Your account" decorative /></Link>} actions={<RoomsCreateMenu />} />
       <main className={styles.main}>
-        <RoomsToolbar filter={filter} counts={counts} filterOpen={filterOpen} searchOpen={searchOpen} editing={editing} grid={grid} query={query} visibleCount={visibleRooms.length} canEdit={false} setFilterOpen={setFilterOpen} setFilter={setFilter} openSearch={() => { setSearchOpen(true); setFilterOpen(false); }} closeSearch={closeSearch} setQuery={setQuery} toggleEditing={() => undefined} toggleGrid={() => updateGridPreference(!grid)} />
-        {loading ? <RoomsCardsLoading grid={grid} /> : visibleRooms.length ? <section ref={containerRef} key={`${filter}:${grid}:${query}`} className={`${styles.cards} ${grid ? styles.cardsGrid : ""}`} aria-label="Your rooms">{visibleRooms.map(({ room, boardItems }, index) => <RoomCard key={room.id} room={room} boardItems={boardItems} grid={grid} editing={editing} active={grid || index === activeIndex} index={index} toggleFavorite={() => undefined} requestDelete={() => undefined} rememberRoom={() => rememberRoomCarouselItem(room.publicId)} cacheScope={viewerCacheScope} />)}</section> : <section className={styles.empty}><Icon name="board" size={26} /><h1>No rooms here.</h1><p>{query ? "Try a different room name." : "The next shared moment will appear here."}</p></section>}
+        <RoomsToolbar filter={filter} counts={counts} filterOpen={filterOpen} searchOpen={searchOpen} editing={editing} grid={grid} query={query} visibleCount={visibleRooms.length} canEdit={false} layoutFading={isTransitioning} setFilterOpen={setFilterOpen} setFilter={setFilter} openSearch={() => { setSearchOpen(true); setFilterOpen(false); }} closeSearch={closeSearch} setQuery={setQuery} toggleEditing={() => undefined} toggleGrid={toggleLayout} />
+        {loading ? <RoomsCardsLoading grid={grid} /> : visibleRooms.length ? <section ref={containerRef} key={`${filter}:${grid}:${query}`} className={`${styles.cards} ${grid ? styles.cardsGrid : ""} ${isTransitioning ? styles.cardsLayoutFading : ""} ${layoutFadePhase === "out" ? styles.cardsFadeOut : layoutFadePhase === "in" ? styles.cardsFadeIn : ""}`} aria-label="Your rooms" aria-busy={isTransitioning || undefined}>{visibleRooms.map(({ room, boardItems }, index) => <RoomCard key={room.id} room={room} boardItems={boardItems} grid={grid} editing={editing} active={grid || index === activeIndex} index={index} toggleFavorite={() => undefined} requestDelete={() => undefined} rememberRoom={() => rememberRoomCarouselItem(room.publicId)} cacheScope={viewerCacheScope} />)}</section> : <section className={styles.empty}><Icon name="board" size={26} /><h1>No rooms here.</h1><p>{query ? "Try a different room name." : "The next shared moment will appear here."}</p></section>}
         {!loading && !grid && visibleRooms.length > 0 ? <RoomProgress activeIndex={activeIndex} total={visibleRooms.length} progress={progress} /> : null}
       </main>
     </div>

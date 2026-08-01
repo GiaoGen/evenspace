@@ -5,6 +5,7 @@ import type { RoomCollectionItem } from "@/features/rooms/model/room-collection"
 
 const VIEWER_SCOPE_KEY = "eventspace:viewer-cache-scope:v1";
 const ROOMS_SNAPSHOT_KEY = "eventspace:rooms-snapshot:v1";
+const ROOMS_SNAPSHOT_EVENT = "eventspace:rooms-snapshot-change";
 const ROOM_SNAPSHOT_PREFIX = "eventspace:room-snapshot:v1:";
 const SNAPSHOT_MAX_AGE_MS = 1000 * 60 * 60 * 12;
 
@@ -20,6 +21,10 @@ export interface RoomRouteSnapshot {
   readonly savedAt: number;
   readonly payload: BackendRoomSession;
 }
+
+let memoizedRoomsRaw: string | null | undefined;
+let memoizedRoomsScope: string | null | undefined;
+let memoizedRoomsSnapshot: RoomsRouteSnapshot | null = null;
 
 function browserStorage() {
   if (typeof window === "undefined") return null;
@@ -62,20 +67,60 @@ export function rememberViewerCacheScope(scope: string | undefined) {
 export function saveRoomsRouteSnapshot(input: Omit<RoomsRouteSnapshot, "savedAt">) {
   const storage = browserStorage();
   if (!storage || !input.scope) return;
+  const stableRooms = removeSignedUrls(input.rooms) as readonly RoomCollectionItem[];
+  const current = readRoomsRouteSnapshot();
+  if (
+    current?.scope === input.scope
+    && current.viewerInitials === input.viewerInitials
+    && JSON.stringify(current.rooms) === JSON.stringify(stableRooms)
+  ) return;
   const snapshot: RoomsRouteSnapshot = {
     ...input,
     savedAt: Date.now(),
-    rooms: removeSignedUrls(input.rooms) as readonly RoomCollectionItem[],
+    rooms: stableRooms,
   };
-  try { storage.local.setItem(ROOMS_SNAPSHOT_KEY, JSON.stringify(snapshot)); }
+  try {
+    const raw = JSON.stringify(snapshot);
+    storage.local.setItem(ROOMS_SNAPSHOT_KEY, raw);
+    memoizedRoomsRaw = raw;
+    memoizedRoomsScope = input.scope;
+    memoizedRoomsSnapshot = snapshot;
+    window.dispatchEvent(new Event(ROOMS_SNAPSHOT_EVENT));
+  }
   catch { /* Storage quota must never block navigation. */ }
 }
 
 export function readRoomsRouteSnapshot(): RoomsRouteSnapshot | null {
   const storage = browserStorage();
   if (!storage) return null;
-  const snapshot = readJson<RoomsRouteSnapshot>(storage.local, ROOMS_SNAPSHOT_KEY);
-  return snapshot && snapshot.scope === currentScope() && fresh(snapshot) ? snapshot : null;
+  try {
+    const raw = storage.local.getItem(ROOMS_SNAPSHOT_KEY);
+    const scope = currentScope();
+    if (raw === memoizedRoomsRaw && scope === memoizedRoomsScope) return memoizedRoomsSnapshot;
+    memoizedRoomsRaw = raw;
+    memoizedRoomsScope = scope;
+    const snapshot = raw ? JSON.parse(raw) as RoomsRouteSnapshot : null;
+    memoizedRoomsSnapshot = snapshot && snapshot.scope === scope && fresh(snapshot) ? snapshot : null;
+    return memoizedRoomsSnapshot;
+  } catch {
+    memoizedRoomsRaw = undefined;
+    memoizedRoomsScope = undefined;
+    memoizedRoomsSnapshot = null;
+    return null;
+  }
+}
+
+export function subscribeRoomsRouteSnapshot(onChange: () => void) {
+  if (typeof window === "undefined") return () => undefined;
+  const handleStorage = (event: StorageEvent) => {
+    if (event.key === ROOMS_SNAPSHOT_KEY) onChange();
+  };
+  window.addEventListener("storage", handleStorage);
+  window.addEventListener(ROOMS_SNAPSHOT_EVENT, onChange);
+  return () => {
+    window.removeEventListener("storage", handleStorage);
+    window.removeEventListener(ROOMS_SNAPSHOT_EVENT, onChange);
+  };
 }
 
 export function saveRoomRouteSnapshot(payload: BackendRoomSession) {

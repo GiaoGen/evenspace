@@ -95,7 +95,7 @@ export function RoomsCreateMenu() {
         <button type="button" className={styles.topCreateAction} aria-label="Open room actions" aria-haspopup="menu" aria-expanded={menuOpen} onClick={() => setMenuOpen((open) => !open)}><Icon name={menuOpen ? "close" : "plus"} size={17} /></button>
         {menuOpen ? (
           <>
-            <div className={styles.createMenuDismiss} aria-hidden="true" onPointerDown={() => setMenuOpen(false)} />
+            <div className={styles.createMenuDismiss} aria-hidden="true" onClick={() => setMenuOpen(false)} />
             <div className={styles.createMenu} role="menu" aria-label="Room actions">
               <Link href="/rooms/new" role="menuitem"><span><Icon name="plus" size={16} /></span><strong>Room</strong></Link>
               <button type="button" role="menuitem" onClick={openInvite}><span><Icon name="copy" size={16} /></span><strong>Invite code</strong></button>

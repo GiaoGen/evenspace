@@ -1,12 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useSyncExternalStore } from "react";
 
-import { readRoomsRouteSnapshot } from "@/features/room-performance/model/route-snapshots";
+import { readRoomsRouteSnapshot, subscribeRoomsRouteSnapshot } from "@/features/room-performance/model/route-snapshots";
 import { RoomsPage } from "./rooms-page";
 
 export function RoomsRouteLoading() {
-  const [snapshot] = useState(readRoomsRouteSnapshot);
+  const snapshot = useSyncExternalStore(subscribeRoomsRouteSnapshot, readRoomsRouteSnapshot, () => null);
 
   if (snapshot) {
     return <RoomsPage

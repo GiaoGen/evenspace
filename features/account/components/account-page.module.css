@@ -11,6 +11,11 @@
   color: var(--ink);
 }
 
+.accountRouteEntry {
+  min-height: 100dvh;
+  animation: accountRouteIn 220ms ease-out both;
+}
+
 .header {
   position: sticky;
   z-index: 30;
@@ -47,7 +52,7 @@
 }
 
 .reveal {
-  animation: accountReveal 420ms cubic-bezier(.2, .72, .25, 1) both;
+  animation: none;
 }
 
 .identityCard {
@@ -466,8 +471,8 @@
 .sheet button:focus-visible,
 .inlineEditor button:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
 
-@keyframes accountReveal { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes accountPulse { from { opacity: .08; } to { opacity: .18; } }
+@keyframes accountRouteIn { from { opacity: 0; } to { opacity: 1; } }
 @keyframes backdropIn { from { opacity: 0; } to { opacity: 1; } }
 @keyframes sheetIn { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes backdropOut { from { opacity: 1; } to { opacity: 0; } }
@@ -507,6 +512,10 @@
     --account-danger: #a95047;
   }
   .sheet { --account-sage: #3e5143; --account-sage-ink: #f1f6ed; --account-danger: #a95047; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .accountRouteEntry { animation: none; }
 }
 
 :global(:root[data-theme="light"]) .page {

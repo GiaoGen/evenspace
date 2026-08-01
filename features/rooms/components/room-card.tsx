@@ -274,7 +274,7 @@ export function RoomCard({ room, boardItems, grid, editing, active, index, toggl
   const roomHref = `/rooms/${room.publicId}`;
   const prefetchRoom = () => router.prefetch(roomHref);
   return (
-    <article data-room-card className={`${styles.card} ${grid ? styles.cardGrid : ""} ${editing ? styles.cardEditing : ""} ${active ? styles.cardActive : styles.cardInactive}`} style={{ "--card-index": Math.min(index, 5) } as CSSProperties}>
+    <article data-room-card data-room-key={room.publicId} className={`${styles.card} ${grid ? styles.cardGrid : ""} ${editing ? styles.cardEditing : ""} ${active ? styles.cardActive : styles.cardInactive}`} style={{ "--card-index": Math.min(index, 5) } as CSSProperties}>
       {editing ? <button className={`${styles.favorite} ${room.isFavorite ? styles.favoriteActive : ""}`} onClick={toggleFavorite} aria-label={room.isFavorite ? `Remove ${room.name} from favorites` : `Favorite ${room.name}`}><Icon name="heart" size={16} /><span>Favorite</span></button> : null}
       {editing ? <button className={styles.deleteRoom} onClick={requestDelete} aria-label={`Delete ${room.name}`}><Icon name="minus" size={16} /></button> : null}
       {grid ? <PhotoStack items={boardItems} compact roomHref={roomHref} roomId={room.id} onOpen={rememberRoom} prefetchRoom={prefetchRoom} cacheScope={cacheScope} /> : <Link href={roomHref} scroll={false} prefetch onPointerEnter={prefetchRoom} onFocus={prefetchRoom} onClick={rememberRoom} className={styles.cardLink}>

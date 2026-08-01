@@ -4,7 +4,7 @@ import Image from "next/image";
 import { useCallback, useSyncExternalStore } from "react";
 
 import type { AssetReference } from "@/core/domain/asset";
-import { useLocalAssetUrl } from "@/features/local-assets/components/use-local-asset-url";
+import { LocalAssetImage } from "@/features/local-assets/components/local-asset-image";
 import { readViewerAvatar, subscribeViewerAvatar } from "@/features/account/model/viewer-avatar-cache";
 import styles from "./avatar.module.css";
 
@@ -31,28 +31,31 @@ export function Avatar({
   const getSnapshot = useCallback(() => cacheScope ? readViewerAvatar(cacheScope) : null, [cacheScope]);
   const cachedAsset = useSyncExternalStore(subscribe, getSnapshot, () => null);
   const activeAsset = asset ?? cachedAsset;
-  const assetUrl = useLocalAssetUrl(
-    activeAsset,
-    Boolean(activeAsset && cacheScope),
-    activeAsset && cacheScope ? { scope: cacheScope, variant: "display" } : undefined,
-  );
-  const imageUrl = assetUrl ?? src;
   return (
     <span
       className={`${styles.avatar} ${className}`}
       aria-hidden={decorative || undefined}
     >
-      {imageUrl ? (
+      <span className={styles.fallback} aria-hidden={Boolean(activeAsset || src) || undefined}>{text}</span>
+      {activeAsset ? (
+        <LocalAssetImage
+          asset={activeAsset}
+          alt={decorative ? "" : `${displayName} avatar`}
+          fill
+          sizes={`${size}px`}
+          preferLocal={Boolean(cacheScope)}
+          cacheScope={cacheScope}
+          reveal="manual"
+        />
+      ) : src ? (
         <Image
-          src={imageUrl}
+          src={src}
           alt={decorative ? "" : `${displayName} avatar`}
           fill
           sizes={`${size}px`}
           unoptimized
         />
-      ) : (
-        text
-      )}
+      ) : null}
     </span>
   );
 }
