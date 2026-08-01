@@ -45,10 +45,10 @@ function updateGridPreference(grid: boolean) {
   window.dispatchEvent(new Event(GRID_PREFERENCE_EVENT));
 }
 
-function RoomsCardsLoading() {
-  return <section className={styles.cards} aria-label="Loading rooms" aria-busy="true">
-    {[0, 1, 2].map((index) => <article className={`${styles.card} ${styles.loadingCard}`} key={index} style={{ "--card-index": Math.min(index, 5) } as CSSProperties}>
-      <div className={styles.loadingCardLayout}><div className={styles.loadingBoard}><i /><i /><i /></div><div className={styles.loadingInfo}><i /><span /><b /></div></div>
+function RoomsCardsLoading({ grid }: { readonly grid: boolean }) {
+  return <section className={`${styles.cards} ${grid ? styles.cardsGrid : ""}`} aria-label="Loading rooms" aria-busy="true">
+    {[0, 1, 2].map((index) => <article className={`${styles.card} ${styles.loadingCard} ${grid ? styles.cardGrid : ""}`} key={index} style={{ "--card-index": Math.min(index, 5) } as CSSProperties}>
+      <div className={styles.loadingCardLayout}><div className={styles.loadingBoard} /><div className={styles.loadingInfo}><i /><span /><b /></div></div>
     </article>)}
   </section>;
 }
@@ -118,7 +118,7 @@ export function RoomsPage({ initialRooms, viewerInitials, viewerAvatarUrl, viewe
       <AppHeader leading={<Link href="/account" className={styles.avatar} aria-label="Open account"><Avatar src={avatarUrl} asset={avatarAsset} cacheScope={viewerAccountScope} text={viewerInitials} displayName="Your account" decorative /></Link>} actions={<RoomsCreateMenu />} />
       <main className={styles.main}>
         <RoomsToolbar filter={filter} counts={counts} filterOpen={filterOpen} searchOpen={searchOpen} editing={editing} grid={grid} query={query} visibleCount={visibleRooms.length} canEdit={false} setFilterOpen={setFilterOpen} setFilter={setFilter} openSearch={() => { setSearchOpen(true); setFilterOpen(false); }} closeSearch={closeSearch} setQuery={setQuery} toggleEditing={() => undefined} toggleGrid={() => updateGridPreference(!grid)} />
-        {loading ? <RoomsCardsLoading /> : visibleRooms.length ? <section ref={containerRef} key={`${filter}:${grid}:${query}`} className={`${styles.cards} ${grid ? styles.cardsGrid : ""}`} aria-label="Your rooms">{visibleRooms.map(({ room, boardItems }, index) => <RoomCard key={room.id} room={room} boardItems={boardItems} grid={grid} editing={editing} active={grid || index === activeIndex} index={index} toggleFavorite={() => undefined} requestDelete={() => undefined} rememberRoom={() => rememberRoomCarouselItem(room.publicId)} cacheScope={viewerCacheScope} />)}</section> : <section className={styles.empty}><Icon name="board" size={26} /><h1>No rooms here.</h1><p>{query ? "Try a different room name." : "The next shared moment will appear here."}</p></section>}
+        {loading ? <RoomsCardsLoading grid={grid} /> : visibleRooms.length ? <section ref={containerRef} key={`${filter}:${grid}:${query}`} className={`${styles.cards} ${grid ? styles.cardsGrid : ""}`} aria-label="Your rooms">{visibleRooms.map(({ room, boardItems }, index) => <RoomCard key={room.id} room={room} boardItems={boardItems} grid={grid} editing={editing} active={grid || index === activeIndex} index={index} toggleFavorite={() => undefined} requestDelete={() => undefined} rememberRoom={() => rememberRoomCarouselItem(room.publicId)} cacheScope={viewerCacheScope} />)}</section> : <section className={styles.empty}><Icon name="board" size={26} /><h1>No rooms here.</h1><p>{query ? "Try a different room name." : "The next shared moment will appear here."}</p></section>}
         {!loading && !grid && visibleRooms.length > 0 ? <RoomProgress activeIndex={activeIndex} total={visibleRooms.length} progress={progress} /> : null}
       </main>
     </div>

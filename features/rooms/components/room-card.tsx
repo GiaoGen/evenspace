@@ -4,6 +4,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperti
 import { PinnedPhoto } from "@/components/pinboard/pinned-photo";
 import { Icon } from "@/components/ui/icon";
 import type { BoardItem, BoardPhoto, RoomSummary } from "@/core/domain/room";
+import { getPhotoStackEntryKey, hasEnteredPhotoStack, markPhotoStackEntered, schedulePhotoStackEntryBatch, type PhotoStackEntryCandidate } from "@/features/rooms/model/photo-stack-entry";
 import { getPhotoStackVisibleRadius, getPhotoStackWindow } from "@/features/rooms/model/photo-stack-window";
 import styles from "./rooms-page.module.css";
 
@@ -14,7 +15,12 @@ function formatRoomMeta(room: RoomSummary) {
   return room.status === "active" ? `Ends ${formatted} · ${room.memberCount} people` : `Archived ${formatted} · ${room.memberCount} people`;
 }
 
-function PhotoStack({ items, compact = false, roomHref, onOpen, prefetchRoom, cacheScope }: { readonly items: readonly BoardItem[]; readonly compact?: boolean; readonly roomHref?: string; readonly onOpen?: () => void; readonly prefetchRoom?: () => void; readonly cacheScope?: string }) {
+type PhotoStackEntryState = {
+  readonly phase: "waiting" | "entering" | "visible" | "failed";
+  readonly delayMs?: number;
+};
+
+function PhotoStack({ items, compact = false, roomHref, roomId, onOpen, prefetchRoom, cacheScope }: { readonly items: readonly BoardItem[]; readonly compact?: boolean; readonly roomHref?: string; readonly roomId: string; readonly onOpen?: () => void; readonly prefetchRoom?: () => void; readonly cacheScope?: string }) {
   const photos = useMemo(() => items.filter((item): item is BoardPhoto => item.kind === "photo"), [items]);
   const source = photos;
   const [view, setView] = useState(() => Math.floor(Math.max(0, source.length - 1) / 2));
@@ -26,10 +32,97 @@ function PhotoStack({ items, compact = false, roomHref, onOpen, prefetchRoom, ca
   const timers = useRef<number[]>([]);
   const animating = useRef(false);
   const resetAfterShuffle = useRef(false);
-
-  useEffect(() => () => { timers.current.forEach(window.clearTimeout); }, []);
+  const decodedPhotoIds = useRef(new Set<string>());
+  const queuedDecodedIds = useRef(new Set<string>());
+  const entryBatchTimer = useRef<number | null>(null);
+  const entrySequenceTimer = useRef<number | null>(null);
+  const entryStatesRef = useRef(new Map<string, PhotoStackEntryState>());
+  const [entryStates, setEntryStates] = useState<ReadonlyMap<string, PhotoStackEntryState>>(() => new Map());
 
   const normalizedView = Math.max(0, Math.min(view, Math.max(0, source.length - 1)));
+  const { visibleRadius, offsets } = getPhotoStackWindow(source.length, normalizedView, compact);
+  const [entryCandidates] = useState<readonly PhotoStackEntryCandidate[]>(() =>
+    offsets
+      .filter((offset) => Math.abs(offset) <= visibleRadius)
+      .map((offset) => ({ id: source[normalizedView + offset].id, offset })),
+  );
+  const entryCandidatesById = new Map(entryCandidates.map((candidate) => [candidate.id, candidate]));
+
+  useEffect(() => () => {
+    timers.current.forEach(window.clearTimeout);
+    if (entryBatchTimer.current !== null) window.clearTimeout(entryBatchTimer.current);
+    if (entrySequenceTimer.current !== null) window.clearTimeout(entrySequenceTimer.current);
+  }, []);
+
+  function setPhotoEntryState(photoId: string, state: PhotoStackEntryState) {
+    const next = new Map(entryStatesRef.current);
+    next.set(photoId, state);
+    entryStatesRef.current = next;
+    setEntryStates(next);
+  }
+
+  function flushDecodedPhotoEntries() {
+    entryBatchTimer.current = null;
+    const candidates = [...queuedDecodedIds.current]
+      .flatMap((photoId) => entryCandidatesById.get(photoId) ?? []);
+    queuedDecodedIds.current.clear();
+    if (candidates.length === 0) return;
+
+    const schedule = schedulePhotoStackEntryBatch({
+      candidates,
+      nowMs: 0,
+      nextSlotAtMs: 0,
+    });
+    const next = new Map(entryStatesRef.current);
+    schedule.entries.forEach((entry) => next.set(entry.id, { phase: "entering", delayMs: entry.delayMs }));
+    entryStatesRef.current = next;
+    setEntryStates(next);
+    entrySequenceTimer.current = window.setTimeout(() => {
+      entrySequenceTimer.current = null;
+      if (queuedDecodedIds.current.size > 0) flushDecodedPhotoEntries();
+    }, 70 + 110 * schedule.entries.length + 360);
+  }
+
+  function markPhotoDecoded(photoId: string) {
+    decodedPhotoIds.current.add(photoId);
+    const candidate = entryCandidatesById.get(photoId);
+    if (!candidate) {
+      setPhotoEntryState(photoId, { phase: "visible" });
+      applyLayout(0);
+      return;
+    }
+
+    const current = entryStatesRef.current.get(photoId)?.phase;
+    if (current === "entering" || current === "visible" || current === "failed") {
+      applyLayout(0);
+      return;
+    }
+
+    const entryKey = getPhotoStackEntryKey(cacheScope, roomId, photoId);
+    if (hasEnteredPhotoStack(entryKey) || window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      setPhotoEntryState(photoId, { phase: "visible" });
+      markPhotoStackEntered(entryKey);
+    } else {
+      queuedDecodedIds.current.add(photoId);
+      if (entryBatchTimer.current === null && entrySequenceTimer.current === null) {
+        entryBatchTimer.current = window.setTimeout(flushDecodedPhotoEntries, 140);
+      }
+    }
+    applyLayout(0);
+  }
+
+  function markPhotoFailed(photoId: string) {
+    queuedDecodedIds.current.delete(photoId);
+    setPhotoEntryState(photoId, { phase: "failed" });
+    applyLayout(0);
+  }
+
+  function markPhotoVisible(photoId: string) {
+    const current = entryStatesRef.current.get(photoId);
+    if (current?.phase !== "entering") return;
+    setPhotoEntryState(photoId, { phase: "visible" });
+    markPhotoStackEntered(getPhotoStackEntryKey(cacheScope, roomId, photoId));
+  }
 
   function applyLayout(xPosition: number, duration = 0, locked = false, shifted = false) {
     const width = Math.max(1, pointer.current.width || deckRef.current?.clientWidth || 1);
@@ -83,6 +176,9 @@ function PhotoStack({ items, compact = false, roomHref, onOpen, prefetchRoom, ca
         card.style.transformOrigin = sideSign < 0 ? "0 100%" : "100% 100%";
       }
       card.style.transition = transition;
+      const photoId = card.dataset.photoId;
+      const requiresDecode = card.dataset.requiresDecode === "true";
+      if (requiresDecode && (!photoId || !decodedPhotoIds.current.has(photoId))) visible = false;
       card.style.visibility = visible ? "visible" : "hidden";
       card.style.zIndex = String(zIndex);
       card.style.transform = `translate3d(-50%, -50%, 0) translate3d(${xOffset}px, ${yOffset}px, 0) rotate(${degree}deg) scale(${scale})`;
@@ -143,19 +239,32 @@ function PhotoStack({ items, compact = false, roomHref, onOpen, prefetchRoom, ca
     const velocity = (event.clientX - lastX) / Math.max(1, event.timeStamp - lastTime);
     const threshold = pointer.current.width * .25;
     const direction = deltaX < 0 || velocity < 0 ? -1 : 1;
-    const canShuffle = direction === 1 ? normalizedView > 0 : normalizedView < source.length - 1;
+    const targetPhoto = source[normalizedView - direction];
+    const targetReady = Boolean(targetPhoto && (!targetPhoto.asset || decodedPhotoIds.current.has(targetPhoto.id)));
+    const canShuffle = (direction === 1 ? normalizedView > 0 : normalizedView < source.length - 1) && targetReady;
     if (canShuffle && (Math.abs(deltaX) >= threshold || Math.abs(velocity) > .62)) finishShuffle(direction);
     else applyLayout(0, 100);
   }
-
-  const { visibleRadius, offsets } = getPhotoStackWindow(source.length, normalizedView, compact);
 
   return <div ref={deckRef} className={styles.photoStack} aria-label="Swipe room photos" onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={finishPointer} onPointerCancel={finishPointer} onClickCapture={(event) => { if (dragged.current) { event.preventDefault(); event.stopPropagation(); dragged.current = false; } }}>
     {source.length === 0 ? <span className={styles.photoStackEmpty}>No photos yet.</span> : null}
     <div className={styles.photoStackDeck}>{offsets.map((offset) => {
       const photo = source[normalizedView + offset];
-      const eager = Math.abs(offset) <= visibleRadius;
-      return <div className={styles.photoStackCard} ref={(element) => { if (element) cardRefs.current.set(offset, element); else cardRefs.current.delete(offset); }} key={photo.id}>{roomHref ? <Link href={roomHref} scroll={false} prefetch onPointerEnter={prefetchRoom} onFocus={prefetchRoom} onClick={onOpen} className={styles.photoStackPhotoLink} aria-label={`Open room photo: ${photo.imageName ?? "photo"}`}><PinnedPhoto variant={photo.variant} asset={photo.asset} imageName={photo.imageName} bare eager={eager} className={styles.photoStackImage} preferLocal={Boolean(cacheScope)} cacheScope={cacheScope} /></Link> : <PinnedPhoto variant={photo.variant} asset={photo.asset} imageName={photo.imageName} bare eager={eager} className={styles.photoStackImage} preferLocal={Boolean(cacheScope)} cacheScope={cacheScope} />}</div>;
+      const entry = entryStates.get(photo.id);
+      const phase = entry?.phase ?? (photo.asset ? "waiting" : "visible");
+      const eager = Math.abs(offset) <= visibleRadius + 1;
+      const entryClassName = phase === "entering"
+        ? styles.photoStackSurfaceEntering
+        : phase === "visible"
+          ? styles.photoStackSurfaceVisible
+          : phase === "failed"
+            ? styles.photoStackSurfaceFailed
+            : styles.photoStackSurfaceWaiting;
+      const entryStyle = phase === "entering" && entry?.delayMs !== undefined
+        ? { "--photo-stack-entry-delay": `${entry.delayMs}ms` } as CSSProperties
+        : undefined;
+      const isVisible = phase === "visible";
+      return <div className={styles.photoStackCard} data-photo-id={photo.id} data-requires-decode={Boolean(photo.asset)} ref={(element) => { if (element) cardRefs.current.set(offset, element); else cardRefs.current.delete(offset); }} key={photo.id}><div className={`${styles.photoStackSurface} ${entryClassName}`} style={entryStyle} aria-hidden={!isVisible} onAnimationEnd={(event) => { if (event.target === event.currentTarget) markPhotoVisible(photo.id); }}>{roomHref ? <Link href={roomHref} scroll={false} prefetch onPointerEnter={prefetchRoom} onFocus={prefetchRoom} onClick={onOpen} className={styles.photoStackPhotoLink} aria-label={`Open room photo: ${photo.imageName ?? "photo"}`} tabIndex={isVisible ? undefined : -1}><PinnedPhoto variant={photo.variant} asset={photo.asset} imageName={photo.imageName} bare eager={eager} reveal="manual" onDecoded={() => markPhotoDecoded(photo.id)} onError={() => markPhotoFailed(photo.id)} className={styles.photoStackImage} preferLocal={Boolean(cacheScope)} cacheScope={cacheScope} /></Link> : <PinnedPhoto variant={photo.variant} asset={photo.asset} imageName={photo.imageName} bare eager={eager} reveal="manual" onDecoded={() => markPhotoDecoded(photo.id)} onError={() => markPhotoFailed(photo.id)} className={styles.photoStackImage} preferLocal={Boolean(cacheScope)} cacheScope={cacheScope} />}</div></div>;
     })}</div>
   </div>;
 }
@@ -168,8 +277,8 @@ export function RoomCard({ room, boardItems, grid, editing, active, index, toggl
     <article data-room-card className={`${styles.card} ${grid ? styles.cardGrid : ""} ${editing ? styles.cardEditing : ""} ${active ? styles.cardActive : styles.cardInactive}`} style={{ "--card-index": Math.min(index, 5) } as CSSProperties}>
       {editing ? <button className={`${styles.favorite} ${room.isFavorite ? styles.favoriteActive : ""}`} onClick={toggleFavorite} aria-label={room.isFavorite ? `Remove ${room.name} from favorites` : `Favorite ${room.name}`}><Icon name="heart" size={16} /><span>Favorite</span></button> : null}
       {editing ? <button className={styles.deleteRoom} onClick={requestDelete} aria-label={`Delete ${room.name}`}><Icon name="minus" size={16} /></button> : null}
-      {grid ? <PhotoStack items={boardItems} compact roomHref={roomHref} onOpen={rememberRoom} prefetchRoom={prefetchRoom} cacheScope={cacheScope} /> : <Link href={roomHref} scroll={false} prefetch onPointerEnter={prefetchRoom} onFocus={prefetchRoom} onClick={rememberRoom} className={styles.cardLink}>
-        <PhotoStack items={boardItems} prefetchRoom={prefetchRoom} cacheScope={cacheScope} />
+      {grid ? <PhotoStack items={boardItems} compact roomHref={roomHref} roomId={room.id} onOpen={rememberRoom} prefetchRoom={prefetchRoom} cacheScope={cacheScope} /> : <Link href={roomHref} scroll={false} prefetch onPointerEnter={prefetchRoom} onFocus={prefetchRoom} onClick={rememberRoom} className={styles.cardLink}>
+        <PhotoStack items={boardItems} roomId={room.id} prefetchRoom={prefetchRoom} cacheScope={cacheScope} />
         <div className={styles.cardInfo}><div><h2>{room.name}</h2><p><i className={room.status === "active" ? styles.liveDot : ""} />{formatRoomMeta(room)}</p></div><span><Icon name="arrow" /></span></div>
       </Link>}
     </article>

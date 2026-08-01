@@ -1,16 +1,23 @@
 "use client";
 
 import Image from "next/image";
+import { type SyntheticEvent } from "react";
 import type { AssetReference } from "@/core/domain/asset";
 import type { ArtVariant, BoardFrameVariant } from "@/core/domain/room";
-import { LocalAssetImage } from "@/features/local-assets/components/local-asset-image";
+import { LocalAssetImage, type ImageRevealMode } from "@/features/local-assets/components/local-asset-image";
 import styles from "./pinned-photo.module.css";
 
-export function PinnedPhoto({ variant, frameVariant = "pin", note, asset, previewUrl, imageName, bare = false, className = "", preferLocal = false, cacheScope, eager = false }: { readonly variant: ArtVariant; readonly frameVariant?: BoardFrameVariant; readonly note?: string | null; readonly asset?: AssetReference; readonly previewUrl?: string; readonly imageName?: string; readonly bare?: boolean; readonly className?: string; readonly preferLocal?: boolean; readonly cacheScope?: string; readonly eager?: boolean }) {
+export function PinnedPhoto({ variant, frameVariant = "pin", note, asset, previewUrl, imageName, bare = false, className = "", preferLocal = false, cacheScope, eager = false, reveal, onDecoded, onError }: { readonly variant: ArtVariant; readonly frameVariant?: BoardFrameVariant; readonly note?: string | null; readonly asset?: AssetReference; readonly previewUrl?: string; readonly imageName?: string; readonly bare?: boolean; readonly className?: string; readonly preferLocal?: boolean; readonly cacheScope?: string; readonly eager?: boolean; readonly reveal?: ImageRevealMode; readonly onDecoded?: () => void; readonly onError?: () => void }) {
+  function handlePreviewLoad(event: SyntheticEvent<HTMLImageElement>) {
+    const image = event.currentTarget;
+    if (typeof image.decode !== "function") { onDecoded?.(); return; }
+    void image.decode().then(() => onDecoded?.()).catch(() => onError?.());
+  }
+
   return (
     <div className={`${styles.photo} ${styles[`frame${frameVariant}`]} ${bare ? styles.bare : ""} ${className}`}>
       <div className={styles.strip}><span /></div>
-      {asset || previewUrl ? <div className={styles.realPhoto}>{asset ? <LocalAssetImage key={asset.id} asset={asset} variant="thumbnail" alt={imageName ? `Pinned photo: ${imageName}` : "Pinned photo"} fill sizes="(max-width: 700px) 70vw, 360px" preferLocal={preferLocal} cacheScope={cacheScope} loading={eager ? "eager" : "lazy"} /> : <Image src={previewUrl!} alt={imageName ? `Pinned photo: ${imageName}` : "Pinned photo"} fill sizes="(max-width: 700px) 70vw, 360px" loading={eager ? "eager" : "lazy"} unoptimized />}</div> : <div className={`${styles.art} ${styles[variant]}`} aria-hidden="true"><i /><i /><i /></div>}
+      {asset || previewUrl ? <div className={styles.realPhoto}>{asset ? <LocalAssetImage key={asset.id} asset={asset} variant="thumbnail" alt={imageName ? `Pinned photo: ${imageName}` : "Pinned photo"} fill sizes="(max-width: 700px) 70vw, 360px" preferLocal={preferLocal} cacheScope={cacheScope} loading={eager ? "eager" : "lazy"} reveal={reveal} onDecoded={onDecoded} onError={onError} /> : <Image src={previewUrl!} alt={imageName ? `Pinned photo: ${imageName}` : "Pinned photo"} fill sizes="(max-width: 700px) 70vw, 360px" loading={eager ? "eager" : "lazy"} onLoad={handlePreviewLoad} onError={onError} unoptimized />}</div> : <div className={`${styles.art} ${styles[variant]}`} aria-hidden="true"><i /><i /><i /></div>}
       {note ? <p>{note}</p> : null}
     </div>
   );

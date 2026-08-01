@@ -19,13 +19,18 @@ function Placeholder({ asset, fill }: { readonly asset: AssetReference; readonly
   />;
 }
 
-function ReadyImage({ url, readinessKey, asset, alt, fill, width, height, sizes, className, loading, reveal, onDecoded }: { readonly url: string; readonly readinessKey: string; readonly asset: AssetReference; readonly alt: string; readonly fill?: boolean; readonly width?: number; readonly height?: number; readonly sizes?: string; readonly className?: string; readonly loading?: "eager" | "lazy"; readonly reveal: ImageRevealMode; readonly onDecoded?: () => void }) {
+function ReadyImage({ url, readinessKey, asset, alt, fill, width, height, sizes, className, loading, reveal, onDecoded, onError }: { readonly url: string; readonly readinessKey: string; readonly asset: AssetReference; readonly alt: string; readonly fill?: boolean; readonly width?: number; readonly height?: number; readonly sizes?: string; readonly className?: string; readonly loading?: "eager" | "lazy"; readonly reveal: ImageRevealMode; readonly onDecoded?: () => void; readonly onError?: () => void }) {
   const [loaded, setLoaded] = useState(() => isImageDecoded(readinessKey));
   const onDecodedRef = useRef(onDecoded);
+  const onErrorRef = useRef(onError);
 
   useEffect(() => {
     onDecodedRef.current = onDecoded;
   }, [onDecoded]);
+
+  useEffect(() => {
+    onErrorRef.current = onError;
+  }, [onError]);
 
   useEffect(() => {
     if (loaded) onDecodedRef.current?.();
@@ -38,7 +43,7 @@ function ReadyImage({ url, readinessKey, asset, alt, fill, width, height, sizes,
       setLoaded(true);
     };
     if (typeof image.decode !== "function") { finish(); return; }
-    void image.decode().then(finish).catch(() => undefined);
+    void image.decode().then(finish).catch(() => onErrorRef.current?.());
   }
 
   return <>
@@ -54,6 +59,7 @@ function ReadyImage({ url, readinessKey, asset, alt, fill, width, height, sizes,
       decoding="async"
       className={`${className ?? ""} ${reveal === "manual" ? "localAssetImageManual" : `localAssetImage ${loaded ? "localAssetImageLoaded" : ""}`}`}
       onLoad={handleLoad}
+      onError={() => onErrorRef.current?.()}
       unoptimized
     />
   </>;
@@ -71,7 +77,7 @@ function resolveVariant(asset: AssetReference, variant: ImageVariant): AssetRefe
   };
 }
 
-export function LocalAssetImage({ asset, alt, fill, width, height, sizes, className, variant = "display", preferLocal = false, cacheScope, loading, reveal = "fade", onDecoded }: { readonly asset: AssetReference; readonly alt: string; readonly fill?: boolean; readonly width?: number; readonly height?: number; readonly sizes?: string; readonly className?: string; readonly variant?: ImageVariant; readonly preferLocal?: boolean; readonly cacheScope?: string; readonly loading?: "eager" | "lazy"; readonly reveal?: ImageRevealMode; readonly onDecoded?: () => void }) {
+export function LocalAssetImage({ asset, alt, fill, width, height, sizes, className, variant = "display", preferLocal = false, cacheScope, loading, reveal = "fade", onDecoded, onError }: { readonly asset: AssetReference; readonly alt: string; readonly fill?: boolean; readonly width?: number; readonly height?: number; readonly sizes?: string; readonly className?: string; readonly variant?: ImageVariant; readonly preferLocal?: boolean; readonly cacheScope?: string; readonly loading?: "eager" | "lazy"; readonly reveal?: ImageRevealMode; readonly onDecoded?: () => void; readonly onError?: () => void }) {
   const cacheVariant: CachedImageVariant = variant === "thumbnail" && asset.thumbnail ? "thumbnail" : "display";
   const reference = useMemo(() => resolveVariant(asset, variant), [asset, variant]);
   const cachedOptions = useMemo(() => cacheScope ? { scope: cacheScope, variant: cacheVariant } : undefined, [cacheScope, cacheVariant]);
@@ -79,6 +85,6 @@ export function LocalAssetImage({ asset, alt, fill, width, height, sizes, classN
   const readinessKey = getImageReadinessKey(asset, cacheVariant, cacheScope);
 
   return url
-    ? <ReadyImage key={readinessKey} url={url} readinessKey={readinessKey} asset={asset} alt={alt} fill={fill} width={width} height={height} sizes={sizes} className={className} loading={loading} reveal={reveal} onDecoded={onDecoded} />
+    ? <ReadyImage key={readinessKey} url={url} readinessKey={readinessKey} asset={asset} alt={alt} fill={fill} width={width} height={height} sizes={sizes} className={className} loading={loading} reveal={reveal} onDecoded={onDecoded} onError={onError} />
     : reveal === "fade" ? <Placeholder asset={asset} fill={fill} /> : null;
 }
