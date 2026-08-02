@@ -1,0 +1,128 @@
+.scene {
+  position: relative;
+  display: grid;
+  width: 100%;
+  min-height: 100svh;
+  place-items: center;
+  overflow: hidden;
+  isolation: isolate;
+  background: #292a25;
+}
+
+.background {
+  position: absolute;
+  z-index: -1;
+  inset: -9%;
+  overflow: hidden;
+  transform: scale(1.12);
+  filter: blur(clamp(34px, 5.5vw, 78px)) saturate(0.72) brightness(0.64);
+  pointer-events: none;
+}
+
+.background::after {
+  position: absolute;
+  inset: 0;
+  content: "";
+  background: rgb(17 18 15 / 22%);
+}
+
+.reader {
+  position: relative;
+  z-index: 1;
+  max-width: calc(100vw - 32px);
+  max-height: calc(100svh - 32px);
+  margin: 0;
+  padding: 0;
+  overflow: visible;
+  color: inherit;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  outline-offset: 5px;
+}
+
+.readerClosed {
+  width: min(76vw, calc(82svh * var(--zine-page-ratio-number)));
+  cursor: pointer;
+  filter: drop-shadow(0 26px 42px rgb(8 9 7 / 31%));
+}
+
+.readerOpen {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  width: min(92vw, calc(82svh * var(--zine-page-ratio-number) * 2));
+  filter: drop-shadow(0 26px 42px rgb(8 9 7 / 31%));
+}
+
+.pageAction {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  color: inherit;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  outline-offset: 4px;
+  cursor: pointer;
+}
+
+.missingPage {
+  display: block;
+  width: 100%;
+  aspect-ratio: calc(var(--zine-page-ratio-number));
+  background: #fffefb;
+}
+
+.mobilePage {
+  display: none;
+}
+
+.mobileHitArea {
+  position: absolute;
+  z-index: 2;
+  inset-block: 0;
+  width: 50%;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  outline-offset: -4px;
+  cursor: pointer;
+}
+
+.mobileHitPrevious {
+  left: 0;
+}
+
+.mobileHitNext {
+  right: 0;
+}
+
+@media (max-width: 720px) {
+  .readerClosed,
+  .readerOpen {
+    width: min(82vw, calc(82svh * var(--zine-page-ratio-number)));
+  }
+
+  .readerOpen {
+    display: block;
+  }
+
+  .desktopLeft,
+  .desktopRight {
+    display: none;
+  }
+
+  .mobilePage {
+    position: relative;
+    display: block;
+    width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .reader {
+    transition: width 220ms cubic-bezier(0.2, 0.7, 0.2, 1), filter 220ms ease;
+  }
+}
