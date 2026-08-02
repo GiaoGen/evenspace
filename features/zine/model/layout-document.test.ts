@@ -24,20 +24,26 @@ function replaceFirstText(document: ZineLayoutDocument, body: string): unknown {
 }
 
 describe("zine layout document v1", () => {
-  it("validates the 1, 3, 10, and 48 photo proofs", async () => {
+  it("validates the 1, 3, 10, and 48 photo proofs for both styles", async () => {
     const documents = await Promise.all(zineFixtureIds.map((id) => zineFixtureRepository.getLayoutById(id)));
     expect(documents.every(Boolean)).toBe(true);
-    expect(documents.map((document) => document?.photos.length)).toEqual([1, 3, 10, 48]);
+    expect(documents.map((document) => document?.photos.length)).toEqual([1, 3, 10, 48, 1, 3, 10, 48]);
+    expect(documents.map((document) => document?.style)).toEqual([
+      "quiet-field", "quiet-field", "quiet-field", "quiet-field",
+      "living-sequence", "living-sequence", "living-sequence", "living-sequence",
+    ]);
   });
 
-  it("keeps every selected photo exactly once in the book pages", async () => {
-    const document = await fixture("quiet-48");
-    const uses = document.spreads
-      .flatMap((spread) => [spread.left, spread.right])
-      .flatMap((page) => page?.kind === "composition" ? page.placements.map((placement) => placement.photoId) : []);
-    expect(uses).toHaveLength(ZINE_MAX_PHOTOS);
-    expect(new Set(uses).size).toBe(ZINE_MAX_PHOTOS);
-    expect(new Set(uses)).toEqual(new Set(document.photos.map((photo) => photo.id)));
+  it("keeps every selected photo exactly once in both 48-photo books", async () => {
+    for (const id of ["quiet-48", "sequence-48"]) {
+      const document = await fixture(id);
+      const uses = document.spreads
+        .flatMap((spread) => [spread.left, spread.right])
+        .flatMap((page) => page?.kind === "composition" ? page.placements.map((placement) => placement.photoId) : []);
+      expect(uses).toHaveLength(ZINE_MAX_PHOTOS);
+      expect(new Set(uses).size).toBe(ZINE_MAX_PHOTOS);
+      expect(new Set(uses)).toEqual(new Set(document.photos.map((photo) => photo.id)));
+    }
   });
 
   it("rejects a forty-ninth selected photo", async () => {
@@ -94,6 +100,28 @@ describe("zine layout document v1", () => {
           : spread.right,
       })),
     });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects template families borrowed from the other style", async () => {
+    const document = await fixture();
+    const result = safeParseZineLayoutDocument({
+      ...document,
+      spreads: document.spreads.map((spread, spreadIndex) => spreadIndex === 0
+        ? {
+          ...spread,
+          right: spread.right?.kind === "composition"
+            ? { ...spread.right, family: "sequence-hero" }
+            : spread.right,
+        }
+        : spread),
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects a template id that does not match the selected style", async () => {
+    const document = await fixture("sequence-10");
+    const result = safeParseZineLayoutDocument({ ...document, templateVersion: "quiet-field-v1" });
     expect(result.success).toBe(false);
   });
 

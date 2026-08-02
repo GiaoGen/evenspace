@@ -75,7 +75,8 @@ export function ZinePage({
   if (page.kind === "cover") {
     return (
       <article
-        className={`${styles.page} ${styles.cover} ${styles[page.composition]}`}
+        className={`${styles.page} ${styles.cover} ${styles[document.style]} ${styles[page.composition]}`}
+        data-zine-style={document.style}
         data-page-side="closed"
         style={pageStyle}
         aria-label={`Cover of ${document.title}`}
@@ -93,7 +94,8 @@ export function ZinePage({
   if (page.kind === "back-cover") {
     return (
       <article
-        className={`${styles.page} ${styles.backCover}`}
+        className={`${styles.page} ${styles.backCover} ${styles[document.style]}`}
+        data-zine-style={document.style}
         data-page-side="closed"
         style={pageStyle}
         aria-label={`Back cover of ${document.title}`}
@@ -104,14 +106,16 @@ export function ZinePage({
   }
 
   if (page.kind === "blank") {
-    return <article className={`${styles.page} ${styles.blank}`} data-page-side={side} style={pageStyle} aria-label="Blank page" />;
+    return <article className={`${styles.page} ${styles.blank} ${styles[document.style]}`} data-zine-style={document.style} data-page-side={side} style={pageStyle} aria-label="Blank page" />;
   }
 
   if (page.kind === "chapter") {
     const chapter = document.chapters.find((candidate) => candidate.id === page.chapterId);
+    const chapterNumber = document.chapters.findIndex((candidate) => candidate.id === page.chapterId) + 1;
     return (
-      <article className={`${styles.page} ${styles.chapter}`} data-page-side={side} style={pageStyle} aria-label={`Chapter: ${chapter?.title ?? "Untitled"}`}>
+      <article className={`${styles.page} ${styles.chapter} ${styles[document.style]}`} data-zine-style={document.style} data-page-side={side} style={pageStyle} aria-label={`Chapter: ${chapter?.title ?? "Untitled"}`}>
         <div className={styles.chapterContent}>
+          <span className={styles.chapterNumber} aria-hidden="true">{String(chapterNumber).padStart(2, "0")}</span>
           {chapter?.timeLabel ? <p>{chapter.timeLabel}</p> : null}
           <h2>{chapter?.title ?? "Untitled"}</h2>
         </div>
@@ -121,7 +125,7 @@ export function ZinePage({
   }
 
   return (
-    <article className={`${styles.page} ${styles.composition}`} data-page-side={side} style={pageStyle} aria-label={`Page ${page.folio ?? ""}`.trim()}>
+    <article className={`${styles.page} ${styles.composition} ${styles[document.style]} ${styles[page.family]}`} data-zine-style={document.style} data-page-family={page.family} data-page-side={side} style={pageStyle} aria-label={`Page ${page.folio ?? ""}`.trim()}>
       <div className={styles.grid}>
         {page.placements.map((placement) => (
           <PhotoPlacement key={placement.photoId} document={document} placement={placement} eager={eager} />

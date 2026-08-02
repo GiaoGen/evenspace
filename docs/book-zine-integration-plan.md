@@ -1,6 +1,6 @@
 # Book / Zine 功能接入计划
 
-> 状态：已进入分批开发；第一批 Zine Core v1 已在 `feature/zine-core-v1` 实现，Phase 1 继续推进
+> 状态：已进入分批开发；第一批 Zine Core v1 已提交，第二批双风格模板系统已在 `feature/zine-template-system` 实现并通过验证，Phase 1 继续推进
 > 建立日期：2026-08-02  
 > 最近更新：2026-08-03  
 > 当前版本：v0.7
@@ -609,6 +609,8 @@ Phase 0 视觉交付不只画 happy path。两套风格应各提供 Select、Sty
 
 第一批实施状态（2026-08-03）：已完成 Zine Layout Document v1、Quiet Field 12×16 离散网格 renderer、封面/章节/单图/双图/三图/外角文字、48 张唯一使用与字数等确定性校验、fixture repository 边界、两元素 Reader 外壳，以及桌面/移动端闭合与打开居中验证。尚未包含 Living Sequence、真实 zine 数据库、AI、StPageFlip 或产品入口，因此 Phase 1 仍为进行中。
 
+第二批实施状态（2026-08-03）：已将两种风格注册为可校验的 template manifest；扩展 Layout Document 以约束风格专属的封面构图、内页构图家族、照片密度、图片 fit 与连续页面节奏；完成 Living Sequence 的主图、对话、建立场景、细节和最多五图 contact sheet 构图，以及无大标题的单图/三图封面。Quiet Field 与 Living Sequence 均提供 1、3、10、48 张确定性 proof。第二批仍不包含真实数据库、AI、Book Studio、上传或 StPageFlip。
+
 ### Phase 2 — 数据模型与生成任务基础
 
 交付：zine/source/version/job/asset 边界、RLS、幂等、删除语义、用量台账、独立入口上传链路。
@@ -749,6 +751,7 @@ Phase 0 视觉交付不只画 happy path。两套风格应各提供 Select、Sty
 | 2026-08-03 | 英文照片文字限制 | 已确认 | 原评论摘录最多 28 words，Host reflection 最多 40 words |
 | 2026-08-03 | Reader 极简视觉结构 | 已确认 | 只有模糊封面照片背景与 Reader；闭合和双页状态均按整体居中，无常驻控件 |
 | 2026-08-03 | 第一批 Zine Core v1 | 已实现 | `feature/zine-core-v1`；版本化契约、Quiet Field renderer、fixture adapter、两元素 Reader proof 与相关校验测试 |
+| 2026-08-03 | 第二批双风格模板系统 | 已实现 | `feature/zine-template-system`；共享 manifest、Living Sequence、双风格 1/3/10/48 张 proof 与节奏校验 |
 
 ## 16. 下一次更新触发条件
 

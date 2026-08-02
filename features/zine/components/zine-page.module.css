@@ -9,6 +9,11 @@
   box-shadow: inset 0 0 0 1px rgb(23 22 19 / 4%);
 }
 
+.living-sequence {
+  color: #191816;
+  background: #fffdf8;
+}
+
 .page[data-page-side="left"]::after,
 .page[data-page-side="right"]::after {
   position: absolute;
@@ -107,6 +112,23 @@
   inset: 3.5%;
 }
 
+.cover.sequence-hero .grid {
+  inset: 0;
+}
+
+.cover.sequence-triptych .grid {
+  inset: 3.25%;
+}
+
+.composition.sequence-contact .grid {
+  inset: 3.8%;
+}
+
+.composition.sequence-hero .grid,
+.composition.sequence-establishing .grid {
+  inset: 4.4%;
+}
+
 .quiet-corner-mark .cornerMark,
 .cornerMark {
   position: absolute;
@@ -129,6 +151,10 @@
   justify-content: center;
 }
 
+.chapterNumber {
+  display: none;
+}
+
 .chapterContent p {
   margin: 0 0 1.4em;
   color: #807a71;
@@ -146,6 +172,53 @@
   font-weight: 400;
   line-height: 0.96;
   letter-spacing: -0.035em;
+}
+
+.living-sequence.chapter .chapterContent {
+  inset: 8% 7%;
+  justify-content: flex-end;
+  padding-bottom: 7%;
+}
+
+.living-sequence .chapterNumber {
+  position: absolute;
+  top: 0;
+  right: 0;
+  display: block;
+  color: #9a3f30;
+  font-family: var(--font-geist), Arial, sans-serif;
+  font-size: clamp(30px, 22cqw, 116px);
+  font-weight: 700;
+  line-height: 0.75;
+  letter-spacing: -0.08em;
+}
+
+.living-sequence.chapter .chapterContent p {
+  margin-bottom: 0.9em;
+  color: #9a3f30;
+  font-family: var(--font-geist), Arial, sans-serif;
+  font-weight: 620;
+}
+
+.living-sequence.chapter .chapterContent h2 {
+  max-width: 92%;
+  font-family: var(--font-geist), Arial, sans-serif;
+  font-size: clamp(17px, 8cqw, 44px);
+  font-weight: 640;
+  line-height: 0.92;
+  letter-spacing: -0.055em;
+}
+
+.living-sequence .annotation {
+  color: #34312d;
+  font-size: clamp(5.5px, 2.05cqw, 10px);
+  font-weight: 520;
+  line-height: 1.25;
+}
+
+.living-sequence .annotation cite,
+.living-sequence .folio {
+  color: #9a3f30;
 }
 
 .backCover {

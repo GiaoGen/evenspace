@@ -1,11 +1,18 @@
 import { z } from "zod";
 
+import {
+  getZineTemplateManifest,
+  zineCoverCompositionSchema,
+  zinePageFamilySchema,
+  zineStyleSchema,
+} from "./template-manifest";
+
 export const ZINE_LAYOUT_VERSION = "1" as const;
 export const ZINE_MAX_PHOTOS = 48;
 export const ZINE_COMMENT_WORD_LIMIT = 28;
 export const ZINE_REFLECTION_WORD_LIMIT = 40;
-export const QUIET_FIELD_GRID_COLUMNS = 12;
-export const QUIET_FIELD_GRID_ROWS = 16;
+export const ZINE_GRID_COLUMNS = 12;
+export const ZINE_GRID_ROWS = 16;
 
 const idSchema = z.string()
   .trim()
@@ -24,15 +31,15 @@ const imageSourceSchema = z.string().trim().min(1).refine((value) => {
 }, "Image sources must be root-relative or HTTPS URLs");
 
 export const zineGridFrameSchema = z.object({
-  column: z.number().int().min(1).max(QUIET_FIELD_GRID_COLUMNS),
-  row: z.number().int().min(1).max(QUIET_FIELD_GRID_ROWS),
-  columnSpan: z.number().int().min(1).max(QUIET_FIELD_GRID_COLUMNS),
-  rowSpan: z.number().int().min(1).max(QUIET_FIELD_GRID_ROWS),
+  column: z.number().int().min(1).max(ZINE_GRID_COLUMNS),
+  row: z.number().int().min(1).max(ZINE_GRID_ROWS),
+  columnSpan: z.number().int().min(1).max(ZINE_GRID_COLUMNS),
+  rowSpan: z.number().int().min(1).max(ZINE_GRID_ROWS),
 }).strict().superRefine((frame, context) => {
-  if (frame.column + frame.columnSpan - 1 > QUIET_FIELD_GRID_COLUMNS) {
+  if (frame.column + frame.columnSpan - 1 > ZINE_GRID_COLUMNS) {
     context.addIssue({ code: "custom", path: ["columnSpan"], message: "Frame exceeds the page columns" });
   }
-  if (frame.row + frame.rowSpan - 1 > QUIET_FIELD_GRID_ROWS) {
+  if (frame.row + frame.rowSpan - 1 > ZINE_GRID_ROWS) {
     context.addIssue({ code: "custom", path: ["rowSpan"], message: "Frame exceeds the page rows" });
   }
 });
@@ -92,6 +99,7 @@ const compositionPageSchema = z.object({
   id: idSchema,
   kind: z.literal("composition"),
   chapterId: idSchema,
+  family: zinePageFamilySchema,
   placements: z.array(placementSchema).min(1).max(5),
   annotations: z.array(annotationSchema).max(5),
   folio: z.number().int().positive().nullable(),
@@ -119,7 +127,7 @@ export const zinePageSchema = z.discriminatedUnion("kind", [
 const coverSchema = z.object({
   id: idSchema,
   kind: z.literal("cover"),
-  composition: z.enum(["quiet-inset", "quiet-near-full", "quiet-corner-mark"]),
+  composition: zineCoverCompositionSchema,
   placements: z.array(placementSchema).min(1).max(3),
   backgroundSourcePhotoId: idSchema,
   cornerMark: z.string().trim().min(1).max(48).nullable(),
@@ -172,7 +180,7 @@ export const zineLayoutDocumentSchema = z.object({
   id: idSchema,
   title: z.string().trim().min(1).max(80),
   createdAt: z.string().datetime({ offset: true }),
-  style: z.literal("quiet-field"),
+  style: zineStyleSchema,
   templateVersion: z.string().trim().min(1).max(32),
   pageRatio: z.object({
     width: z.number().int().min(1).max(20),
@@ -185,12 +193,26 @@ export const zineLayoutDocumentSchema = z.object({
   spreads: z.array(spreadSchema).min(1).max(80),
   backCover: backCoverSchema,
 }).strict().superRefine((document, context) => {
+  const manifest = getZineTemplateManifest(document.style);
   const photos = new Map(document.photos.map((photo) => [photo.id, photo]));
   const texts = new Map(document.texts.map((text) => [text.id, text]));
   const chapters = new Map(document.chapters.map((chapter) => [chapter.id, chapter]));
   const photoUsage = new Map(document.photos.map((photo) => [photo.id, 0]));
   const textUsage = new Map(document.texts.map((text) => [text.id, 0]));
   const pageIds = new Set<string>();
+  let previousFamily: string | null = null;
+  let consecutiveFamilyCount = 0;
+  let consecutiveDenseCount = 0;
+
+  if (document.templateVersion !== manifest.id) {
+    context.addIssue({ code: "custom", path: ["templateVersion"], message: "Template id does not match the selected style" });
+  }
+  if (
+    document.pageRatio.width !== manifest.pageRatio.width
+    || document.pageRatio.height !== manifest.pageRatio.height
+  ) {
+    context.addIssue({ code: "custom", path: ["pageRatio"], message: "Page ratio does not match the selected template" });
+  }
 
   function reportDuplicateIds<T extends { readonly id: string }>(items: readonly T[], path: string, label: string) {
     const seen = new Set<string>();
@@ -219,7 +241,24 @@ export const zineLayoutDocumentSchema = z.object({
     if (!photos.has(placement.photoId)) {
       context.addIssue({ code: "custom", path: ["cover", "placements", index, "photoId"], message: "Cover references an unknown photo" });
     }
+    document.cover.placements.slice(0, index).forEach((previous) => {
+      if (framesOverlap(previous.frame, placement.frame)) {
+        context.addIssue({ code: "custom", path: ["cover", "placements", index, "frame"], message: "Cover photo frames cannot overlap" });
+      }
+    });
   });
+  const coverFamily = manifest.coverFamilies.find((family) => family.id === document.cover.composition);
+  if (!coverFamily) {
+    context.addIssue({ code: "custom", path: ["cover", "composition"], message: "Cover composition is not available for this style" });
+  } else {
+    const count = document.cover.placements.length;
+    if (count < coverFamily.minPhotos || count > coverFamily.maxPhotos) {
+      context.addIssue({ code: "custom", path: ["cover", "placements"], message: "Cover photo count is outside this composition's range" });
+    }
+    if (document.cover.cornerMark && !coverFamily.supportsCornerMark) {
+      context.addIssue({ code: "custom", path: ["cover", "cornerMark"], message: "This cover composition does not support a corner mark" });
+    }
+  }
   if (!document.cover.placements.some((placement) => placement.photoId === document.cover.backgroundSourcePhotoId)) {
     context.addIssue({ code: "custom", path: ["cover", "backgroundSourcePhotoId"], message: "Background source must be on the selected cover" });
   }
@@ -233,10 +272,39 @@ export const zineLayoutDocumentSchema = z.object({
       pageIds.add(page.id);
       if (page.kind === "chapter") {
         if (!chapters.has(page.chapterId)) context.addIssue({ code: "custom", path: [...path, "chapterId"], message: "Page references an unknown chapter" });
+        previousFamily = null;
+        consecutiveFamilyCount = 0;
+        consecutiveDenseCount = 0;
         return;
       }
       if (page.kind !== "composition") return;
       if (!chapters.has(page.chapterId)) context.addIssue({ code: "custom", path: [...path, "chapterId"], message: "Page references an unknown chapter" });
+      const pageFamily = manifest.pageFamilies.find((family) => family.id === page.family);
+      if (!pageFamily) {
+        context.addIssue({ code: "custom", path: [...path, "family"], message: "Page family is not available for this style" });
+      } else {
+        if (page.placements.length < pageFamily.minPhotos || page.placements.length > pageFamily.maxPhotos) {
+          context.addIssue({ code: "custom", path: [...path, "placements"], message: "Photo count is outside this page family's range" });
+        }
+        if (page.annotations.length > pageFamily.maxAnnotations) {
+          context.addIssue({ code: "custom", path: [...path, "annotations"], message: "This page family has too many annotations" });
+        }
+        page.placements.forEach((placement, placementIndex) => {
+          if (!pageFamily.allowedFits.includes(placement.fit)) {
+            context.addIssue({ code: "custom", path: [...path, "placements", placementIndex, "fit"], message: "Image fit is not allowed by this page family" });
+          }
+        });
+
+        consecutiveFamilyCount = previousFamily === page.family ? consecutiveFamilyCount + 1 : 1;
+        if (consecutiveFamilyCount > manifest.rhythm.maxConsecutiveSameFamily) {
+          context.addIssue({ code: "custom", path: [...path, "family"], message: "Page family repeats too many times in sequence" });
+        }
+        previousFamily = page.family;
+        consecutiveDenseCount = pageFamily.density === "dense" ? consecutiveDenseCount + 1 : 0;
+        if (consecutiveDenseCount > manifest.rhythm.maxConsecutiveDensePages) {
+          context.addIssue({ code: "custom", path: [...path, "family"], message: "Dense pages repeat too many times in sequence" });
+        }
+      }
       const placementByPhoto = new Map<string, z.infer<typeof placementSchema>>();
       page.placements.forEach((placement, placementIndex) => {
         if (!photos.has(placement.photoId)) {

@@ -6,7 +6,7 @@ import { ZineReaderScene } from "@/features/zine/components/zine-reader-scene";
 
 export const metadata: Metadata = {
   title: "Zine Core Proof",
-  description: "Deterministic Quiet Field renderer proof for EventSpace.",
+  description: "Deterministic Quiet Field and Living Sequence renderer proof for EventSpace.",
 };
 
 export default async function ZineCoreSamplePage({
