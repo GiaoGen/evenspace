@@ -1,6 +1,6 @@
 # EventSpace 第一版技术架构方案
 
-> 状态：2026-07-30 Supabase 封闭 MVP 接线校准；详细实施与任务状态以 [`supabase-backend-integration-plan.md`](./supabase-backend-integration-plan.md) 为准。
+> 状态：2026-08-02 Supabase 封闭 MVP 接线校准；详细实施与任务状态以 [`supabase-backend-integration-plan.md`](./supabase-backend-integration-plan.md) 为准。
 > 原则：个人开发者可维护、移动端优先、数十人房间实时协作、严格服务端授权、托管加密而非 E2EE。
 
 ## 1. 选型总览
@@ -11,7 +11,7 @@
 | UI | Tailwind CSS + shadcn/ui 基础组件 + Motion | 保持黑白卡片视觉的一致性，精细控制动效与可访问性。 |
 | 数据/鉴权 | Supabase Postgres、Auth、RLS | 单一托管后端，支持 Google、magic link/OTP、匿名会话及行级授权。 |
 | 实时 | Supabase Realtime private Broadcast | 适合数十人私密房间；数据库提交后只广播权威实体 ID、操作和 revision。 |
-| 媒体 | Supabase Storage 私有 bucket | 房间级授权与短期签名 URL；当前 UI 为头像和房间媒体生成 30 分钟读取签名 URL。 |
+| 媒体 | Supabase Storage 私有 bucket | 房间级授权与短期签名 URL；当前 UI 为头像和房间媒体生成 30 分钟读取签名 URL，图片 asset 已携带 display / thumbnail / placeholder / dimensions / revision。 |
 | 定时任务 | Supabase Cron/pg_cron + Edge Function | 处理归档、到期提醒、清理与通知；不依赖 Vercel Hobby 的低频 Cron。 |
 | 部署 | Vercel（生产使用适合商业项目的付费计划） | Next.js 原生部署、全球 CDN、WAF 与预算控制。 |
 | 邮件 | Resend 作为 Supabase Auth 的自定义 SMTP | 生产 magic link/OTP 可靠送达；使用自有认证域名。 |
@@ -45,7 +45,7 @@
 
 ## 4. 数据与授权模型
 
-Postgres 是真相来源。首期核心实体包括：`profiles`、`actors`、`terms_acceptances`、`rooms`、`room_members`、`room_preferences`、`room_invites`、`room_join_requests`、`actor_claim_challenges`、`messages`、`message_reactions`、`message_pins`、`assets`、`photos`、`photo_comments`、`itineraries`、`reports`、`room_bans`、`archive_entries`、`audit_events`、`command_receipts` 和 `outbox_jobs`。`profiles`、`room_members` 与 `room_join_requests` 当前已携带 `avatar_variant` / `avatar_asset_id`，头像 asset 继续复用私有 `assets` + `room-media`。支付模块包括 `products`、`prices`、`checkout_sessions`、`payment_events`、`room_entitlements` 和 `refund_events`。Book 与投票均不进入首批 schema；旧 `board_items` / `board_comments` 只作为本地兼容来源评估。
+Postgres 是真相来源。首期核心实体包括：`profiles`、`actors`、`terms_acceptances`、`rooms`、`room_members`、`room_preferences`、`room_invites`、`room_join_requests`、`actor_claim_challenges`、`messages`、`message_reactions`、`message_pins`、`assets`、`photos`、`photo_comments`、`itineraries`、`reports`、`room_bans`、`archive_entries`、`audit_events`、`command_receipts` 和 `outbox_jobs`。`profiles`、`room_members` 与 `room_join_requests` 当前已携带 `avatar_variant` / `avatar_asset_id`，头像 asset 继续复用私有 `assets` + `room-media`。图片类 asset 当前还携带 `thumbnail_object_key`、`thumbnail_byte_size`、`placeholder_data_url`、`image_width`、`image_height` 与 `media_revision`，用于区分 display 与 thumbnail 衍生资源。支付模块包括 `products`、`prices`、`checkout_sessions`、`payment_events`、`room_entitlements` 和 `refund_events`。Book 与投票均不进入首批 schema；旧 `board_items` / `board_comments` 只作为本地兼容来源评估。
 
 所有暴露到 Data API 的表均启用 RLS。每项读取和写入策略至少同时验证：
 
@@ -76,10 +76,11 @@ Secret/service role key 只在服务端环境使用，绝不发送到浏览器�
 
 ### 7.1 媒体
 
-- 浏览器在上传前使用 Worker 压缩、移除 EXIF、验证 10 MB 原始大小限制；服务端再次检查 MIME、尺寸、文件签名及配额。
-- Storage bucket 一律私有。读取时由已授权服务端动作生成 60 秒签名 URL；不要使用公开 bucket。签名 URL 在到期前不可按单用户即时撤销，因此到期必须足够短。
-- 不存原图。缩略图可在上传阶段生成，供首页卡片和顺序流使用。
-- 当前 Photos 使用 CSS 网格与照片详情层；`page-flip` 仍是 package dependency，但 Book/StPageFlip 组件已删除且不参与运行时。若未来恢复阅读器，应独立评审其数据模型和包依赖。
+- 浏览器在上传前使用 Worker 压缩、移除大部分 EXIF、验证 12 MB 本地输入限制，并生成 display JPEG、thumbnail JPEG、placeholder data URL、宽高和 revision；不支持 Worker/OffscreenCanvas 时回退主线程处理。
+- Storage bucket 一律私有。读取时由已授权服务端动作生成短期签名 URL；当前 helper 批量签 display 与 thumbnail，默认有效期 30 分钟。签名 URL 在到期前不可按单用户即时撤销，因此到期必须足够短，且不得持久化到本地 snapshot。
+- 不存原图。图片上传当前保存 display 与 thumbnail 两个对象，服务端 RPC 约束 display 不超过 2.25 MB、thumbnail 不超过 180 KB、placeholder data URL 长度、尺寸上限和 revision。
+- `AssetReference` 是 UI/领域层稳定契约，已包含可选 `thumbnail`、`placeholderDataUrl`、`width`、`height` 与 `revision`。legacy asset 缺少 variant 字段时，服务端读取层会降级为单 display URL。
+- 当前 Photos 使用 CSS 网格与照片详情层；`page-flip` 依赖和旧类型声明已删除，Book/StPageFlip 不参与运行时。若未来恢复阅读器，应重新评审其数据模型、包依赖和客户端边界。
 
 ### 7.2 PWA
 
@@ -92,6 +93,7 @@ Secret/service role key 只在服务端环境使用，绝不发送到浏览器�
 - 目标设备支持 120Hz 时，输入、拖动和切换尽可能接近 120fps；普通设备最低保证 60fps。
 - 动画只使用 `transform`/`opacity` 等合成友好属性；支持 `prefers-reduced-motion`。
 - 图片懒加载、缩略图优先、长列表虚拟化；避免将全量聊天或全部 Photos 原图一次性渲染。
+- `/rooms`、Room detail、Account 与 viewer avatar 使用浏览器 snapshot/cache 作为路由加速层：本地仅保存 scope-bound、去签名 URL 的展示快照；进入页面后仍要读取 Supabase 权威快照。房间照片另用 IndexedDB read-through cache 保存 display/thumbnail Blob，并用 asset id、variant 和 revision 组成缓存键。
 
 ## 8. 第三方服务边界
 
@@ -151,9 +153,20 @@ Secret/service role key 只在服务端环境使用，绝不发送到浏览器�
 - `next.config.ts` 根据 `NEXT_PUBLIC_SUPABASE_URL` 放行当前 Supabase host 的 `/storage/v1/object/sign/room-media/**` 图片；切换 Supabase 项目时需要随 public env 重新构建。
 - `BackendSessionProvider.executeCommand` 已成为云端房间命令适配层：本地 reducer 先乐观应用，支持的命令上传媒体或调用 RPC，失败后 hydrate 回服务器快照并把错误返回 UI。
 - 后端风险：头像和房间媒体仍缺服务端 EXIF 清理、转码、缩略图、恶意文件扫描、引用计数清理；匿名访客还需要 Turnstile、速率限制和清理任务才能作为生产安全承诺。
+
+## 2026-08-02 当前同步：媒体变体、快照缓存与性能接线
+
+- Photos 图片路径升级为 display / thumbnail / placeholder 三件套：`prepare_room_media_upload_v2` 创建 display 与 thumbnail object key，`finalize_room_media_upload_v2` 校验 Storage 对象存在后写入 variant 元数据并返回可签名 asset。
+- `data/supabase/media-variant-compat.ts` 是 schema 灰度兼容层：新字段存在时读取 variant；遇到缺列或 PostgREST schema cache 未刷新时回退 legacy asset 字段。该兼容层不应长期替代 migration 验收。
+- `list_room_card_media` 已成为房间卡片媒体 read model：返回每个房间全部 ready photos 和 `photo_count`，客户端用有限窗口控制可见照片堆，而不是让数据库查询只给前 5 张。
+- `createSignedMediaUrls` 批量生成 display/thumbnail signed URL map，避免在 Rooms 卡片、Room detail 和 account/avatar 路径中逐资产串行签名。
+- 本地 route snapshot 使用 `localStorage` + `sessionStorage` cache scope：`eventspace:rooms-snapshot:v1`、`eventspace:room-snapshot:v1:{scope}:{publicId}`、`eventspace:account-snapshot:v1` 与 `eventspace:viewer-avatar:v1:{scope}`。保存前必须移除 signed URL，缓存失败或过期时页面仍能正常回源。
+- `eventspace:room-photo-cache:v3` 是云端图片 Blob 加速缓存，不是业务状态。它按 display/thumbnail variant 和 revision 缓存，优先当前照片窗口与前 12 张网格缩略图，后台再缓存其余资源；401/403 视为签名 URL 过期并触发刷新。
+- Rooms UI 的照片堆 entry animation、decode 协调和 Grid/Magazine fade 只属于表现层；其状态不进入 Supabase，也不应成为跨设备同步需求。
+
 ## 2026-07-18 历史同步：技术架构现状与后端接入提醒
 
-本节为历史同步，保留用于理解旧本地优先阶段；当前判断以 2026-07-30 同步为准。
+本节为历史同步，保留用于理解旧本地优先阶段；当前判断以 2026-08-02 同步为准。
 
 - 本地状态主入口为 `MockSessionProvider`，通过 `localStorage` 保存 `eventspace:local-session:v1`，兼容旧 `sessionStorage`。
 - `MockSession` command reducer 已经覆盖大部分写操作，后端接入时可以把 command 逐步映射为 Server Action / RPC / repository mutation。
@@ -205,7 +218,7 @@ Secret/service role key 只在服务端环境使用，绝不发送到浏览器�
 
 ## 2026-07-23 历史同步：回忆录数据与翻页依赖
 
-- `page-flip@2.0.7` 目前未被运行时代码引用；后续应在恢复 Book 前重新评估，或从依赖清单移除。
+- 当时 `page-flip@2.0.7` 未被运行时代码引用；截至 2026-08-02 依赖和旧类型声明已移除，恢复 Book 前必须重新评估。
 - 当前本地 schema 以 `BoardPhoto`/`boardItems`、`boardComments` 和 `AssetReference` 驱动 Photos 网格。生产建议拆分为 photo、comment、asset 等领域 DTO，不应直接复制兼容字段名称。
 - 添加照片与 caption 必须是同一服务端事务：服务端复核成员资格、房间状态、目标页、asset 所有权、照片配额和正文长度，并写入服务器作者/时间。
 - 新增 spread 和修改纸张样式需要 expected revision 或等价乐观并发控制；Realtime 只广播权威页版本，不传播 StPageFlip 动画状态。

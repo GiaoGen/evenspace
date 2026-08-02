@@ -1,6 +1,6 @@
 # EventSpace 类型化 Mock MVP 架构
 
-> 状态：2026-07-30 历史 Mock 架构与当前兼容壳说明。正式房间已接入 Supabase；`MockSession` 仍服务本地 mock、旧数据兼容和云端 UI contract，不再代表全部业务真相。
+> 状态：2026-08-02 历史 Mock 架构与当前兼容壳说明。正式房间已接入 Supabase；`MockSession` 仍服务本地 mock、旧数据兼容和云端 UI contract，不再代表全部业务真相。
 
 ## 1. 可运行范围
 
@@ -23,6 +23,7 @@ app/                    路由、Metadata、加载/错误/Not Found 边界
 components/             无业务数据访问的共享 UI
 features/landing/       Landing 页面组合
 features/rooms/         房间列表与卡片交互
+features/room-performance/  route snapshot、房间列表/详情预取与浏览器加载加速
 features/room/          Room 外壳及 Chat/Photos/Itinerary；Photos 复用 BoardPhoto 兼容数据与照片详情组件
 features/create-room/   创建草稿类型、独立草稿存储、纯 reducer 状态机、三步向导与邀请卡导出
 features/mock-session/  版本化浏览器会话、云端兼容 provider、领域命令、selectors 与恢复校验
@@ -92,7 +93,7 @@ data/rooms.ts           server-only 数据访问入口和最小 View DTO
 
 - `MockSessionProvider` 负责从 `localStorage` 恢复 `eventspace:local-session:v1`，并兼容旧 `sessionStorage` 键。
 - `features/mock-session/model/mock-session.ts` 仍是主要状态转换中心，包含创建房间、发消息、投票、回忆录 item、行程、成员治理、归档等命令。
-- `core/domain/asset.ts` 定义稳定 `AssetReference` 及运行时校验；Chat image/voice 与回忆录 photo/drawing 只保存引用，Blob 由实现 `data/contracts/asset-repository.ts` 的 IndexedDB repository 管理。
+- `core/domain/asset.ts` 定义稳定 `AssetReference` 及运行时校验；Chat image/voice 与回忆录 photo/drawing 只保存引用，Blob 由实现 `data/contracts/asset-repository.ts` 的 IndexedDB repository 管理。当前云端图片引用还可携带 thumbnail、placeholder、width/height 与 revision。
 - `core/domain/board-layout.ts` 为 Board 与 Rooms 卡片共用画板 item 尺寸、边界和 fit 计算。
 - `features/room/components/chat-panel.tsx` 仍承载大量移动端交互；回忆录已经按编排、模型、Photos、Editor 和 Book 拆分。旧 `board-panel.tsx` 不再是正式入口。
 - `data/mock/mock-runtime.ts` 继续阻止正式生产环境默认运行固定 mock 身份；本地 build/start 可直接验证 mock。
@@ -177,7 +178,7 @@ data/rooms.ts           server-only 数据访问入口和最小 View DTO
 - `RoomExperience` 只实例化 `ChatPanel`、`PhotosPanel` 和 `ItineraryPanel`。`PhotosPanel` 使用 `boardItems` 中的 `BoardPhoto` 与 `boardComments`，这是当前 mock 的兼容实现，不等同于自由 Board 或 memoir domain。
 - `ChatPanel` 的产品入口只包含搜索、文字消息和语音录制；图片/相机/位置发送与聊天 Poll/Votes UI 已移除。`MockCommand` 中保留的 `CREATE_POLL` 等命令只服务于 Room 控制和旧本地数据兼容。
 - `create-room-machine.ts` 的 `CreateRoomStep` 为 `details`、`timing`、`review` 三步；创建后的 mock room 固定为 `host-led`。本文先前关于五步创建、Community-led 创建配置和 Book 编排器的描述均为历史实现。
-- `page-flip` 仍在 `package.json`，但没有运行时代码导入。发布前应在依赖审计中决定删除，或在恢复 Book 时重新引入最小化客户端边界。
+- `page-flip` 已从 `package.json` 和旧类型声明中删除。恢复 Book 时必须重新立项并重新引入最小化客户端边界，不能假设历史依赖仍可用。
 
 ## 2026-07-30 当前同步：云端兼容壳与头像字段
 
@@ -187,6 +188,16 @@ data/rooms.ts           server-only 数据访问入口和最小 View DTO
 - `core/domain/avatar.ts` 固定 `initials`、`single`、`ring` 三种 avatar 文本变体；数据库以 check constraint 约束同一枚举。当前文件中 `ring` 文本存在疑似编码异常，后续应作为代码修复处理。
 - Join flow 不再是纯 client state machine：Server Component 先读 invite preview、claims、profile 和 avatar asset，Server Action 负责 anonymous sign-in、identity bootstrap 和 `join_room_with_profile`，Client 只提交昵称并轮询 pending 状态。
 - Room share 与创建完成卡依赖 `core/web/use-browser-origin` 获取浏览器 origin，再用 `qrcode` 生成真实 invite URL；SSR 首帧没有 origin 时需要按钮/QR 禁用或占位。
+
+## 2026-08-02 当前同步：媒体变体与 route snapshot 架构
+
+- `AssetReference` 已扩展为同时表达 display、thumbnail、placeholder、尺寸和 `revision`。UI 仍消费领域引用，不直接拼接 Supabase object key；签名 URL 由服务端读模型或 route handler 注入。
+- `features/local-assets` 现在同时服务旧本地 Blob 与云端图片 read-through cache：cloud cache key 形如 `cache:{scope}:{asset.id}:{variant}:r{revision}`，不会被普通本地 asset prune 误删。
+- `features/room-performance/model/route-snapshots.ts` 负责 `/rooms` 与 Room detail 的 scope-bound 快照；`features/account/model/account-snapshot.ts` 与 `viewer-avatar-cache.ts` 分别负责 Account 和头像缓存。它们都不进入 `MockCommand`，也不是 reducer 状态。
+- 快照保存必须剥离 `remoteUrl` / `avatarUrl` 等短期 signed URL；hydrate 后页面仍需要从 Supabase 读取 no-store 权威快照并重新签名。
+- 房间卡片照片数据现在由 `list_room_card_media` read model 返回全部 ready photos；`features/rooms/model/photo-stack-window.ts` 只控制可见/隐藏预渲染窗口，不能被理解为数据裁剪。
+- 图片处理链路拆到 `image-upload.ts` 与 `image-processing.worker.ts`：前者负责编排和主线程 fallback，后者负责 display/thumbnail/placeholder 生成。`compressImage` 只作为旧兼容入口，不应继续扩展。
+- Route loading skeleton 属于 App Router 页面体验层；它不改变数据契约、权限或 `MockSession` 恢复规则。
 
 ## 2026-07-27 当前同步：浏览器导航状态
 

@@ -46,6 +46,7 @@
 - 原始图片最大 10 MB；上传后移除 EXIF 等隐私元数据。
 - 服务端应验证真实文件类型、限制解压/图像处理资源、阻止 SVG/HTML 等可执行内容伪装为图片。
 - 统一压缩并存储服务版本，最长边 2560px、目标质量约 85；不保存原图。
+- 当前封闭 MVP 的图片重编码发生在浏览器端，并生成 display、thumbnail 和 placeholder；这能减少上传体积和大部分常见 EXIF 暴露，但不能替代服务端可信解码、扫描和转码。
 - 上传前首次提示用户只分享拥有权利或已获授权的内容。
 - 内容和上传文件不应进入应用日志、错误追踪正文或分析管道。
 
@@ -88,17 +89,27 @@
 - 真实 QR 编码 private invite URL，因此邀请卡 PNG 和分享截图都应被视为敏感入口材料；轮换邀请后旧链接应失效，分享缓存和截图无法远程撤回。
 - `SUPABASE_SECRET_KEY` 是媒体/头像签名上传的服务端必要 secret；不得使用 `NEXT_PUBLIC_` 前缀，不得提交 git，不得从客户端读取。
 
+## 2026-08-02 当前同步：媒体变体与本地快照安全边界
+
+- 图片 asset 当前除 display object 外，还可保存 thumbnail object、placeholder data URL、width/height 和 `media_revision`。这些字段是展示和缓存元数据，不降低照片本身的私密等级。
+- display 与 thumbnail 都位于私有 `room-media` bucket；Storage select/insert/delete policy 必须同时覆盖 display object key 与 thumbnail object key，并继续按房间成员/头像读取策略授权。
+- 浏览器 snapshot/cache 不得保存 signed read URL。`/rooms`、Room detail、Account 和 viewer avatar 缓存写入前会剥离 `remoteUrl` / `avatarUrl`，并以当前 viewer scope 隔离，避免同一浏览器中切换账号后直接复用他人短期链接。
+- IndexedDB 的 cloud image read-through cache 保存的是已授权下载过的 display/thumbnail Blob；这提升当前设备重开体验，但清除站点数据、换设备、权限变更或签名 URL 过期都需要重新经过服务端授权路径。
+- `eventspace:room-photo-cache:v3` 使用 asset id、variant 和 revision 组成缓存键；当 revision 变化时旧缓存必须被视为 stale 并可清理，不能继续作为当前照片内容。
+- `placeholder_data_url` 虽然体积小，仍可能泄露照片颜色/构图轮廓；它只能随授权房间快照返回，不应进入公开 HTML、日志或跨用户缓存。
+- `list_room_card_media` 现在可返回房间全部 ready photos。UI 的有限渲染窗口只是性能策略，服务端仍应按房间权限、成员状态、照片状态和私有 Storage 签名控制每张照片读取。
+
 ### 仍待补齐的生产安全要求
 
 1. Cloudflare Turnstile 或等价机制、服务端速率限制和匿名用户清理任务。
-2. 媒体和头像的服务端 MIME magic number 校验、图像解码、EXIF 清理、转码、缩略图与恶意文件扫描。
+2. 媒体和头像的服务端 MIME magic number 校验、图像解码、EXIF 清理、转码、缩略图复核与恶意文件扫描。
 3. Storage object 引用计数、删除/软删除、孤立 pending asset 清理和归档保留策略。
 4. Auth Site URL / Additional Redirect URLs、`EVENTSPACE_APP_ORIGIN` 和移动端邮件回调的生产域名验收。
 5. 支持人员例外访问、审计日志、举报、备份清理和正式法律文本。
 
 ## 2026-07-18 历史同步：本地 Mock 安全与数据边界
 
-本节为历史同步，保留用于理解旧本地优先阶段；当前判断以 2026-07-30 同步为准。
+本节为历史同步，保留用于理解旧本地优先阶段；当前判断以 2026-08-02 同步为准。
 
 - 当前没有真实认证、RLS、RPC、Realtime Authorization 或服务端 session。
 - 当前所有写操作均在浏览器本地状态中完成，不能代表生产授权。

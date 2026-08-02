@@ -1,6 +1,6 @@
 # EventSpace Supabase 后端接入方案
 
-> 状态：2026-07-30 同步；首批后端基础任务已完成 8/8，BE-010 至 BE-022、
+> 状态：2026-08-02 同步；首批后端基础任务已完成 8/8，BE-010 至 BE-022、
 > DW-001 至 DW-010、2026-07-28 五项线上接入修复，以及头像/访客加入/真实 QR
 > 工作区改动均已记录；BE-009 支付规划按产品决策延期。
 > 建立日期：2026-07-27。  
@@ -1588,3 +1588,26 @@ Photos/语音 Storage、支付、Book 和投票仍按既定范围延后。
 - [ ] 继续保留 `SUPABASE_SECRET_KEY`、Auth Site URL / Additional Redirect URLs、`EVENTSPACE_APP_ORIGIN` 的环境配置检查；头像和媒体签名上传都依赖 server secret。
 - [ ] 在手机上扫描创建完成卡和 Room share QR，分别验证 logged-in、anonymous guest、pending approve、rejected 四条路径。
 - [ ] 头像图片仍缺少服务端解码/重编码、EXIF 清理、恶意文件扫描和缩略图流水线；当前只完成 MIME/大小/RLS/Storage 对象归属边界。
+
+## 19. 2026-08-02 媒体变体、房间卡片投影与快照缓存
+
+> 状态：代码和 migration 文件已进入仓库；是否已应用到目标 Supabase 云项目仍需 CLI / Dashboard 复核。
+
+- [x] **MEDIA-V2-001 图片变体 schema**：`assets` 新增 `thumbnail_object_key`、`thumbnail_byte_size`、`placeholder_data_url`、`image_width`、`image_height` 与 `media_revision`，并补充图片尺寸、placeholder data URL、thumbnail 必须为图片等约束。
+- [x] **MEDIA-V2-002 上传 RPC**：新增 `prepare_room_media_upload_v2` / `finalize_room_media_upload_v2`，图片上传同时分配 display 与 thumbnail object key；display 上限 2.25 MB、thumbnail 上限 180 KB、尺寸上限 1600，voice 继续走既有 v1 路径。
+- [x] **MEDIA-V2-003 Storage RLS**：`room-media` 的 insert/select/delete policies 已覆盖 display object key 与 thumbnail object key；头像和房间媒体仍沿用私有 bucket，不新增公开缩略图 bucket。
+- [x] **MEDIA-V2-004 PostgREST 兼容**：新增 schema cache reload migration，并重建 v2 public wrapper 参数名，避免 Supabase RPC 命名参数与 PostgREST cache 不一致导致上传准备失败。
+- [x] **ROOM-MEDIA-001 read projection**：新增并升级 `public.list_room_card_media(uuid[])`，按房间返回全部 ready photos、asset variant 字段和 `photo_count`；v2 已取消原先每房间 5 张 SQL 限制。
+- [x] **ROOM-MEDIA-002 前端读取兼容**：`data/supabase/media-variant-compat.ts` 在 variant 字段缺失或 PostgREST cache 未刷新时退回 legacy asset 字段，降低灰度期故障面；迁移完成后仍应以新 schema 为准。
+- [x] **ROOM-MEDIA-003 批量签名 URL**：`createSignedMediaUrls` 按 display/thumbnail 分组批量调用 Storage signed URL API，减少 Rooms 卡片和详情页逐图签名开销。
+- [x] **CACHE-001 Route snapshot**：`/rooms`、Room detail、Account 和 viewer avatar 增加 scope-bound 浏览器快照/头像缓存；写入前移除 signed URL，缓存只作为加载加速层。
+- [x] **CACHE-002 Room photo cache**：Room Photos 使用 `eventspace:room-photo-cache:v3`、display/thumbnail variant key 与 `media_revision` 做 IndexedDB read-through cache；401/403 作为签名 URL 过期处理并触发回源。
+- [x] **TEST-002 数据库覆盖**：新增 `025-room-card-media-projection.test.sql`，覆盖 authenticated 可执行、anon 禁止、投影返回超过旧 5 张限制、`photo_count` 正确以及 schema version 为 2。
+
+**仍需云端/环境验收**：
+
+- [ ] 确认 `20260730090439_photo_media_variants.sql`、`20260730091859_room_media_read_projection.sql`、`20260730092953_refresh_postgrest_schema_cache.sql`、`20260730093223_fix_media_v2_rpc_argument_names.sql` 与 `20260731183801_remove_room_card_media_limit.sql` 已应用到目标 Supabase 云项目。
+- [ ] 重新生成并比对 `data/supabase/database.types.ts`，确认 asset variant 字段和 v2 RPC 参数进入类型文件。
+- [ ] 运行 `npm run supabase:test:db`，确认 023/024/025 以及既有 RLS 测试在云端测试环境通过。
+- [ ] 真机验证大图上传、HEIC/Live Photo 静态化、Worker fallback、thumbnail 显示、房间卡片超过 5 张照片横滑、签名 URL 过期刷新和清除站点数据后的重新回源。
+- [ ] 服务端媒体净化仍未完成：magic number、可信图像解码/重编码、EXIF 清理证明、恶意文件扫描、孤立 pending asset 清理和引用计数删除仍是上线前 P0。

@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { presentRoomCollection } from "@/data/room-read-presenter";
 import { createSupabaseServerClient } from "@/data/supabase/server-client";
 import { getRoomCardMedia } from "@/data/supabase/room-card-media";
+import { getRoomCardMembers } from "@/data/supabase/room-card-members";
 import { SupabaseRoomReadRepository } from "@/data/supabase/supabase-room-read-repository";
 import { RoomsPage } from "@/features/rooms/components/rooms-page";
 
@@ -36,12 +37,15 @@ export default async function RoomsRoute() {
   // Avatar resolution is decorative. Keep the first useful room collection
   // independent from it so a slow Storage request never blanks the route.
   const page = await roomsPromise;
-  const cardMedia = await getRoomCardMedia(page);
+  const [cardMedia, cardMembers] = await Promise.all([
+    getRoomCardMedia(page),
+    getRoomCardMembers(page),
+  ]);
   const identity = page.items[0]?.viewer.nickname ?? fallbackIdentity;
 
   return (
     <RoomsPage
-      initialRooms={presentRoomCollection(page, cardMedia)}
+      initialRooms={presentRoomCollection(page, cardMedia, cardMembers)}
       viewerInitials={initials(identity)}
       viewerAvatarUrl={null}
       viewerCacheScope={page.items[0]?.viewer.actorId}

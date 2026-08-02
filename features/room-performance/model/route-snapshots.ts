@@ -11,6 +11,7 @@ const SNAPSHOT_MAX_AGE_MS = 1000 * 60 * 60 * 12;
 
 export interface RoomsRouteSnapshot {
   readonly scope: string;
+  readonly viewerAccountScope?: string;
   readonly savedAt: number;
   readonly rooms: readonly RoomCollectionItem[];
   readonly viewerInitials: string;
@@ -71,6 +72,7 @@ export function saveRoomsRouteSnapshot(input: Omit<RoomsRouteSnapshot, "savedAt"
   const current = readRoomsRouteSnapshot();
   if (
     current?.scope === input.scope
+    && current.viewerAccountScope === input.viewerAccountScope
     && current.viewerInitials === input.viewerInitials
     && JSON.stringify(current.rooms) === JSON.stringify(stableRooms)
   ) return;

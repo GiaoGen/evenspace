@@ -3,7 +3,9 @@
 import type { AssetReference } from "@/core/domain/asset";
 
 const PREFIX = "eventspace:viewer-avatar:v1:";
+const VALIDATED_PREFIX = "eventspace:viewer-avatar-validated:v1:";
 const CHANGE_EVENT = "eventspace:viewer-avatar-change";
+const VALIDATION_MAX_AGE_MS = 1000 * 60 * 10;
 const memo = new Map<string, { readonly raw: string | null; readonly asset: AssetReference | null }>();
 
 function withoutRemoteUrl(asset: AssetReference): AssetReference {
@@ -43,11 +45,15 @@ export function saveViewerAvatar(scope: string, asset: AssetReference | null) {
     if (asset) {
       const stable = withoutRemoteUrl(asset);
       const raw = JSON.stringify(stable);
-      window.localStorage.setItem(`${PREFIX}${scope}`, raw);
+      const changed = window.localStorage.getItem(`${PREFIX}${scope}`) !== raw;
+      if (changed) window.localStorage.setItem(`${PREFIX}${scope}`, raw);
       memo.set(scope, { raw, asset: stable });
+      if (!changed) return;
     } else {
-      window.localStorage.removeItem(`${PREFIX}${scope}`);
+      const changed = window.localStorage.getItem(`${PREFIX}${scope}`) !== null;
+      if (changed) window.localStorage.removeItem(`${PREFIX}${scope}`);
       memo.set(scope, { raw: null, asset: null });
+      if (!changed) return;
     }
     window.dispatchEvent(new Event(CHANGE_EVENT));
   } catch {
@@ -58,9 +64,26 @@ export function saveViewerAvatar(scope: string, asset: AssetReference | null) {
 export function clearViewerAvatar(scope: string) {
   if (typeof window === "undefined" || !scope) return;
   try {
-    window.localStorage.removeItem(`${PREFIX}${scope}`);
+    const changed = window.localStorage.getItem(`${PREFIX}${scope}`) !== null;
+    if (changed) window.localStorage.removeItem(`${PREFIX}${scope}`);
     memo.set(scope, { raw: null, asset: null });
-    window.dispatchEvent(new Event(CHANGE_EVENT));
+    if (changed) window.dispatchEvent(new Event(CHANGE_EVENT));
   }
   catch { /* Cleanup must not block sign out. */ }
+}
+
+export function hasFreshViewerAvatarValidation(scope: string) {
+  if (typeof window === "undefined" || !scope) return false;
+  try {
+    const checkedAt = Number(window.localStorage.getItem(`${VALIDATED_PREFIX}${scope}`));
+    return Number.isFinite(checkedAt) && checkedAt > 0 && Date.now() - checkedAt < VALIDATION_MAX_AGE_MS;
+  } catch {
+    return false;
+  }
+}
+
+export function markViewerAvatarValidated(scope: string) {
+  if (typeof window === "undefined" || !scope) return;
+  try { window.localStorage.setItem(`${VALIDATED_PREFIX}${scope}`, String(Date.now())); }
+  catch { /* Validation metadata is optional. */ }
 }

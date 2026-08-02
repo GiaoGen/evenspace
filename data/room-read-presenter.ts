@@ -5,6 +5,7 @@ import type {
 } from "@/data/contracts/room-read-repository";
 import type { RoomCollectionItem } from "@/features/rooms/model/room-collection";
 import type { RoomCardMedia } from "@/data/supabase/room-card-media";
+import type { RoomMemberPreview } from "@/features/rooms/model/room-member-preview";
 
 const backgrounds: readonly RoomSummary["boardBackground"][] = [
   "stone",
@@ -46,9 +47,11 @@ export function presentRoomSummary(room: RoomReadModel, media?: RoomCardMedia): 
 export function presentRoomCollection(
   page: RoomReadPage,
   mediaByRoom: ReadonlyMap<string, RoomCardMedia> = new Map(),
+  membersByRoom: ReadonlyMap<string, readonly RoomMemberPreview[]> = new Map(),
 ): readonly RoomCollectionItem[] {
   return page.items.map((room) => ({
     room: presentRoomSummary(room, mediaByRoom.get(room.id)),
     boardItems: mediaByRoom.get(room.id)?.boardItems ?? [],
+    memberPreviews: membersByRoom.get(room.id) ?? [],
   }));
 }

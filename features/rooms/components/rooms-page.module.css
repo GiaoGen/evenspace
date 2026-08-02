@@ -247,13 +247,21 @@
 .boardSnapshotDrawing img { object-fit: contain; }
 .emptyBoard { position: absolute; top: 50%; left: 50%; color: rgba(245,241,234,.72); font-family: var(--font-bodoni),Georgia,serif; font-size: 38px; transform: translate(-50%,-50%); }
 
-.cardInfo { display: flex; flex-direction: column; justify-content: flex-end; gap: 22px; padding: 28px 23px; border-left: 1px solid var(--line); border-radius: 30px; background: var(--surface); }
-.cardInfo h2 { margin: 0; font-family: var(--font-bodoni),Georgia,serif; font-size: 44px; font-weight: 600; line-height: .95; }
-.cardInfo p { margin: 12px 0 0; color: var(--muted); font-size: 8px; line-height: 1.5; }
+.cardInfo { min-width: 0; display: flex; flex-direction: column; justify-content: flex-end; gap: 18px; padding: 28px 20px 20px 23px; border-left: 1px solid var(--line); border-radius: 30px; background: var(--surface); }
+.cardInfo h2 { overflow: hidden; margin: 0; font-family: var(--font-bodoni),Georgia,serif; font-size: 44px; font-weight: 600; line-height: .95; text-overflow: ellipsis; white-space: nowrap; }
+.cardInfoBottom { min-width: 0; display: grid; grid-template-columns: minmax(0,1fr) 45px; gap: 10px; align-items: end; }
+.cardInfoMeta { min-width: 0; height: 45px; display: flex; flex-direction: column; align-items: flex-start; justify-content: space-between; }
+.memberAvatars { min-width: 0; height: 24px; display: flex; align-items: center; padding-left: 1px; isolation: isolate; }
+.memberAvatarShell { position: relative; width: 24px; height: 24px; flex: 0 0 24px; display: grid; place-items: center; margin-left: -5px; border: 2px solid var(--surface); border-radius: 50%; background: var(--surface-2); color: var(--ink); font-size: 7px; font-weight: 760; line-height: 1; box-sizing: border-box; }
+.memberAvatarShell:first-child { margin-left: 0; }
+.memberAvatar { width: 100%; height: 100%; background: var(--surface-2); }
+.memberOverflow { z-index: 6; letter-spacing: -.03em; }
+.memberAvatarEntering { animation: memberAvatarIn 220ms cubic-bezier(.22,.72,.25,1) calc(70ms + var(--member-index,0) * 55ms) both; }
+.cardInfo p { min-width: 0; overflow: hidden; margin: 0; color: var(--muted); font-size: 8px; line-height: 1.5; text-overflow: ellipsis; white-space: nowrap; }
 .cardInfo p i { width: 6px; height: 6px; display: inline-block; margin-right: 6px; border-radius: 50%; background: var(--muted); }
 .cardInfo p i.liveDot { background: var(--ink); }
-.cardInfo > span { width: 45px; height: 45px; display: grid; place-items: center; border-radius: 15px; background: var(--ink); color: var(--canvas); transition: transform 180ms ease-out; }
-.cardLink:hover .cardInfo > span { transform: translateX(3px); }
+.cardInfoBottom > span { width: 45px; height: 45px; display: grid; place-items: center; border-radius: 15px; background: var(--ink); color: var(--canvas); transition: transform 180ms ease-out; }
+.cardLink:hover .cardInfoBottom > span { transform: translateX(3px); }
 .cardGrid .cardInfo { display: none; }
 .cardGrid .boardPreview { min-height: 390px; }
 .cardGrid .photoStack { height: 100%; }
@@ -304,6 +312,7 @@
 @keyframes modeIn { from { opacity: 0; transform: translateX(5px); } to { opacity: 1; transform: translateX(0); } }
 @keyframes cardActionIn { from { opacity: 0; transform: scale(.72); } to { opacity: 1; transform: scale(1); } }
 @keyframes countIn { from { opacity: 0; transform: translateY(3px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes memberAvatarIn { from { opacity: 0; transform: translateY(5px) scale(.84); } to { opacity: 1; transform: translateY(0) scale(1); } }
 @keyframes roomsLayoutFadeOut { from { opacity: 1; } to { opacity: 0; } }
 @keyframes roomsLayoutFadeIn { from { opacity: 0; } to { opacity: 1; } }
 @keyframes emptyIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
@@ -315,15 +324,15 @@
 @media (max-width: 900px) {
   .cards { grid-auto-columns: 88vw; padding-inline: max(0px,calc((100% - 88vw) / 2)); scroll-padding-inline: max(0px,calc((100% - 88vw) / 2)); }
   .cardLink { grid-template-columns: 1fr; }
-  .loadingCardLayout { grid-template-columns:1fr; grid-template-rows:minmax(0,1fr) auto; }.loadingInfo { min-height:140px; border-top:1px solid var(--line); border-left:0; }.loadingInfo i { bottom:68px; }.loadingInfo span { bottom:43px; }.loadingInfo b { right:18px; bottom:18px; left:auto; }
-  .cardInfo { min-height: 140px; flex-direction: row; align-items: center; justify-content: space-between; border-top: 1px solid var(--line); border-left: 0; border-radius: 30px; }
+  .loadingCardLayout { grid-template-columns:1fr; grid-template-rows:minmax(0,1fr) auto; }.loadingInfo { min-height:138px; border-top:1px solid var(--line); border-left:0; }.loadingInfo i { bottom:68px; }.loadingInfo span { bottom:43px; }.loadingInfo b { right:18px; bottom:18px; left:auto; }
+  .cardInfo { min-height: 138px; gap: 14px; padding: 18px 20px; border-top: 1px solid var(--line); border-left: 0; border-radius: 30px; }
   .cardsGrid { grid-auto-rows: 390px; grid-template-columns: repeat(2,minmax(0,1fr)); padding: 4px 0 24px; }
   .cardsGrid .card { border-radius: 23px; }
   .cardsGrid .cardLink { min-height: 0; }
   .cardsGrid .boardPreview { min-height: 280px; }
   .cardsGrid .cardInfo { min-height: 110px; padding: 15px; }
   .cardsGrid .cardInfo h2 { font-size: 25px; }
-  .cardsGrid .cardInfo > span { display: none; }
+  .cardsGrid .cardInfoBottom > span { display: none; }
 }
 
 @media (max-width: 640px) {
@@ -336,14 +345,14 @@
   .cardLink { min-height: 0; grid-template-rows: minmax(0,1fr) auto; }
   .boardPreview { min-height: 0; height: 100%; }
   .photoStack { height: 100%; }
-  .cardInfo { min-height: 118px; padding: 18px; border-radius: 25px; }
-  .loadingCardLayout { border-radius:25px; }.loadingInfo { min-height:118px; }.loadingInfo i { left:18px; bottom:62px; height:24px; }.loadingInfo span { left:18px; bottom:40px; }.loadingInfo b { right:18px; bottom:18px; width:40px; height:40px; border-radius:13px; }
+  .cardInfo { min-height: 120px; gap: 12px; padding: 16px 18px; border-radius: 25px; }
+  .loadingCardLayout { border-radius:25px; }.loadingInfo { min-height:120px; }.loadingInfo i { left:18px; bottom:62px; height:24px; }.loadingInfo span { left:18px; bottom:40px; }.loadingInfo b { right:18px; bottom:18px; width:40px; height:40px; border-radius:13px; }
   .cardInfo h2 { font-size: 31px; }
   .favorite { top: 12px; left: 12px; height: 36px; }
   .deleteRoom { top: 12px; right: 12px; width: 36px; height: 36px; }
   .cardsGrid { grid-auto-rows: clamp(170px,52vw,220px); grid-template-columns: repeat(2,minmax(0,1fr)); gap: 9px; padding: 3px 14px 24px; }
   .cardsGrid .cardLink { min-height: 0; }
-  .cardsGrid .cardInfo { min-height: 100px; align-items: flex-start; }
+  .cardsGrid .cardInfo { min-height: 100px; }
   .cardsGrid .cardInfo h2 { font-size: 21px; }
   .cardsGrid .cardInfo p { margin-top: 8px; }
   .cardsGrid .favorite { top: 9px; left: 9px; height: 33px; padding: 0 9px; }
@@ -362,5 +371,5 @@
 
 
 @media (min-width: 700px) { .sheetBackdrop { align-items: center; } }
-@media (prefers-reduced-motion: reduce) { .cardsFadeOut,.cardsFadeIn { animation:none; }.photoStackCard { transition: none !important; }.photoStackSurfaceEntering { animation:none; opacity:1; transform:none; } }
+@media (prefers-reduced-motion: reduce) { .cardsFadeOut,.cardsFadeIn,.memberAvatarEntering { animation:none; }.photoStackCard { transition: none !important; }.photoStackSurfaceEntering { animation:none; opacity:1; transform:none; } }
 @keyframes createIn { from { opacity: 0; transform: translateY(10px) scale(.94); } to { opacity: 1; transform: translateY(0) scale(1); } }

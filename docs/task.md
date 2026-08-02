@@ -1,9 +1,9 @@
 # EventSpace 当前任务记录
 
-> 最后更新：2026-07-30
+> 最后更新：2026-08-02
 > 用途：记录最近任务做了什么、当前真实进度、验证结果、遗留事项和下一步。  
 > 规则：本文件保持为当前阶段活文档；更早阶段摘要迁移到 [`history_taks.md`](./history_taks.md)。  
-> 本次同步范围：相对 `origin/main` / 当前工作区 diff 的文档校准；只同步文档，不修改业务代码。
+> 本次同步范围：基于 `git log` / `git diff c70547e..HEAD` 的文档校准；只同步文档，不修改业务代码。
 
 ## 项目当前状态
 
@@ -11,13 +11,43 @@
 - `MockSession` 仍存在，但在云端房间内主要作为 `RoomExperience` 的兼容前端状态外壳；`BackendSessionProvider.executeCommand` 会把支持的命令转成 Server Action / RPC / Storage 操作，失败后回滚到服务器快照。
 - 结构化本地会话 `eventspace:local-session:v1` 与 IndexedDB `eventspace-local-assets` 继续服务本地 mock、录音/图片采集的上传前临时 Blob，以及旧数据兼容；它不是云端业务真相。
 - 当前已经支持创建真实 Host-led 房间、真实邀请 token/code、可扫描 QR、匿名访客加入、待审核轮询、Host 审批、账号资料和头像上传、房间列表/详情、文字/语音 Chat、Photos 上传/评论/删除、行程和成员治理。Room 内联投票、Book 与回忆录编辑器仍不在当前正式范围。
-- 图片、语音与头像均走 `assets` + 私有 `room-media` Storage + 短期签名 URL；客户端仍需先持有本地 Blob 才能上传，服务端负责成员资格、状态、配额和对象归属校验。
+- 图片、语音与头像均走 `assets` + 私有 `room-media` Storage + 短期签名 URL；图片上传当前生成 display / thumbnail / placeholder / dimensions / revision 元数据，客户端仍需先持有本地 Blob 才能上传，服务端负责成员资格、状态、配额、对象归属和 variant 字段约束校验。
+- `/rooms`、`/rooms/[roomId]`、`/account` 和 viewer avatar 已增加浏览器快照/头像缓存与 IndexedDB 云端图片 read-through cache。它们只保存去签名 URL 的展示快照或媒体 Blob 加速读取，不是跨设备业务真相；权限、签名和最终内容仍以 Supabase 为准。
 - 后端范围已冻结：仅 Host-led；Chat 文本/语音；Photos 与 Itinerary 进入首期；Stripe 一次性房间支付进入 MVP 但当前免费/封闭测试不阻塞；Book 延后设计，投票继续延后。
 - 后端实施、验收和任务 Mark 统一以 [`supabase-backend-integration-plan.md`](./supabase-backend-integration-plan.md) 为主计划书。
 - 生产构建不再依赖远程 Google Fonts / `next/font` 拉取；字体资源已通过 `public/fonts` 的本地 `@font-face` 加载，保留 Bodoni 衬线标题风格。
 - `/prototype` 系列路由只作为视觉历史参考，不再代表当前功能完成度。
 
 ## 最近完成任务
+
+### TASK-027 - 媒体变体、路线快照与 Rooms 性能同步
+
+- 日期：2026-08-02
+- 状态：代码已在最近多次提交中完成；本轮按维护规范补齐文档。Supabase 云端 migration、远端 types 和数据库测试仍需在具备 CLI/云项目权限的环境复核。
+- 完成内容：
+  - Photos 图片上传从单对象升级为 display + thumbnail + placeholder data URL + width/height + media revision；浏览器优先用 Worker 生成有界 JPEG，失败时回退主线程处理。
+  - 新增 `prepare_room_media_upload_v2` / `finalize_room_media_upload_v2` 及兼容读取层；旧 asset schema 缺少 variant 字段时前端可退回 legacy display URL，避免灰度期直接崩溃。
+  - 新增批量签名读 URL helper，房间卡片和详情可分别批量签 display/thumbnail，减少逐图请求。
+  - `list_room_card_media` 投影从“每房间最多 5 张”改为返回全部 ready photos；Rooms 卡片只限制 UI 可见/渲染窗口，不再裁剪可横滑访问的照片集合。
+  - Room Photos 引入 `eventspace:room-photo-cache:v3` manifest、display/thumbnail cache key、优先窗口和后台缓存；签名 URL 失效时触发回源刷新。
+  - `/rooms`、Room detail、Account 与 viewer avatar 增加本地 snapshot/cache：保存前移除 `remoteUrl` / `avatarUrl` 等短期签名 URL，并以当前 viewer scope 隔离。
+  - `/rooms` 卡片照片堆增加确定性入场、图片 decode 协调和有限渲染窗口；Grid/Magazine 切换增加布局淡出淡入并保留视觉锚点。
+  - Account / Rooms / Room New / Room detail 路由新增 loading skeleton；`page-flip` 依赖和类型声明已移除，当前运行时不再携带 Book 翻页包。
+- 真实能力边界：
+  - 真实能力：私有媒体 variant 元数据、display/thumbnail 双对象上传签名、短期读签名批量生成、房间卡片全量照片投影、浏览器侧去签名快照缓存和云端图片 read-through cache。
+  - 仍不是完整生产媒体流水线：图片重编码目前发生在浏览器，服务端仍需补 magic number 校验、可信解码/转码、EXIF 清理证明、恶意文件扫描、生命周期清理和后台再处理。
+- 已知问题：
+  - `SUPABASE_SECRET_KEY`、Auth redirect / `EVENTSPACE_APP_ORIGIN`、Supabase migration 应用状态仍属于环境验收项。
+  - snapshot/cache 只能改善当前设备二次打开体验；权限变化后仍必须依赖服务端 no-store 快照刷新和短期签名 URL 重新生成。
+  - `core/domain/avatar.ts` 中 `ring` avatar 文本疑似编码异常仍未在本轮文档同步中修改。
+- 验证：
+  - 2026-08-02 `npm run check` 通过（ESLint + `tsc --noEmit`）。
+  - 2026-08-02 `npm run build` 通过；Next.js 16.2.10 生产构建完成，未复现 2026-07-30 的 `.next/server-3101.error.log` EBUSY 锁文件问题。
+  - 2026-08-02 `git diff --check` 通过；仅有工作区 LF/CRLF 提示，无 whitespace error。
+- 下一步：
+  - 应用并复核 `photo_media_variants`、`room_media_read_projection` v2、PostgREST schema cache reload 和 v2 RPC 参数名修复 migration。
+  - 运行 `npm run supabase:types:check`、`npm run supabase:test:db`，确认 `025-room-card-media-projection.test.sql` 与既有头像/媒体测试通过。
+  - 对 iOS Safari / Android Chromium 真机验证 12 MB 图片输入、HEIC/Live Photo 静态化、Worker fallback、Rooms 卡片横滑全量照片和签名 URL 过期刷新。
 
 ### TASK-026 - 云端头像、访客加入与真实邀请二维码同步
 
@@ -167,7 +197,7 @@
   - 390 x 844 移动端视口验证封面、Spread/Single、单页满宽、翻页完成后视角切换和无横向溢出。
 - 遗留事项：
   - Photos 当前只支持 spread 级添加/删除和纸张样式，复杂自由排版、跨页移动、层级、裁切、撤销/重做尚未实现。
-  - Rooms 卡片仍消费旧 Board snapshot/background，尚未改为回忆录封面或 Photos spread 预览。
+  - 当时 Rooms 卡片仍消费旧 Board snapshot/background，尚未改为回忆录封面或 Photos spread 预览；截至 2026-08-02 当前实现已改为 Photos 牌堆预览。
   - StPageFlip 是客户端呈现依赖；后端只应保存页序、内容归属和样式，不保存翻页运行时状态。
   - 生产端需要把 memoir page/spread、item placement、caption 与 asset 分别建模，并以事务、权限、版本号和服务器时间处理并发编辑。
 

@@ -37,11 +37,12 @@ describe("rooms route snapshot", () => {
     const { dispatchEvent } = browserWindow();
     rememberViewerCacheScope("actor-stable");
 
-    saveRoomsRouteSnapshot({ scope: "actor-stable", rooms: [], viewerInitials: "AS" });
+    saveRoomsRouteSnapshot({ scope: "actor-stable", viewerAccountScope: "user-stable", rooms: [], viewerInitials: "AS" });
     const first = readRoomsRouteSnapshot();
-    saveRoomsRouteSnapshot({ scope: "actor-stable", rooms: [], viewerInitials: "AS" });
+    saveRoomsRouteSnapshot({ scope: "actor-stable", viewerAccountScope: "user-stable", rooms: [], viewerInitials: "AS" });
 
     expect(readRoomsRouteSnapshot()).toBe(first);
+    expect(first?.viewerAccountScope).toBe("user-stable");
     expect(dispatchEvent).toHaveBeenCalledTimes(1);
   });
 
@@ -53,6 +54,17 @@ describe("rooms route snapshot", () => {
     saveRoomsRouteSnapshot({ scope: "actor-updated", rooms: [], viewerInitials: "NEW" });
 
     expect(readRoomsRouteSnapshot()?.viewerInitials).toBe("NEW");
+    expect(dispatchEvent).toHaveBeenCalledTimes(2);
+  });
+
+  it("broadcasts when the account cache scope changes", () => {
+    const { dispatchEvent } = browserWindow();
+    rememberViewerCacheScope("actor-account");
+
+    saveRoomsRouteSnapshot({ scope: "actor-account", viewerAccountScope: "user-before", rooms: [], viewerInitials: "AA" });
+    saveRoomsRouteSnapshot({ scope: "actor-account", viewerAccountScope: "user-after", rooms: [], viewerInitials: "AA" });
+
+    expect(readRoomsRouteSnapshot()?.viewerAccountScope).toBe("user-after");
     expect(dispatchEvent).toHaveBeenCalledTimes(2);
   });
 });

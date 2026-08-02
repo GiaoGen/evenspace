@@ -1,6 +1,6 @@
 # EventSpace 本地优先静态实现计划
 
-> 状态：2026-07-30 历史计划；本地优先阶段已被 Supabase-backed 封闭 MVP 接线覆盖。
+> 状态：2026-08-02 历史计划；本地优先阶段已被 Supabase-backed 封闭 MVP 接线覆盖，当前本地存储只承担 mock/fallback、上传前临时 Blob、旧数据兼容与云端读取加速。
 > 目标：在不接入后端的前提下，将当前可操作 Mock 逐步改造成移动端优先、真实本地数据驱动、可被后端 Repository 替换的完整静态版本。  
 > 原则：不再把页面写死为样例 Mock；本地浏览器数据是当前真相来源，未来 Supabase/Postgres 是同一领域命令的远端真相来源。
 
@@ -160,9 +160,9 @@
 - 已完成：Room 正式入口由 Board/Sequence 改为 Photos/Book；旧 Board 代码暂时保留，不再继续扩展。
 - 已完成：`createMemoirDocument` 从现有 item、页数和纸张样式生成稳定偶数页与 spread；Photos 和 Book 共用该只读 document。
 - 已完成：相册/相机/Chat 图片、Chat 文本、新文本、纸张样式、caption 和新增双页均通过本地命令写入 `MockSession` v7；媒体继续使用 IndexedDB asset reference。
-- 已完成：Book 的 `page-flip` 生命周期与 UI 分离，支持封面、Spread/Single、移动端尺寸更新和翻页后视角定位。
+- 当时已完成：Book 的 `page-flip` 生命周期与 UI 分离，支持封面、Spread/Single、移动端尺寸更新和翻页后视角定位；当前运行时已移除 Book 与 `page-flip` 依赖。
 - 部分完成：当前编辑器只支持目标页选择、添加、删除和纸张样式；复杂排版引擎尚未进入数据模型。
-- 未完成：Rooms 卡片尚未从旧 Board snapshot/background 迁移为 memoir cover/spread preview。
+- 当时未完成：Rooms 卡片尚未从旧 Board snapshot/background 迁移为 memoir cover/spread preview；当前已改为 Photos 牌堆预览，memoir/spread 路线已撤回。
 - 后端替换点：不要直接暴露 `boardItems` 兼容字段；先定义 `memoir_pages`、`memoir_items`、`photo_captions` 或等价聚合，以及带 expected version 的页面 mutation。
 - Room extension 已使用 5 分钟步进和本地上限校验；生产必须由服务端根据套餐、当前结束时间和总时长再次裁决。
 
@@ -187,3 +187,12 @@
 - 本地创建草稿 `eventspace:create-room-draft:v1` 仍是 UI draft；创建成功后写入真实 Supabase room / invite，而不是写入本地 session。
 - `/rooms` 的 `sessionStorage` 视图偏好和最近卡片仍只是单标签 UI 状态，不进入 Supabase。
 - 后续本地侧优先级：继续保留上传前失败恢复、移动端 Blob 采集、旧 session 迁移和清站点数据后的可恢复错误提示；不再扩展本地-only 投票、Book 或自由 Board。
+
+## 2026-08-02 当前同步：本地缓存的收缩与新增加速职责
+
+- 浏览器本地存储新增一类“云端读取加速”职责，但它仍不改变业务真相来源：Account snapshot、Rooms snapshot、Room detail snapshot、viewer avatar cache 和 room photo cache 都必须被视为可丢弃缓存。
+- `localStorage` 中的 route/account/avatar snapshot 保存 scope-bound 展示数据，且写入前剥离 signed URL；它们不能支持离线访问私密房间，也不能跨账号复用。
+- IndexedDB `eventspace-local-assets` 继续保存旧本地 mock Blob，同时保存云端 display/thumbnail read-through cache。云端缓存键包含 asset id、variant 和 revision，revision 变化后旧 Blob 应视为过期。
+- Room photo cache v3 的优先级策略是性能实现：当前照片、前后窗口和前 12 张网格缩略图优先，其余缩略图/显示图后台下载；它不是新建照片排序、收藏或归档规则。
+- `/rooms` 的照片牌堆 entry animation、decode 协调和布局 fade 只属于 UI 状态；本地计划不再把这类状态提升为 repository 或 command。
+- 下一步本地侧只保留缓存失效、存储配额失败、签名 URL 过期回源和清站点数据恢复提示；不再把 PWA 离线房间内容、Book、投票或自由 Board 作为本地优先主线推进。

@@ -2,17 +2,42 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
 import { PinnedPhoto } from "@/components/pinboard/pinned-photo";
+import { Avatar } from "@/components/ui/avatar";
 import { Icon } from "@/components/ui/icon";
 import type { BoardItem, BoardPhoto, RoomSummary } from "@/core/domain/room";
 import { getPhotoStackEntryKey, hasEnteredPhotoStack, markPhotoStackEntered, schedulePhotoStackEntryBatch, type PhotoStackEntryCandidate } from "@/features/rooms/model/photo-stack-entry";
 import { getPhotoStackVisibleRadius, getPhotoStackWindow } from "@/features/rooms/model/photo-stack-window";
+import { getRoomMemberEntryKey, hasEnteredRoomMemberPreview, markRoomMemberPreviewEntered } from "@/features/rooms/model/room-member-entry";
+import { getRoomMemberPreviewSlots, type RoomMemberPreview } from "@/features/rooms/model/room-member-preview";
 import styles from "./rooms-page.module.css";
 
 function formatRoomMeta(room: RoomSummary) {
   const source = room.status === "active" ? room.endsAt : room.archivedAt;
   const date = source ? new Date(source) : null;
   const formatted = date ? new Intl.DateTimeFormat("en-US", room.status === "active" ? { hour: "numeric", minute: "2-digit", timeZone: room.timeZone } : { month: "short", day: "numeric", timeZone: room.timeZone }).format(date) : "—";
-  return room.status === "active" ? `Ends ${formatted} · ${room.memberCount} people` : `Archived ${formatted} · ${room.memberCount} people`;
+  return room.status === "active" ? `Ends ${formatted}` : `Archived ${formatted}`;
+}
+
+function RoomMemberAvatars({ roomId, cacheScope, members, memberCount }: { readonly roomId: string; readonly cacheScope?: string; readonly members: readonly RoomMemberPreview[]; readonly memberCount: number }) {
+  const { members: visibleMembers, overflowCount } = getRoomMemberPreviewSlots(members, memberCount);
+  const entryKey = getRoomMemberEntryKey(cacheScope, roomId);
+  const [animateEntry] = useState(() => visibleMembers.length > 0 && !hasEnteredRoomMemberPreview(entryKey));
+
+  useEffect(() => {
+    if (animateEntry) markRoomMemberPreviewEntered(entryKey);
+  }, [animateEntry, entryKey]);
+
+  if (visibleMembers.length === 0 && overflowCount === 0) return null;
+  return (
+    <div className={styles.memberAvatars} role="img" aria-label={`${memberCount} ${memberCount === 1 ? "member" : "members"}`}>
+      {visibleMembers.map((member, index) => (
+        <span className={`${styles.memberAvatarShell} ${animateEntry ? styles.memberAvatarEntering : ""}`} style={{ "--member-index": index } as CSSProperties} key={member.actorId}>
+          <Avatar className={styles.memberAvatar} src={member.avatarUrl} asset={member.avatarAsset} cacheScope={cacheScope} text={member.initials} displayName={member.displayName} size={24} variant="thumbnail" decorative />
+        </span>
+      ))}
+      {overflowCount > 0 ? <span className={`${styles.memberAvatarShell} ${styles.memberOverflow} ${animateEntry ? styles.memberAvatarEntering : ""}`} style={{ "--member-index": visibleMembers.length } as CSSProperties} aria-hidden="true">+{overflowCount}</span> : null}
+    </div>
+  );
 }
 
 type PhotoStackEntryState = {
@@ -269,7 +294,7 @@ function PhotoStack({ items, compact = false, roomHref, roomId, onOpen, prefetch
   </div>;
 }
 
-export function RoomCard({ room, boardItems, grid, editing, active, index, toggleFavorite, requestDelete, rememberRoom, cacheScope }: { readonly room: RoomSummary; readonly boardItems: readonly BoardItem[]; readonly grid: boolean; readonly editing: boolean; readonly active: boolean; readonly index: number; readonly toggleFavorite: () => void; readonly requestDelete: () => void; readonly rememberRoom: () => void; readonly cacheScope?: string }) {
+export function RoomCard({ room, boardItems, memberPreviews = [], grid, editing, active, index, toggleFavorite, requestDelete, rememberRoom, cacheScope }: { readonly room: RoomSummary; readonly boardItems: readonly BoardItem[]; readonly memberPreviews?: readonly RoomMemberPreview[]; readonly grid: boolean; readonly editing: boolean; readonly active: boolean; readonly index: number; readonly toggleFavorite: () => void; readonly requestDelete: () => void; readonly rememberRoom: () => void; readonly cacheScope?: string }) {
   const router = useRouter();
   const roomHref = `/rooms/${room.publicId}`;
   const prefetchRoom = () => router.prefetch(roomHref);
@@ -279,7 +304,16 @@ export function RoomCard({ room, boardItems, grid, editing, active, index, toggl
       {editing ? <button className={styles.deleteRoom} onClick={requestDelete} aria-label={`Delete ${room.name}`}><Icon name="minus" size={16} /></button> : null}
       {grid ? <PhotoStack items={boardItems} compact roomHref={roomHref} roomId={room.id} onOpen={rememberRoom} prefetchRoom={prefetchRoom} cacheScope={cacheScope} /> : <Link href={roomHref} scroll={false} prefetch onPointerEnter={prefetchRoom} onFocus={prefetchRoom} onClick={rememberRoom} className={styles.cardLink}>
         <PhotoStack items={boardItems} roomId={room.id} prefetchRoom={prefetchRoom} cacheScope={cacheScope} />
-        <div className={styles.cardInfo}><div><h2>{room.name}</h2><p><i className={room.status === "active" ? styles.liveDot : ""} />{formatRoomMeta(room)}</p></div><span><Icon name="arrow" /></span></div>
+        <div className={styles.cardInfo}>
+          <h2 title={room.name}>{room.name}</h2>
+          <div className={styles.cardInfoBottom}>
+            <div className={styles.cardInfoMeta}>
+              <RoomMemberAvatars roomId={room.id} cacheScope={cacheScope} members={memberPreviews} memberCount={room.memberCount} />
+              <p><i className={room.status === "active" ? styles.liveDot : ""} />{formatRoomMeta(room)}</p>
+            </div>
+            <span><Icon name="arrow" /></span>
+          </div>
+        </div>
       </Link>}
     </article>
   );

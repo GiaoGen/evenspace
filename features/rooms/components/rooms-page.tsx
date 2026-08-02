@@ -16,7 +16,8 @@ import { rememberViewerCacheScope, saveRoomsRouteSnapshot } from "@/features/roo
 import type { BackendAccount } from "@/data/supabase/backend-account";
 import { rememberAccountCacheScope, saveAccountSnapshot } from "@/features/account/model/account-snapshot";
 import type { AssetReference } from "@/core/domain/asset";
-import { clearViewerAvatar, readViewerAvatar, saveViewerAvatar } from "@/features/account/model/viewer-avatar-cache";
+import { getCachedLocalAssetBlob } from "@/features/local-assets/model/local-asset-repository";
+import { clearViewerAvatar, hasFreshViewerAvatarValidation, markViewerAvatarValidated, readViewerAvatar, saveViewerAvatar } from "@/features/account/model/viewer-avatar-cache";
 import styles from "./rooms-page.module.css";
 
 const GRID_PREFERENCE_KEY = "eventspace:rooms:grid";
@@ -80,11 +81,12 @@ export function RoomsPage({ initialRooms, viewerInitials, viewerAvatarUrl, viewe
     if (viewerCacheScope) {
       saveRoomsRouteSnapshot({
         scope: viewerCacheScope,
+        viewerAccountScope,
         rooms: initialRooms,
         viewerInitials,
       });
     }
-  }, [initialRooms, loading, viewerCacheScope, viewerInitials]);
+  }, [initialRooms, loading, viewerAccountScope, viewerCacheScope, viewerInitials]);
   useEffect(() => {
     if (loading || !viewerAccountScope) return;
     rememberAccountCacheScope(viewerAccountScope);
@@ -101,23 +103,37 @@ export function RoomsPage({ initialRooms, viewerInitials, viewerAvatarUrl, viewe
     };
   }, [loading, viewerAccountScope]);
   useEffect(() => {
-    if (loading || viewerAvatarUrl) return;
-    if (viewerAccountScope) {
-      const cached = readViewerAvatar(viewerAccountScope);
-      if (cached) queueMicrotask(() => setAvatarAsset(cached));
-    }
+    if (loading || viewerAvatarUrl || !viewerAccountScope) return;
+    const accountScope = viewerAccountScope;
+    const cached = readViewerAvatar(accountScope);
+    if (cached) queueMicrotask(() => setAvatarAsset(cached));
+    let active = true;
     const controller = new AbortController();
-    void fetch("/api/viewer/avatar", { signal: controller.signal })
-      .then((response) => response.ok ? response.json() as Promise<{ asset?: AssetReference | null; url?: unknown }> : null)
-      .then((result) => {
-        if (result?.asset) {
-          setAvatarAsset(result.asset);
-          if (viewerAccountScope) saveViewerAvatar(viewerAccountScope, result.asset);
-        } else if (result && viewerAccountScope) clearViewerAvatar(viewerAccountScope);
-        if (typeof result?.url === "string") setAvatarUrl(result.url);
-      })
-      .catch(() => undefined);
-    return () => controller.abort();
+    async function resolveAvatar() {
+      const hasCachedBlob = cached
+        ? Boolean(await getCachedLocalAssetBlob(cached, { scope: accountScope, variant: "display" }))
+        : false;
+      if (!active || (hasCachedBlob && hasFreshViewerAvatarValidation(accountScope))) return;
+      const response = await fetch("/api/viewer/avatar", { cache: "no-store", signal: controller.signal });
+      const result = response.ok ? await response.json() as { asset?: AssetReference | null; url?: unknown } : null;
+      if (!active || !result) return;
+      markViewerAvatarValidated(accountScope);
+      if (result.asset) {
+        const sameRevision = cached?.id === result.asset.id
+          && (cached.revision ?? 1) === (result.asset.revision ?? 1);
+        if (!hasCachedBlob || !sameRevision) setAvatarAsset(result.asset);
+        saveViewerAvatar(accountScope, result.asset);
+      } else {
+        setAvatarAsset(null);
+        clearViewerAvatar(accountScope);
+      }
+      if (typeof result.url === "string") setAvatarUrl(result.url);
+    }
+    void resolveAvatar().catch(() => undefined);
+    return () => {
+      active = false;
+      controller.abort();
+    };
   }, [loading, viewerAccountScope, viewerAvatarUrl]);
   function closeSearch() { setSearchOpen(false); setQuery(""); }
 
@@ -126,7 +142,7 @@ export function RoomsPage({ initialRooms, viewerInitials, viewerAvatarUrl, viewe
       <AppHeader leading={<Link href="/account" className={styles.avatar} aria-label="Open account"><Avatar src={avatarUrl} asset={avatarAsset} cacheScope={viewerAccountScope} text={viewerInitials} displayName="Your account" decorative /></Link>} actions={<RoomsCreateMenu />} />
       <main className={styles.main}>
         <RoomsToolbar filter={filter} counts={counts} filterOpen={filterOpen} searchOpen={searchOpen} editing={editing} grid={grid} query={query} visibleCount={visibleRooms.length} canEdit={false} layoutFading={isTransitioning} setFilterOpen={setFilterOpen} setFilter={setFilter} openSearch={() => { setSearchOpen(true); setFilterOpen(false); }} closeSearch={closeSearch} setQuery={setQuery} toggleEditing={() => undefined} toggleGrid={toggleLayout} />
-        {loading ? <RoomsCardsLoading grid={grid} /> : visibleRooms.length ? <section ref={containerRef} key={`${filter}:${grid}:${query}`} className={`${styles.cards} ${grid ? styles.cardsGrid : ""} ${isTransitioning ? styles.cardsLayoutFading : ""} ${layoutFadePhase === "out" ? styles.cardsFadeOut : layoutFadePhase === "in" ? styles.cardsFadeIn : ""}`} aria-label="Your rooms" aria-busy={isTransitioning || undefined}>{visibleRooms.map(({ room, boardItems }, index) => <RoomCard key={room.id} room={room} boardItems={boardItems} grid={grid} editing={editing} active={grid || index === activeIndex} index={index} toggleFavorite={() => undefined} requestDelete={() => undefined} rememberRoom={() => rememberRoomCarouselItem(room.publicId)} cacheScope={viewerCacheScope} />)}</section> : <section className={styles.empty}><Icon name="board" size={26} /><h1>No rooms here.</h1><p>{query ? "Try a different room name." : "The next shared moment will appear here."}</p></section>}
+        {loading ? <RoomsCardsLoading grid={grid} /> : visibleRooms.length ? <section ref={containerRef} key={`${filter}:${grid}:${query}`} className={`${styles.cards} ${grid ? styles.cardsGrid : ""} ${isTransitioning ? styles.cardsLayoutFading : ""} ${layoutFadePhase === "out" ? styles.cardsFadeOut : layoutFadePhase === "in" ? styles.cardsFadeIn : ""}`} aria-label="Your rooms" aria-busy={isTransitioning || undefined}>{visibleRooms.map(({ room, boardItems, memberPreviews = [] }, index) => <RoomCard key={room.id} room={room} boardItems={boardItems} memberPreviews={memberPreviews} grid={grid} editing={editing} active={grid || index === activeIndex} index={index} toggleFavorite={() => undefined} requestDelete={() => undefined} rememberRoom={() => rememberRoomCarouselItem(room.publicId)} cacheScope={viewerCacheScope} />)}</section> : <section className={styles.empty}><Icon name="board" size={26} /><h1>No rooms here.</h1><p>{query ? "Try a different room name." : "The next shared moment will appear here."}</p></section>}
         {!loading && !grid && visibleRooms.length > 0 ? <RoomProgress activeIndex={activeIndex} total={visibleRooms.length} progress={progress} /> : null}
       </main>
     </div>

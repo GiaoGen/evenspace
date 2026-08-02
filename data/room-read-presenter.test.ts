@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { actorId, roomId, roomPublicId } from "@/core/domain/ids";
 import { presentRoomCollection } from "@/data/room-read-presenter";
+import type { RoomMemberPreview } from "@/features/rooms/model/room-member-preview";
 
 const room = {
   id: roomId("32000000-0000-4000-8000-000000000001"),
@@ -55,5 +56,22 @@ describe("room read presenter", () => {
 
     expect(item.room.status).toBe("archived");
     expect(item.room.archivedAt).toBe(room.endsAt);
+  });
+
+  it("attaches the card-specific member preview without expanding RoomSummary", () => {
+    const member: RoomMemberPreview = {
+      actorId: room.viewer.actorId,
+      displayName: room.viewer.nickname,
+      initials: "H",
+      avatarUrl: "https://example.invalid/avatar.jpg",
+    };
+    const [item] = presentRoomCollection(
+      { items: [room], nextCursor: null },
+      new Map(),
+      new Map([[room.id, [member]]]),
+    );
+
+    expect(item.memberPreviews).toEqual([member]);
+    expect(item.room).not.toHaveProperty("members");
   });
 });

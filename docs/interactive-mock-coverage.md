@@ -1,6 +1,6 @@
 # EventSpace 交互式 Mock 覆盖与边界
 
-> 状态：2026-07-30。正式产品路由已经进入 Supabase-backed 封闭 MVP 接线阶段；本文继续用于区分“本地 mock/fallback”“真实云端能力”和“尚未达到生产安全承诺”的边界。
+> 状态：2026-08-02。正式产品路由已经进入 Supabase-backed 封闭 MVP 接线阶段；本文继续用于区分“本地 mock/fallback”“真实云端能力”“浏览器加速缓存”和“尚未达到生产安全承诺”的边界。
 
 ## 1. Mock 会话模型
 
@@ -29,16 +29,16 @@
 ### Chat
 
 - 文字发送、房内搜索、回复、表情回应、两分钟撤回；管理员删除与置顶。
-- 按住录制、左滑取消、松开发送且最多 60 秒的真实浏览器本地录音；调用麦克风并把音频 Blob 存入 IndexedDB，但不上传服务器。
+- 按住录制、左滑取消、松开发送且最多 60 秒的浏览器录音；云端房间会通过私有 Storage / `assets` / signed URL 持久化，旧本地 mock/fallback 仍会把音频 Blob 存入 IndexedDB。
 - 工具托盘当前只提供房内搜索；不提供 Camera、Photos 或当前位置发送。既有图片消息仍可查看、下载或加入 Photos。
 - 每条普通消息以稳定随机色卡片呈现；支持回复、反应、两分钟撤回、管理员删除与置顶、长按操作和未读跳转。
 - reducer 中保留投票与 Community-led 兼容命令，但 `RoomExperience` 当前传入 `canVote=false` 且不渲染聊天投票入口，不能宣称投票为当前 Room 可操作能力。
 
 ### Photos
 
-- 以照片网格浏览现有 `BoardPhoto`；可从本机多选图片，浏览器压缩后写入 IndexedDB，并受 `maxPhotos` 配额限制。
+- 以照片网格浏览现有 `BoardPhoto` 兼容 DTO；云端房间可从本机多选图片，浏览器生成 display / thumbnail / placeholder 后上传私有 Storage，并受服务端配额限制。旧本地 mock/fallback 仍将压缩图片 Blob 写入 IndexedDB。
 - Room 初次打开以 Photos 为默认页；Photos 面板首次挂载会定位到最新照片。此定位只发生在浏览器 UI 层，不改变照片排序或本地 session 数据。
-- 短点击照片打开全屏详情与纵向评论；本人或管理员可删除，评论仍通过 `ADD_BOARD_COMMENT` 写入本地 session。
+- 短点击照片打开全屏详情与纵向评论；云端房间的评论/删除通过 Server Action / RPC 持久化，旧本地 mock/fallback 仍通过 `ADD_BOARD_COMMENT` 写入本地 session。
 - 没有 Book、双页 spread、caption 提交层、相机入口、Chat 内容导入、纸张样式或复杂自由排版。
 - `MockSession` v7 的 `boardItems` / `boardComments` 是当前本地兼容存储，而不是未来生产 API 的推荐命名。
 
@@ -56,7 +56,8 @@
 
 - Room 的 Chat、Photos、Itinerary 同时挂载在浏览器原生横向 scroll-snap 轨道；非交互内容区域可以横拖切页，每页自己的内容区继续纵向滚动。顶部两侧按钮跳至相邻页，居中的房间名/倒计时打开 `More`。
 - `/rooms` 的 Grid 偏好使用 `sessionStorage` 键 `eventspace:rooms:grid`；`eventspace:rooms:active-room` 记录 Magazine 最近居中或打开的房间，以便返回列表时恢复位置。两者均不属于 `MockSession`，刷新当前标签页通常保留，关闭标签页、清除站点数据或换设备不保证保留。
-- Grid 卡片的照片牌堆最多同时显示五张；房间内的完整照片集合没有被裁剪，继续在卡片滑动和 Room Photos 中可访问。
+- `/rooms` 与 Room detail 另有 route snapshot cache，保存去签名 URL 的房间列表/详情展示快照；它只用于加速加载，页面仍以 Supabase 权威快照覆盖。
+- Grid 卡片的照片牌堆只限制同时可见和预渲染窗口；`list_room_card_media` 已返回房间全部 ready photos，卡片横滑和 Room Photos 不再被旧的 5 张 SQL 投影裁剪。
 
 ### 治理与生命周期
 
@@ -70,7 +71,7 @@
 以下能力不能因为 Mock 中有入口就被视为完成：
 
 - 完整生产登录域名/SMTP 验收、匿名身份认领、Turnstile、匿名清理、完整限流；
-- 头像/照片/语音已经使用私有 bucket 和签名 URL，但仍缺 MIME magic number 验证、EXIF 清理、转码、缩略图、恶意文件检查和对象清理；
+- 头像/照片/语音已经使用私有 bucket 和签名 URL；照片已有浏览器端 display/thumbnail/placeholder 生成，但仍缺服务端 MIME magic number 验证、可信解码、EXIF 清理证明、恶意文件检查和对象清理；
 - Stripe Checkout、webhook、退款、永久归档权益与真实价格；
 - Browser Push、PWA 安装、Resend 邮件、Google Places、Cron 归档和删除任务；
 - 真实速率限制、设备封禁、审计日志、备份清理与法律文本。
@@ -92,6 +93,14 @@
 - 创建完成卡和 Room share 的 QR 已是真实 invite URL，可扫码；不再作为视觉 mock 记录。
 - Account 已是云端资料页，不再是本地账号演示页；昵称、主题、头像和统计都来自 Supabase。
 - 旧本地投票、Book、Board/free canvas、Chat 图片/位置发送、申请备注仍属于历史兼容或延期能力，不能写成当前可操作范围。
+## 2026-08-02 当前同步：浏览器加速缓存与媒体变体
+
+- Photos 上传的云端路径已经是 display / thumbnail / placeholder 三件套；Rooms 卡片优先使用 thumbnail，详情页使用 display，legacy asset 缺少 variant 字段时才回退单图。
+- Room Photos 的 IndexedDB 图片缓存是 cloud image read-through cache，不是新的本地业务数据源；缓存键包含 scope、asset id、variant 和 revision，权限变化或签名 URL 过期后仍必须回源。
+- Account snapshot、Rooms snapshot、Room detail snapshot 和 viewer avatar cache 都会剥离 signed URL 再保存；这些缓存不能被描述为离线访问、跨设备同步或生产授权。
+- Rooms 卡片照片牌堆新增确定性入场、decode 协调和 Grid/Magazine 淡入淡出；这些是 UI/性能状态，不进入 `MockSession` 或 Supabase。
+- `page-flip` 已从依赖中移除；Book 仍是延期能力，不存在隐藏的运行时翻页包。
+
 ## 2026-07-18 历史同步：旧本地优先 Mock 覆盖
 
 > 本节保留当时的 Board 覆盖记录；当前正式入口以本文开头和 2026-07-23 同步为准。
@@ -177,7 +186,7 @@
 - `ADD_MEMOIR_PHOTO` 原子写入照片与可选 caption；`ADD_MEMOIR_SPREAD` 固定增加双页；`SET_MEMOIR_PAGE_STYLE` 只允许修改存在页且校验稳定枚举。
 - Book 的 StPageFlip 实例只在客户端初始化，等待字体和稳定尺寸后再揭示；ResizeObserver/visualViewport 更新尺寸，并在卸载时清理实例。
 - 已验证 390 x 844 的封面、单双页视角和翻页侧规则；尚未完成 iOS Safari/Android Chromium 真机长时间翻页、横竖屏切换与大书页压力测试。
-- Rooms 仍展示旧 Board snapshot/background；这不是最终回忆录卡片设计。
+- 当时 Rooms 仍展示旧 Board snapshot/background；截至 2026-08-02 当前实现已改为 Photos 牌堆预览，回忆录卡片路线不再代表当前目标。
 
 ## 2026-07-26 当前实现优先级
 

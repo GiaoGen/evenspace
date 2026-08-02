@@ -4,7 +4,7 @@ import Image from "next/image";
 import { useCallback, useSyncExternalStore } from "react";
 
 import type { AssetReference } from "@/core/domain/asset";
-import { LocalAssetImage } from "@/features/local-assets/components/local-asset-image";
+import { LocalAssetImage, type ImageVariant } from "@/features/local-assets/components/local-asset-image";
 import { readViewerAvatar, subscribeViewerAvatar } from "@/features/account/model/viewer-avatar-cache";
 import styles from "./avatar.module.css";
 
@@ -17,6 +17,7 @@ export function Avatar({
   className = "",
   size = 64,
   decorative = false,
+  variant = "display",
 }: {
   readonly src?: string | null;
   readonly asset?: AssetReference | null;
@@ -26,6 +27,7 @@ export function Avatar({
   readonly className?: string;
   readonly size?: number;
   readonly decorative?: boolean;
+  readonly variant?: ImageVariant;
 }) {
   const subscribe = useCallback((onChange: () => void) => subscribeViewerAvatar(cacheScope, onChange), [cacheScope]);
   const getSnapshot = useCallback(() => cacheScope ? readViewerAvatar(cacheScope) : null, [cacheScope]);
@@ -43,6 +45,7 @@ export function Avatar({
           alt={decorative ? "" : `${displayName} avatar`}
           fill
           sizes={`${size}px`}
+          variant={variant}
           preferLocal={Boolean(cacheScope)}
           cacheScope={cacheScope}
           reveal="manual"

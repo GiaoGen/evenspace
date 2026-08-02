@@ -14,6 +14,7 @@ export function RoomsRouteLoading() {
       viewerInitials={snapshot.viewerInitials}
       viewerAvatarUrl={null}
       viewerCacheScope={snapshot.scope}
+      viewerAccountScope={snapshot.viewerAccountScope}
     />;
   }
 
