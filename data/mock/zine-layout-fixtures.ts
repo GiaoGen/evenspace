@@ -1,4 +1,5 @@
 import type { ZineLayoutRepository } from "@/data/contracts/zine-layout-repository";
+import { REAL_ZINE_PROOF_IMAGES } from "@/data/mock/zine-real-photo-manifest.generated";
 import {
   parseZineLayoutDocument,
   type ZineGridFrame,
@@ -27,6 +28,8 @@ const PROOFS = [
   { id: "sequence-3", style: "living-sequence", count: 3 },
   { id: "sequence-10", style: "living-sequence", count: 10 },
   { id: "sequence-48", style: "living-sequence", count: 48 },
+  { id: "real-quiet-27", style: "quiet-field", count: 27 },
+  { id: "real-sequence-27", style: "living-sequence", count: 27 },
 ] as const satisfies ReadonlyArray<{ id: string; style: ZineStyle; count: number }>;
 
 const CHAPTER_TITLES = ["After the rain", "Along the river", "The long table", "Last light"] as const;
@@ -195,9 +198,7 @@ function appendCompositionPage(
     placements: photoIds.map((photoId, index) => ({
       photoId,
       frame: frames[index],
-      fit: family === "sequence-hero" || family === "sequence-contact"
-        ? "cover"
-        : index === 0 && photoIds.length > 1 ? "cover" : "contain",
+      fit: "cover",
       focalPoint: { x: index % 2 === 0 ? 0.48 : 0.56, y: 0.5 },
       tone: index === photoIds.length - 1 && photoIds.length > 1 ? "muted" : "natural",
     })),
@@ -205,9 +206,13 @@ function appendCompositionPage(
   });
 }
 
-function createFixture(style: ZineStyle, photoCount: number): ZineLayoutDocument {
+function createFixture(
+  style: ZineStyle,
+  photoCount: number,
+  imagePool: readonly { readonly src: string; readonly width: number; readonly height: number; readonly alt: string }[] = SAMPLE_IMAGES,
+): ZineLayoutDocument {
   const photos = Array.from({ length: photoCount }, (_, index) => {
-    const image = SAMPLE_IMAGES[index % SAMPLE_IMAGES.length];
+    const image = imagePool[index % imagePool.length];
     return {
       id: `photo_${String(index + 1).padStart(2, "0")}`,
       src: image.src,
@@ -300,11 +305,11 @@ function createFixture(style: ZineStyle, photoCount: number): ZineLayoutDocument
 
 const fixtureCache = new Map<string, ZineLayoutDocument>();
 
-function getFixture(style: ZineStyle, photoCount: number) {
-  const key = `${style}:${photoCount}`;
+function getFixture(style: ZineStyle, photoCount: number, realPhotos: boolean) {
+  const key = `${style}:${photoCount}:${realPhotos ? "real" : "synthetic"}`;
   const cached = fixtureCache.get(key);
   if (cached) return cached;
-  const fixture = createFixture(style, photoCount);
+  const fixture = createFixture(style, photoCount, realPhotos ? REAL_ZINE_PROOF_IMAGES : SAMPLE_IMAGES);
   fixtureCache.set(key, fixture);
   return fixture;
 }
@@ -313,7 +318,7 @@ export const zineFixtureRepository: ZineLayoutRepository = {
   async getLayoutById(id) {
     if (id === "error") throw new Error("The fixture repository could not load this proof.");
     const proof = PROOFS.find((candidate) => candidate.id === id);
-    return proof ? getFixture(proof.style, proof.count) : null;
+    return proof ? getFixture(proof.style, proof.count, proof.id.startsWith("real-")) : null;
   },
 };
 

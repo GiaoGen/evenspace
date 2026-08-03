@@ -27,10 +27,11 @@ describe("zine layout document v1", () => {
   it("validates the 1, 3, 10, and 48 photo proofs for both styles", async () => {
     const documents = await Promise.all(zineFixtureIds.map((id) => zineFixtureRepository.getLayoutById(id)));
     expect(documents.every(Boolean)).toBe(true);
-    expect(documents.map((document) => document?.photos.length)).toEqual([1, 3, 10, 48, 1, 3, 10, 48]);
+    expect(documents.map((document) => document?.photos.length)).toEqual([1, 3, 10, 48, 1, 3, 10, 48, 27, 27]);
     expect(documents.map((document) => document?.style)).toEqual([
       "quiet-field", "quiet-field", "quiet-field", "quiet-field",
       "living-sequence", "living-sequence", "living-sequence", "living-sequence",
+      "quiet-field", "living-sequence",
     ]);
   });
 
@@ -123,6 +124,44 @@ describe("zine layout document v1", () => {
     const document = await fixture("sequence-10");
     const result = safeParseZineLayoutDocument({ ...document, templateVersion: "quiet-field-v1" });
     expect(result.success).toBe(false);
+  });
+
+  it("uses real mixed-aspect photographs without contain-fit expansion bars", async () => {
+    for (const id of ["real-quiet-27", "real-sequence-27"]) {
+      const document = await fixture(id);
+      expect(document.photos).toHaveLength(27);
+      expect(new Set(document.photos.map((photo) => Math.sign(photo.width - photo.height)))).toEqual(new Set([-1, 0, 1]));
+      expect(document.cover.placements.every((placement) => placement.fit === "cover")).toBe(true);
+      expect(document.spreads.flatMap((spread) => [spread.left, spread.right])
+        .flatMap((page) => page?.kind === "composition" ? page.placements : [])
+        .every((placement) => placement.fit === "cover")).toBe(true);
+    }
+  });
+
+  it("rejects contain fit on both cover and interior photo frames", async () => {
+    const document = await fixture("real-quiet-27");
+    expect(safeParseZineLayoutDocument({
+      ...document,
+      cover: {
+        ...document.cover,
+        placements: document.cover.placements.map((placement, index) =>
+          index === 0 ? { ...placement, fit: "contain" } : placement),
+      },
+    }).success).toBe(false);
+
+    expect(safeParseZineLayoutDocument({
+      ...document,
+      spreads: document.spreads.map((spread) => ({
+        ...spread,
+        right: spread.right?.kind === "composition"
+          ? {
+            ...spread.right,
+            placements: spread.right.placements.map((placement, index) =>
+              index === 0 ? { ...placement, fit: "contain" } : placement),
+          }
+          : spread.right,
+      })),
+    }).success).toBe(false);
   });
 
   it("counts contractions and hyphenated terms as one English word", () => {

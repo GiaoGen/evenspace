@@ -26,4 +26,9 @@ describe("zine template manifests", () => {
     expect(zineTemplateManifests.flatMap((manifest) => manifest.pageFamilies)
       .every((family) => family.maxPhotos <= 5)).toBe(true);
   });
+
+  it("forbids contain-fit letterboxing in every photo family", () => {
+    expect(zineTemplateManifests.flatMap((manifest) => manifest.pageFamilies)
+      .every((family) => family.allowedFits.length === 1 && family.allowedFits[0] === "cover")).toBe(true);
+  });
 });

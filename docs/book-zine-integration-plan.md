@@ -1,9 +1,9 @@
 # Book / Zine 功能接入计划
 
-> 状态：已进入分批开发；第一批 Zine Core v1 已提交，第二批双风格模板系统已在 `feature/zine-template-system` 实现并通过验证，Phase 1 继续推进
+> 状态：已进入分批开发；第一、二批已提交，第三批数据基础与 27 张真实照片 proof 已在 `feature/zine-data-foundation` 实现，Phase 2 继续推进
 > 建立日期：2026-08-02  
 > 最近更新：2026-08-03  
-> 当前版本：v0.7
+> 当前版本：v0.8
 > 维护方式：本文件是持续更新的产品、设计、数据与技术决策基线。实现严格按已确认批次推进，新增或改变产品边界前先更新本文件。
 
 ## 1. 目标与当前共识
@@ -611,6 +611,8 @@ Phase 0 视觉交付不只画 happy path。两套风格应各提供 Select、Sty
 
 第二批实施状态（2026-08-03）：已将两种风格注册为可校验的 template manifest；扩展 Layout Document 以约束风格专属的封面构图、内页构图家族、照片密度、图片 fit 与连续页面节奏；完成 Living Sequence 的主图、对话、建立场景、细节和最多五图 contact sheet 构图，以及无大标题的单图/三图封面。Quiet Field 与 Living Sequence 均提供 1、3、10、48 张确定性 proof。第二批仍不包含真实数据库、AI、Book Studio、上传或 StPageFlip。
 
+第三批实施状态（2026-08-03）：已建立 Room / standalone zine、不可变 source snapshot、source photo/text、version、可重试 generation job、usage ledger 与 standalone upload 数据边界；新增 Host/owner 命令、48 张限制、私有 RLS、当前确认版本的媒体读取策略、幂等命令与失败任务原 job 重试。27 张真实混合比例照片已生成非破坏性 WebP proof，并逐页验证两套风格；封面与所有内页照片 frame 只接受 `cover`，禁止使用比例补边产生照片外侧空白。完整 Supabase pgTAP 文件已加入，但本机缺少 WSL，Docker Supabase 栈无法启动；迁移已改用隔离 PostgreSQL 18 实际执行并通过草稿、上传确认、首次入队与失败重试事务烟雾测试。第三批不包含 AI、Book Studio 产品入口或 StPageFlip。
+
 ### Phase 2 — 数据模型与生成任务基础
 
 交付：zine/source/version/job/asset 边界、RLS、幂等、删除语义、用量台账、独立入口上传链路。
@@ -752,6 +754,8 @@ Phase 0 视觉交付不只画 happy path。两套风格应各提供 Select、Sty
 | 2026-08-03 | Reader 极简视觉结构 | 已确认 | 只有模糊封面照片背景与 Reader；闭合和双页状态均按整体居中，无常驻控件 |
 | 2026-08-03 | 第一批 Zine Core v1 | 已实现 | `feature/zine-core-v1`；版本化契约、Quiet Field renderer、fixture adapter、两元素 Reader proof 与相关校验测试 |
 | 2026-08-03 | 第二批双风格模板系统 | 已实现 | `feature/zine-template-system`；共享 manifest、Living Sequence、双风格 1/3/10/48 张 proof 与节奏校验 |
+| 2026-08-03 | 照片 frame 禁止比例补边 | 已确认并实现 | 封面与内页 placement 仅允许 `cover`；可保留页面留白，但照片 frame 内不能出现由比例不匹配产生的扩充空白 |
+| 2026-08-03 | 第三批数据与任务基础 | 已实现，Supabase pgTAP 待环境复跑 | `feature/zine-data-foundation`；真实 27 图 proof、zine/source/version/job/upload/usage、RLS、幂等与失败任务安全重试 |
 
 ## 16. 下一次更新触发条件
 

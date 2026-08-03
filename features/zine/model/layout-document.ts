@@ -238,6 +238,9 @@ export const zineLayoutDocumentSchema = z.object({
   });
 
   document.cover.placements.forEach((placement, index) => {
+    if (placement.fit !== "cover") {
+      context.addIssue({ code: "custom", path: ["cover", "placements", index, "fit"], message: "Cover photos must fill their frames without expansion bars" });
+    }
     if (!photos.has(placement.photoId)) {
       context.addIssue({ code: "custom", path: ["cover", "placements", index, "photoId"], message: "Cover references an unknown photo" });
     }

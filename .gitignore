@@ -20,6 +20,9 @@
 # production
 /build
 
+# Local source photographs used to generate committed zine proof derivatives
+/images/
+
 # misc
 .DS_Store
 *.pem
