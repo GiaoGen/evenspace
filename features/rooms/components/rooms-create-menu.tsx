@@ -99,7 +99,7 @@ export function RoomsCreateMenu() {
             <div className={styles.createMenu} role="menu" aria-label="Room actions">
               <Link href="/rooms/new" role="menuitem"><span><Icon name="plus" size={16} /></span><strong>Room</strong></Link>
               <button type="button" role="menuitem" onClick={openInvite}><span><Icon name="copy" size={16} /></span><strong>Invite code</strong></button>
-              <button type="button" role="menuitem" disabled><span><Icon name="board" size={16} /></span><strong>Book</strong><small>Later</small></button>
+              <Link href="/books/new" role="menuitem"><span><Icon name="board" size={16} /></span><strong>Book</strong></Link>
             </div>
           </>
         ) : null}

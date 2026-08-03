@@ -50,6 +50,29 @@ const enqueueZineGenerationInputSchema = z.object({
   idempotencyKey: z.uuid(),
 }).strict();
 
+const draftPhotoChoiceSchema = z.object({
+  sourceId: z.uuid(),
+  textKind: z.enum(["none", "comment", "reflection"]),
+  commentId: z.uuid().nullable(),
+  reflection: z.string().trim().max(500).nullable(),
+}).strict().superRefine((choice, context) => {
+  if (choice.textKind === "comment" && !choice.commentId) context.addIssue({ code: "custom", path: ["commentId"], message: "A comment is required" });
+  if (choice.textKind === "reflection" && !choice.reflection) context.addIssue({ code: "custom", path: ["reflection"], message: "A reflection is required" });
+});
+
+const saveZineManualDraftInputSchema = z.object({
+  zinePublicId: zinePublicIdSchema,
+  title: z.string().trim().min(1).max(80),
+  style: zineStyleSchema,
+  photos: z.array(draftPhotoChoiceSchema).min(1).max(48),
+}).strict();
+
+const publishZineDeterministicInputSchema = z.object({
+  zinePublicId: zinePublicIdSchema,
+  chapterBasis: z.enum(["itinerary", "captured-time"]),
+  layoutDocument: z.record(z.string(), z.unknown()),
+}).strict();
+
 const createZineDraftResultSchema = z.object({
   zine_id: z.uuid(),
   public_id: zinePublicIdSchema,
@@ -78,6 +101,13 @@ const enqueueZineGenerationResultSchema = z.object({
   retried: z.boolean(),
 }).strict();
 
+const saveZineManualDraftResultSchema = z.object({
+  zine_id: z.uuid(), selected_count: z.number().int().min(1).max(48), updated_at: z.string().datetime({ offset: true }),
+}).strict();
+const publishZineDeterministicResultSchema = z.object({
+  version_id: z.uuid(), version_number: z.number().int().positive(), status: z.literal("ready"),
+}).strict();
+
 export type CreateZineDraftInput = z.input<typeof createZineDraftInputSchema>;
 export type CreateZineDraftResult = z.infer<typeof createZineDraftResultSchema>;
 export type PrepareZinePhotoUploadInput = z.input<typeof prepareZinePhotoUploadInputSchema>;
@@ -86,6 +116,8 @@ export type FinalizeZinePhotoUploadInput = z.input<typeof finalizeZinePhotoUploa
 export type FinalizeZinePhotoUploadResult = z.infer<typeof finalizeZinePhotoUploadResultSchema>;
 export type EnqueueZineGenerationInput = z.input<typeof enqueueZineGenerationInputSchema>;
 export type EnqueueZineGenerationResult = z.infer<typeof enqueueZineGenerationResultSchema>;
+export type SaveZineManualDraftInput = z.input<typeof saveZineManualDraftInputSchema>;
+export type PublishZineDeterministicInput = z.input<typeof publishZineDeterministicInputSchema>;
 
 export type ZineCommandErrorCode =
   | "invalid_input"
@@ -153,6 +185,17 @@ type ZineRpcClient = {
     requested_source_id: string;
     requested_kind: "compose" | "recompose" | "change-style";
     requested_idempotency_key: string;
+  }): ZineRpcResponse;
+  rpc(name: "save_zine_manual_draft", args: {
+    requested_zine_public_id: string;
+    requested_title: string;
+    requested_style: "quiet-field" | "living-sequence";
+    requested_photos: unknown;
+  }): ZineRpcResponse;
+  rpc(name: "publish_zine_deterministic", args: {
+    requested_zine_public_id: string;
+    requested_chapter_basis: "itinerary" | "captured-time";
+    requested_layout_document: unknown;
   }): ZineRpcResponse;
 };
 
@@ -256,4 +299,29 @@ export async function enqueueZineGeneration(
   });
   if (error) throw mapRpcError(error);
   return parseRpcResult(enqueueZineGenerationResultSchema, data);
+}
+
+export async function saveZineManualDraft(input: SaveZineManualDraftInput) {
+  const parsed = parseInput(saveZineManualDraftInputSchema, input);
+  const supabase = await createZineRpcClient();
+  const { data, error } = await supabase.rpc("save_zine_manual_draft", {
+    requested_zine_public_id: parsed.zinePublicId,
+    requested_title: parsed.title,
+    requested_style: parsed.style,
+    requested_photos: parsed.photos,
+  });
+  if (error) throw mapRpcError(error);
+  return parseRpcResult(saveZineManualDraftResultSchema, data);
+}
+
+export async function publishZineDeterministic(input: PublishZineDeterministicInput) {
+  const parsed = parseInput(publishZineDeterministicInputSchema, input);
+  const supabase = await createZineRpcClient();
+  const { data, error } = await supabase.rpc("publish_zine_deterministic", {
+    requested_zine_public_id: parsed.zinePublicId,
+    requested_chapter_basis: parsed.chapterBasis,
+    requested_layout_document: parsed.layoutDocument,
+  });
+  if (error) throw mapRpcError(error);
+  return parseRpcResult(publishZineDeterministicResultSchema, data);
 }

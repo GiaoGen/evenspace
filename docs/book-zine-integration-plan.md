@@ -1,6 +1,6 @@
 # Book / Zine 功能接入计划
 
-> 状态：已进入分批开发；第一、二批已提交，第三批数据基础与 27 张真实照片 proof 已在 `feature/zine-data-foundation` 实现，Phase 2 继续推进
+> 状态：已进入分批开发；第四批已在 `feature/zine-book-studio` 实现两个入口、手动草稿、远程数据验证与确定性成书基线，下一批进入 Phase 4 AI 艺术指导
 > 建立日期：2026-08-02  
 > 最近更新：2026-08-03  
 > 当前版本：v0.8
@@ -624,6 +624,8 @@ Phase 0 视觉交付不只画 happy path。两套风格应各提供 Select、Sty
 交付：Room 照片选择、评论素材选择、行程/时间模式、独立上传、标题和风格选择、草稿保存。
 
 验收门：不调用 AI 也能用确定性策略生成一本可读 zine，作为故障回退与质量基线。
+
+第四批实施状态（2026-08-03）：已完成现有 Create 菜单 `Book` 与结束后 Room Host 两个入口；Book Studio 包含 Select、Style、Words、Compose 四段，支持 1–48 张真实私有照片、独立图片压缩/缩略图上传、两种风格真实素材预览、原评论/Host 感悟/无文字选择、40 英文词限制、行程或时间章节依据、串行自动保存与确定性私有版本。所有版面照片 placement 只生成 `cover`，不会通过 `contain` 或扩充画布制造照片外侧补白。远程 `eventspace-dev` 上数据基础 pgTAP 30/30、手动草稿 pgTAP 19/19 通过；本批不调用 AI，也不接入 StPageFlip。
 
 ### Phase 4 — AI 艺术指导
 

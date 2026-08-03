@@ -5,7 +5,7 @@ set local lock_timeout = '5s';
 
 create extension if not exists pgtap with schema extensions;
 
-select extensions.plan(29);
+select extensions.plan(30);
 
 select extensions.has_table('public','zines','zines table exists');
 select extensions.has_table('public','zine_sources','zine source snapshots exist');
@@ -186,13 +186,14 @@ select extensions.lives_ok(
 reset role;
 update public.zine_generation_jobs set status='failed',error_code='provider_timeout',finished_at=now();
 set local role authenticated;
-select extensions.results_eq(
-  $$select attempt_count,retried from public.enqueue_zine_generation(
+with retry as materialized (
+  select attempt_count,retried from public.enqueue_zine_generation(
     (select public_id from public.zines where kind='room'),
-    '65000000-0000-4000-8000-000000000001','compose','64000000-0000-4000-8000-000000000006')$$,
-  $$values(2,true)$$,
-  'retry requeues the same failed job and increments its attempt'
-);
+    '65000000-0000-4000-8000-000000000001','compose','64000000-0000-4000-8000-000000000006')
+)
+select extensions.is(attempt_count,2,'retry increments the original job attempt') from retry
+union all
+select extensions.is(retried,true,'retry requeues the same failed job') from retry;
 
 reset role;
 insert into public.zine_usage_ledger(job_id,provider_request_id,metric,quantity,cost_micros)
@@ -203,9 +204,9 @@ select extensions.throws_ok(
   '23505',null,
   'a repeated provider usage event cannot be charged twice'
 );
-select extensions.results_eq(
-  $$select version from private.schema_versions where component='zine_data_foundation'$$,
-  array[1],
+select extensions.is(
+  (select version from private.schema_versions where component='zine_data_foundation'),
+  1,
   'zine data foundation schema version is recorded'
 );
 

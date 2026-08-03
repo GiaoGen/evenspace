@@ -541,17 +541,17 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "room_members_avatar_asset_id_fkey"
-            columns: ["avatar_asset_id"]
-            isOneToOne: false
-            referencedRelation: "assets"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "room_members_actor_id_fkey"
             columns: ["actor_id"]
             isOneToOne: false
             referencedRelation: "actors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "room_members_avatar_asset_id_fkey"
+            columns: ["avatar_asset_id"]
+            isOneToOne: false
+            referencedRelation: "assets"
             referencedColumns: ["id"]
           },
           {
@@ -643,11 +643,533 @@ export type Database = {
           },
         ]
       }
+      zine_draft_photos: {
+        Row: {
+          comment_id: string | null
+          created_at: string
+          id: string
+          ordinal: number
+          reflection_body: string | null
+          room_photo_id: string | null
+          text_kind: string
+          updated_at: string
+          upload_id: string | null
+          zine_id: string
+        }
+        Insert: {
+          comment_id?: string | null
+          created_at?: string
+          id?: string
+          ordinal: number
+          reflection_body?: string | null
+          room_photo_id?: string | null
+          text_kind?: string
+          updated_at?: string
+          upload_id?: string | null
+          zine_id: string
+        }
+        Update: {
+          comment_id?: string | null
+          created_at?: string
+          id?: string
+          ordinal?: number
+          reflection_body?: string | null
+          room_photo_id?: string | null
+          text_kind?: string
+          updated_at?: string
+          upload_id?: string | null
+          zine_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "zine_draft_photos_comment_id_fkey"
+            columns: ["comment_id"]
+            isOneToOne: false
+            referencedRelation: "photo_comments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "zine_draft_photos_room_photo_id_fkey"
+            columns: ["room_photo_id"]
+            isOneToOne: false
+            referencedRelation: "photos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "zine_draft_photos_upload_id_fkey"
+            columns: ["upload_id"]
+            isOneToOne: false
+            referencedRelation: "zine_uploads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "zine_draft_photos_zine_id_fkey"
+            columns: ["zine_id"]
+            isOneToOne: false
+            referencedRelation: "zines"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      zine_generation_jobs: {
+        Row: {
+          attempt_count: number
+          created_at: string
+          error_code: string | null
+          finished_at: string | null
+          id: string
+          idempotency_key: string
+          kind: string
+          model: string | null
+          prompt_version: string | null
+          provider: string | null
+          requested_by_user_id: string | null
+          source_id: string
+          stage: string
+          started_at: string | null
+          status: string
+          updated_at: string
+          zine_id: string
+        }
+        Insert: {
+          attempt_count?: number
+          created_at?: string
+          error_code?: string | null
+          finished_at?: string | null
+          id?: string
+          idempotency_key: string
+          kind: string
+          model?: string | null
+          prompt_version?: string | null
+          provider?: string | null
+          requested_by_user_id?: string | null
+          source_id: string
+          stage?: string
+          started_at?: string | null
+          status?: string
+          updated_at?: string
+          zine_id: string
+        }
+        Update: {
+          attempt_count?: number
+          created_at?: string
+          error_code?: string | null
+          finished_at?: string | null
+          id?: string
+          idempotency_key?: string
+          kind?: string
+          model?: string | null
+          prompt_version?: string | null
+          provider?: string | null
+          requested_by_user_id?: string | null
+          source_id?: string
+          stage?: string
+          started_at?: string | null
+          status?: string
+          updated_at?: string
+          zine_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "zine_generation_jobs_source_same_zine"
+            columns: ["zine_id", "source_id"]
+            isOneToOne: false
+            referencedRelation: "zine_sources"
+            referencedColumns: ["zine_id", "id"]
+          },
+          {
+            foreignKeyName: "zine_generation_jobs_zine_id_fkey"
+            columns: ["zine_id"]
+            isOneToOne: false
+            referencedRelation: "zines"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      zine_source_photos: {
+        Row: {
+          alt_text: string
+          asset_id: string
+          captured_at: string | null
+          created_at: string
+          height: number
+          id: string
+          ordinal: number
+          original_asset_id: string | null
+          original_name: string
+          original_photo_id: string | null
+          source_id: string
+          width: number
+        }
+        Insert: {
+          alt_text: string
+          asset_id: string
+          captured_at?: string | null
+          created_at?: string
+          height: number
+          id?: string
+          ordinal: number
+          original_asset_id?: string | null
+          original_name: string
+          original_photo_id?: string | null
+          source_id: string
+          width: number
+        }
+        Update: {
+          alt_text?: string
+          asset_id?: string
+          captured_at?: string | null
+          created_at?: string
+          height?: number
+          id?: string
+          ordinal?: number
+          original_asset_id?: string | null
+          original_name?: string
+          original_photo_id?: string | null
+          source_id?: string
+          width?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "zine_source_photos_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "assets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "zine_source_photos_original_asset_id_fkey"
+            columns: ["original_asset_id"]
+            isOneToOne: false
+            referencedRelation: "assets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "zine_source_photos_original_photo_id_fkey"
+            columns: ["original_photo_id"]
+            isOneToOne: false
+            referencedRelation: "photos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "zine_source_photos_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "zine_sources"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      zine_source_texts: {
+        Row: {
+          author_display_name: string | null
+          body: string
+          created_at: string
+          id: string
+          kind: string
+          original_comment_id: string | null
+          source_photo_id: string
+        }
+        Insert: {
+          author_display_name?: string | null
+          body: string
+          created_at?: string
+          id?: string
+          kind: string
+          original_comment_id?: string | null
+          source_photo_id: string
+        }
+        Update: {
+          author_display_name?: string | null
+          body?: string
+          created_at?: string
+          id?: string
+          kind?: string
+          original_comment_id?: string | null
+          source_photo_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "zine_source_texts_original_comment_id_fkey"
+            columns: ["original_comment_id"]
+            isOneToOne: false
+            referencedRelation: "photo_comments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "zine_source_texts_source_photo_id_fkey"
+            columns: ["source_photo_id"]
+            isOneToOne: true
+            referencedRelation: "zine_source_photos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      zine_sources: {
+        Row: {
+          chapter_basis: string
+          consent_version: string
+          created_at: string
+          frozen_at: string | null
+          id: string
+          photo_count: number
+          room_revision: number | null
+          schema_version: number
+          status: string
+          zine_id: string
+        }
+        Insert: {
+          chapter_basis: string
+          consent_version: string
+          created_at?: string
+          frozen_at?: string | null
+          id?: string
+          photo_count?: number
+          room_revision?: number | null
+          schema_version?: number
+          status?: string
+          zine_id: string
+        }
+        Update: {
+          chapter_basis?: string
+          consent_version?: string
+          created_at?: string
+          frozen_at?: string | null
+          id?: string
+          photo_count?: number
+          room_revision?: number | null
+          schema_version?: number
+          status?: string
+          zine_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "zine_sources_zine_id_fkey"
+            columns: ["zine_id"]
+            isOneToOne: false
+            referencedRelation: "zines"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      zine_uploads: {
+        Row: {
+          asset_id: string
+          created_at: string
+          id: string
+          idempotency_key: string
+          ready_at: string | null
+          status: string
+          zine_id: string
+        }
+        Insert: {
+          asset_id: string
+          created_at?: string
+          id?: string
+          idempotency_key: string
+          ready_at?: string | null
+          status?: string
+          zine_id: string
+        }
+        Update: {
+          asset_id?: string
+          created_at?: string
+          id?: string
+          idempotency_key?: string
+          ready_at?: string | null
+          status?: string
+          zine_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "zine_uploads_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: true
+            referencedRelation: "assets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "zine_uploads_zine_id_fkey"
+            columns: ["zine_id"]
+            isOneToOne: false
+            referencedRelation: "zines"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      zine_usage_ledger: {
+        Row: {
+          cost_micros: number
+          created_at: string
+          id: string
+          job_id: string
+          metric: string
+          provider_request_id: string
+          quantity: number
+        }
+        Insert: {
+          cost_micros?: number
+          created_at?: string
+          id?: string
+          job_id: string
+          metric: string
+          provider_request_id: string
+          quantity: number
+        }
+        Update: {
+          cost_micros?: number
+          created_at?: string
+          id?: string
+          job_id?: string
+          metric?: string
+          provider_request_id?: string
+          quantity?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "zine_usage_ledger_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "zine_generation_jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      zine_versions: {
+        Row: {
+          created_at: string
+          failure_code: string | null
+          id: string
+          is_current: boolean
+          layout_document: Json | null
+          ready_at: string | null
+          source_id: string
+          status: string
+          style: string
+          template_id: string
+          version_number: number
+          zine_id: string
+        }
+        Insert: {
+          created_at?: string
+          failure_code?: string | null
+          id?: string
+          is_current?: boolean
+          layout_document?: Json | null
+          ready_at?: string | null
+          source_id: string
+          status?: string
+          style: string
+          template_id: string
+          version_number: number
+          zine_id: string
+        }
+        Update: {
+          created_at?: string
+          failure_code?: string | null
+          id?: string
+          is_current?: boolean
+          layout_document?: Json | null
+          ready_at?: string | null
+          source_id?: string
+          status?: string
+          style?: string
+          template_id?: string
+          version_number?: number
+          zine_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "zine_versions_source_same_zine"
+            columns: ["zine_id", "source_id"]
+            isOneToOne: false
+            referencedRelation: "zine_sources"
+            referencedColumns: ["zine_id", "id"]
+          },
+          {
+            foreignKeyName: "zine_versions_zine_id_fkey"
+            columns: ["zine_id"]
+            isOneToOne: false
+            referencedRelation: "zines"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      zines: {
+        Row: {
+          created_at: string
+          created_by_actor_id: string | null
+          deleted_at: string | null
+          id: string
+          kind: string
+          owner_user_id: string | null
+          public_id: string
+          room_id: string | null
+          status: string
+          style: string
+          title: string
+          updated_at: string
+          visibility: string
+        }
+        Insert: {
+          created_at?: string
+          created_by_actor_id?: string | null
+          deleted_at?: string | null
+          id?: string
+          kind: string
+          owner_user_id?: string | null
+          public_id?: string
+          room_id?: string | null
+          status?: string
+          style: string
+          title: string
+          updated_at?: string
+          visibility?: string
+        }
+        Update: {
+          created_at?: string
+          created_by_actor_id?: string | null
+          deleted_at?: string | null
+          id?: string
+          kind?: string
+          owner_user_id?: string | null
+          public_id?: string
+          room_id?: string | null
+          status?: string
+          style?: string
+          title?: string
+          updated_at?: string
+          visibility?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "zines_created_by_actor_id_fkey"
+            columns: ["created_by_actor_id"]
+            isOneToOne: false
+            referencedRelation: "actors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "zines_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "rooms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
+      add_photo_comment: {
+        Args: { requested_body: string; requested_photo_id: string }
+        Returns: {
+          comment_id: string
+          created_at: string
+        }[]
+      }
       bootstrap_identity: {
         Args: { requested_display_name: string; requested_theme?: string }
         Returns: {
@@ -716,6 +1238,42 @@ export type Database = {
           room_id: string
         }[]
       }
+      create_room_photo: {
+        Args: {
+          requested_aspect_ratio: number
+          requested_asset_id: string
+          requested_original_name: string
+          requested_room_public_id: string
+        }
+        Returns: {
+          created_at: string
+          photo_id: string
+        }[]
+      }
+      create_zine_draft: {
+        Args: {
+          requested_idempotency_key: string
+          requested_kind: string
+          requested_room_public_id: string
+          requested_style: string
+          requested_title: string
+        }
+        Returns: {
+          created: boolean
+          kind: string
+          public_id: string
+          status: string
+          zine_id: string
+        }[]
+      }
+      delete_room_photo: {
+        Args: { requested_photo_id: string }
+        Returns: {
+          asset_id: string
+          object_key: string
+          photo_id: string
+        }[]
+      }
       end_host_led_room: {
         Args: {
           requested_idempotency_key: string
@@ -739,11 +1297,56 @@ export type Database = {
           revision: number
         }[]
       }
+      enqueue_zine_generation: {
+        Args: {
+          requested_idempotency_key: string
+          requested_kind: string
+          requested_source_id: string
+          requested_zine_public_id: string
+        }
+        Returns: {
+          attempt_count: number
+          job_id: string
+          retried: boolean
+          status: string
+        }[]
+      }
       finalize_profile_avatar_upload: {
         Args: { requested_asset_id: string }
         Returns: {
           asset_id: string
           object_key: string
+        }[]
+      }
+      finalize_room_media_upload: {
+        Args: { requested_asset_id: string }
+        Returns: {
+          asset_id: string
+          byte_size: number
+          duration_ms: number
+          kind: string
+          mime_type: string
+          object_key: string
+        }[]
+      }
+      finalize_room_media_upload_v2: {
+        Args: { requested_asset_id: string }
+        Returns: {
+          asset_id: string
+          byte_size: number
+          mime_type: string
+          object_key: string
+          placeholder_data_url: string
+          thumbnail_byte_size: number
+          thumbnail_object_key: string
+        }[]
+      }
+      finalize_zine_photo_upload: {
+        Args: { requested_upload_id: string }
+        Returns: {
+          asset_id: string
+          status: string
+          upload_id: string
         }[]
       }
       get_current_user_room: {
@@ -773,13 +1376,21 @@ export type Database = {
         }[]
       }
       get_join_request_status: {
-        Args: {
-          requested_request_id: string
-          requested_room_public_id: string
-        }
+        Args: { requested_request_id: string; requested_room_public_id: string }
         Returns: {
           request_status: string
         }[]
+      }
+      get_zine_asset_path: {
+        Args: { requested_asset_id: string; requested_zine_public_id: string }
+        Returns: {
+          bucket_id: string
+          object_key: string
+        }[]
+      }
+      get_zine_studio: {
+        Args: { requested_zine_public_id: string }
+        Returns: Json
       }
       join_room_with_invite: {
         Args: {
@@ -867,11 +1478,88 @@ export type Database = {
           requested_at: string
         }[]
       }
+      list_room_card_media: {
+        Args: { requested_room_ids: string[] }
+        Returns: {
+          aspect_ratio: number
+          asset_id: string
+          byte_size: number
+          created_at: string
+          image_height: number
+          image_width: number
+          kind: string
+          media_revision: number
+          mime_type: string
+          note: string
+          object_key: string
+          original_name: string
+          owner_actor_id: string
+          photo_count: number
+          photo_id: string
+          placeholder_data_url: string
+          room_id: string
+          status: string
+          thumbnail_byte_size: number
+          thumbnail_object_key: string
+        }[]
+      }
       pin_room_message: {
         Args: { requested_message_id: string; requested_room_public_id: string }
         Returns: {
           message_id: string
           room_id: string
+        }[]
+      }
+      prepare_profile_avatar_upload: {
+        Args: { requested_byte_size: number; requested_mime_type: string }
+        Returns: {
+          asset_id: string
+          object_key: string
+        }[]
+      }
+      prepare_room_media_upload: {
+        Args: {
+          requested_byte_size: number
+          requested_duration_ms?: number
+          requested_kind: string
+          requested_mime_type: string
+          requested_room_public_id: string
+        }
+        Returns: {
+          asset_id: string
+          object_key: string
+        }[]
+      }
+      prepare_room_media_upload_v2: {
+        Args: {
+          requested_display_byte_size: number
+          requested_image_height: number
+          requested_image_width: number
+          requested_placeholder_data_url: string
+          requested_room_public_id: string
+          requested_thumbnail_byte_size: number
+        }
+        Returns: {
+          asset_id: string
+          object_key: string
+          thumbnail_object_key: string
+        }[]
+      }
+      prepare_zine_photo_upload: {
+        Args: {
+          requested_display_byte_size: number
+          requested_idempotency_key: string
+          requested_image_height: number
+          requested_image_width: number
+          requested_placeholder_data_url: string
+          requested_thumbnail_byte_size: number
+          requested_zine_public_id: string
+        }
+        Returns: {
+          asset_id: string
+          object_key: string
+          thumbnail_object_key: string
+          upload_id: string
         }[]
       }
       preview_room_invite: {
@@ -893,14 +1581,16 @@ export type Database = {
           time_zone: string
         }[]
       }
-      prepare_profile_avatar_upload: {
+      publish_zine_deterministic: {
         Args: {
-          requested_byte_size: number
-          requested_mime_type: string
+          requested_chapter_basis: string
+          requested_layout_document: Json
+          requested_zine_public_id: string
         }
         Returns: {
-          asset_id: string
-          object_key: string
+          status: string
+          version_id: string
+          version_number: number
         }[]
       }
       react_to_room_message: {
@@ -948,6 +1638,19 @@ export type Database = {
           actor_id: string
           membership_state: string
           outcome: string
+        }[]
+      }
+      save_zine_manual_draft: {
+        Args: {
+          requested_photos: Json
+          requested_style: string
+          requested_title: string
+          requested_zine_public_id: string
+        }
+        Returns: {
+          selected_count: number
+          updated_at: string
+          zine_id: string
         }[]
       }
       send_room_message: {
