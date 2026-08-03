@@ -177,6 +177,9 @@
 
 .bookTile {
   display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 10px;
   place-items: center;
   border: 0;
   background: var(--surface-2);
@@ -191,6 +194,18 @@
   height: 44px;
   border: 1px solid color-mix(in srgb, var(--ink) 24%, transparent);
   border-radius: 50%;
+}
+
+.bookTile svg,
+.bookTile span {
+  position: relative;
+  z-index: 1;
+}
+
+.bookTile span {
+  font: 700 8px var(--font-geist-mono);
+  letter-spacing: .14em;
+  text-transform: uppercase;
 }
 
 .addTile:disabled {

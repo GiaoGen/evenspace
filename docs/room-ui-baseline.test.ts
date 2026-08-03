@@ -12,8 +12,8 @@ const baseline = {
   "features/room/components/itinerary/itinerary.module.css": "E2469044274A701F5B930425054408DB4AEB312C298644B0504EB65A0DC1A6F9",
   "features/room/components/room-controls.tsx": "D1678706FBCC2E3937C1B6ECEAA1EF6214CDF9438A2EDEA67AD5BFFBDF335613",
   "features/room/components/room-controls.module.css": "0F3467F9E039CC5A85BC8A542197C3E63A251C4C65FA19081973C8C49CAB44E0",
-  "features/room/components/photos-panel.tsx": "6F35842FAE94CFB9F9247BB75E5728FC0CF20B07CB8F34F56F145467FEFC1581",
-  "features/room/components/photos-panel.module.css": "B4FA1F5D57D8AD27D542FADDEDD3FA77B30FBD25B4BF1295ADB34F995467E534",
+  "features/room/components/photos-panel.tsx": "2276E645377250C8999D3963173B62829E3BA35F666A9F5BDD240F53464DDDD3",
+  "features/room/components/photos-panel.module.css": "4D76FFCB722E284C93D663EA4BF39197C88D11EF8A4FC9490E11891A580DCC02",
 } as const;
 
 describe("Room UI wiring baseline", () => {
