@@ -13,7 +13,6 @@ import { useMockSession } from "@/features/mock-session/components/mock-session-
 import type { MockCommand } from "@/features/mock-session/model/mock-session";
 import { RoomExperience } from "./room-experience";
 import styles from "./room-experience.module.css";
-import routeStyles from "./backend-room-route.module.css";
 import { rememberViewerCacheScope, saveRoomRouteSnapshot } from "@/features/room-performance/model/route-snapshots";
 import {
   deleteRoomSecondarySnapshot,
@@ -199,25 +198,20 @@ export function BackendRoomRoute({
   }
 
   return (
-    <>
-      <BackendSessionProvider
-        initialSession={payload.session}
-        onCommand={execute}
-        onSettled={handleSettled}
-      >
-        <LiveRoomExperience
-          initialRoom={payload.room}
-          secondaryRoom={secondaryPayload?.room}
-          capabilities={payload.capabilities}
-          viewerActorId={payload.session.viewer.actorId}
-          cacheScope={cacheScope}
-          secondaryState={secondaryState}
-        />
-      </BackendSessionProvider>
-      {payload.room.lifecycle === "archived" && payload.room.members.find((member) => member.role === "host")?.actorId === payload.session.viewer.actorId
-        ? <Link className={routeStyles.bookEntry} href={`/rooms/${payload.room.publicId}/book`}>Book</Link>
-        : null}
-    </>
+    <BackendSessionProvider
+      initialSession={payload.session}
+      onCommand={execute}
+      onSettled={handleSettled}
+    >
+      <LiveRoomExperience
+        initialRoom={payload.room}
+        secondaryRoom={secondaryPayload?.room}
+        capabilities={payload.capabilities}
+        viewerActorId={payload.session.viewer.actorId}
+        cacheScope={cacheScope}
+        secondaryState={secondaryState}
+      />
+    </BackendSessionProvider>
   );
 }
 function LiveRoomExperience({

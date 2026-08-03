@@ -1,6 +1,7 @@
 export type IconName =
   | "arrow"
   | "board"
+  | "book"
   | "camera"
   | "calendar"
   | "chat"
@@ -49,6 +50,7 @@ export function Icon({ name, size = 18 }: { readonly name: IconName; readonly si
   const paths: Record<IconName, React.ReactNode> = {
     arrow: <><path d="M5 12h14" /><path d="m14 7 5 5-5 5" /></>,
     board: <><rect x="3.5" y="4" width="17" height="16" rx="3" /><path d="m8 15 2.8-3 2.1 2 2.9-3.3L19 15" /><circle cx="8.5" cy="8.5" r="1" /></>,
+    book: <><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H11a3 3 0 0 1 3 3v14a3 3 0 0 0-3-3H6.5A2.5 2.5 0 0 0 4 19.5Z" /><path d="M20 5.5A2.5 2.5 0 0 0 17.5 3H14v17a3 3 0 0 1 3-3h.5a2.5 2.5 0 0 1 2.5 2.5Z" /></>,
     camera: <><path d="M8.5 6.5 10 4h4l1.5 2.5H19a2 2 0 0 1 2 2V18a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8.5a2 2 0 0 1 2-2h3.5Z" /><circle cx="12" cy="13" r="3.5" /></>,
     calendar: <><rect x="3.5" y="5.5" width="17" height="15" rx="3" /><path d="M8 3.5v4M16 3.5v4M3.5 10h17" /></>,
     chat: <path d="M20 11.5a7.5 7.5 0 0 1-8 7.5 9 9 0 0 1-3.6-.8L4 20l1.4-4a7.3 7.3 0 0 1-.9-3.5A7.5 7.5 0 0 1 12 5h.5A7.5 7.5 0 0 1 20 11.5Z" />,

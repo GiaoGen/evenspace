@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ChangeEvent, type CSSProperties } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/ui/icon";
 import type { ActorId, RoomPublicId } from "@/core/domain/ids";
@@ -67,6 +68,7 @@ export function PhotosPanel({
   const [pendingPhotos, setPendingPhotos] = useState<readonly PendingPhoto[]>([]);
   const [syncingPhotoIds, setSyncingPhotoIds] = useState<ReadonlySet<string>>(() => new Set());
   const photos = useMemo(() => items.filter((item): item is BoardPhoto => item.kind === "photo"), [items]);
+  const canOpenBook = archived && members.find((member) => member.role === "host")?.actorId === viewerActorId;
   const entranceCandidateIdsRef = useRef<ReadonlySet<string> | null>(null);
   const queuedDecodedIdsRef = useRef<Set<string>>(new Set());
   const scheduledPhotoIdsRef = useRef<Set<string>>(new Set());
@@ -321,6 +323,7 @@ export function PhotosPanel({
           {syncingPhotoIds.has(photo.id) ? <span className={styles.processingBadge}>Syncing</span> : null}
         </button>;
       })}
+      {canOpenBook ? <Link className={`${styles.tile} ${styles.bookTile}`} href={`/rooms/${roomPublicId}/book`} aria-label="Open Book Studio"><Icon name="book" size={24} /></Link> : null}
       {pendingPhotos.map((photo) => <div key={photo.id} className={`${styles.tile} ${styles.pendingTile}`} aria-live="polite">
         <Image src={photo.previewUrl} alt="" fill sizes="(max-width: 700px) 33vw, 300px" className={styles.image} unoptimized />
         <span className={styles.pendingShade} />

@@ -175,6 +175,24 @@
   color: var(--muted);
 }
 
+.bookTile {
+  display: grid;
+  place-items: center;
+  border: 0;
+  background: var(--surface-2);
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.bookTile::before {
+  content: "";
+  position: absolute;
+  width: 44px;
+  height: 44px;
+  border: 1px solid color-mix(in srgb, var(--ink) 24%, transparent);
+  border-radius: 50%;
+}
+
 .addTile:disabled {
   opacity: .48;
   cursor: wait;
