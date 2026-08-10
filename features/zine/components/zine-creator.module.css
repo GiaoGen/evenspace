@@ -13,7 +13,7 @@
   top: 0;
   height: 56px;
   display: grid;
-  grid-template-columns: 42px 1fr 42px;
+  grid-template-columns: 42px 1fr auto;
   align-items: center;
   padding: 0 12px;
   border-bottom: 1px solid var(--line);
@@ -39,12 +39,43 @@
   letter-spacing: -.01em;
 }
 
-.header > span {
+.aiSwitch {
   justify-self: end;
+  display: flex;
+  align-items: center;
+  gap: 6px;
   color: var(--muted);
-  font-size: 7px;
-  font-weight: 680;
+  font-size: 6px;
+  font-weight: 720;
+  white-space: nowrap;
+  cursor: pointer;
 }
+
+.aiSwitch input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.aiSwitch i {
+  position: relative;
+  width: 27px;
+  height: 16px;
+  display: block;
+  border: 1px solid var(--line);
+  border-radius: 99px;
+  background: var(--surface-2);
+  transition: border-color 160ms ease, background 160ms ease;
+}
+.aiSwitch i::after {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--muted);
+  content: "";
+  transition: background 160ms ease, transform 160ms ease;
+}
+.aiSwitch input:checked + i { border-color: var(--ink); background: var(--ink); }
+.aiSwitch input:checked + i::after { background: var(--canvas); transform: translateX(11px); }
+.aiSwitch input:focus-visible + i { outline: 2px solid var(--ink); outline-offset: 2px; }
 
 .stepNavigation {
   position: sticky;
@@ -556,7 +587,7 @@
 }
 
 @media (min-width: 641px) {
-  .header { grid-template-columns: 48px 1fr 48px; padding-inline: clamp(16px, 5vw, 72px); }
+  .header { grid-template-columns: 48px 1fr auto; padding-inline: clamp(16px, 5vw, 72px); }
   .stepNavigation { padding-inline: clamp(16px, 5vw, 72px); }
   .stepNavigation button { font-size: 7px; }
   .stepContent { padding: 38px clamp(18px, 5vw, 72px) calc(var(--zine-footer-height) + 48px); }

@@ -13,11 +13,10 @@ import {
   type TransitionEvent,
 } from "react";
 import type { PageFlip } from "page-flip";
-import { Icon } from "@/components/ui/icon";
 import type { ZineDraft } from "../../model/zine-draft";
 import { createZineReaderPages } from "../../model/zine-pages";
-import { ZineReaderPageView } from "./zine-reader-page";
-import styles from "./zine-reader.module.css";
+import { ZineReaderPageView } from "../reader/zine-reader-page";
+import styles from "./manual-layout-step.module.css";
 
 type ViewMode = "spread" | "focus";
 type CameraMotion = "idle" | "moving" | "flipping";
@@ -28,15 +27,33 @@ type CameraGeometry = {
   readonly shift: number;
 };
 
+type PhotoDrag = {
+  readonly pointerId: number;
+  readonly photoId: string;
+  readonly pageIndex: number;
+  readonly startClientX: number;
+  readonly startClientY: number;
+  readonly startPositionX: number;
+  readonly startPositionY: number;
+  readonly overflowX: number;
+  readonly overflowY: number;
+  positionX: number;
+  positionY: number;
+  moved: boolean;
+};
+
 type PointerIntent = {
   readonly pointerId: number;
   readonly pageIndex: number | null;
+  readonly photoId: string | null;
   readonly startClientX: number;
   readonly startClientY: number;
+  readonly allowFocusNavigation: boolean;
   moved: boolean;
 };
 
 type LastTap = {
+  readonly key: string;
   readonly pageIndex: number;
   readonly at: number;
 };
@@ -51,22 +68,41 @@ const defaultCameraGeometry: CameraGeometry = {
   shift: 205,
 };
 
-export function ZineReader({
+export function ManualLayoutStep({
   draft,
-  onClose,
+  onPhotoPositionChange,
 }: {
   readonly draft: ZineDraft;
-  readonly onClose: () => void;
+  readonly onPhotoPositionChange: (
+    photoId: string,
+    positionX: number,
+    positionY: number,
+  ) => void;
 }) {
   const pages = useMemo(() => createZineReaderPages(draft), [draft]);
+  const photoById = useMemo(
+    () => new Map(draft.photos.map((photo) => [photo.id, photo])),
+    [draft.photos],
+  );
+  const structureKey = useMemo(
+    () => JSON.stringify({
+      name: draft.name,
+      styleId: draft.styleId,
+      photos: draft.photos.map((photo) => ({ id: photo.id, caption: photo.caption })),
+    }),
+    [draft.name, draft.photos, draft.styleId],
+  );
   const sourceRef = useRef<HTMLDivElement>(null);
   const bookSlotRef = useRef<HTMLDivElement>(null);
-  const viewportRef = useRef<HTMLElement>(null);
+  const viewportRef = useRef<HTMLDivElement>(null);
   const pageFlipRef = useRef<PageFlip | null>(null);
-  const currentPageRef = useRef(0);
+  const initialPage = pages.length > 2 ? 1 : 0;
+  const currentPageRef = useRef(initialPage);
   const viewModeRef = useRef<ViewMode>("spread");
   const cameraMotionRef = useRef<CameraMotion>("idle");
+  const selectedPhotoIdRef = useRef<string | null>(null);
   const focusedPageRef = useRef<number | null>(null);
+  const photoDragRef = useRef<PhotoDrag | null>(null);
   const pointerIntentRef = useRef<PointerIntent | null>(null);
   const blockedPointerRef = useRef<number | null>(null);
   const pendingPageTurnRef = useRef<PendingPageTurn | null>(null);
@@ -74,13 +110,19 @@ export function ZineReader({
   const suppressNativeDoubleClickUntilRef = useRef(0);
   const cameraTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pageTurnTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [currentPage, setCurrentPage] = useState(0);
+  const [currentPage, setCurrentPage] = useState(initialPage);
   const [viewMode, setViewMode] = useState<ViewMode>("spread");
   const [cameraMotion, setCameraMotion] = useState<CameraMotion>("idle");
   const [cameraGeometry, setCameraGeometry] = useState(defaultCameraGeometry);
+  const [selectedPhotoId, setSelectedPhotoId] = useState<string | null>(null);
   const [focusedPage, setFocusedPage] = useState<number | null>(null);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
   const lastPage = pages.length - 1;
+
+  const setPhotoSelection = useCallback((photoId: string | null) => {
+    selectedPhotoIdRef.current = photoId;
+    setSelectedPhotoId(photoId);
+  }, []);
 
   const finishCameraMotion = useCallback(() => {
     if (cameraMotionRef.current !== "moving") return;
@@ -129,9 +171,10 @@ export function ZineReader({
       Math.max(24, maxFocusWidth - scaledPageWidth),
       Math.min(54, Math.max(30, scaledPageWidth * .11)),
     );
+    const focusWidth = scaledPageWidth + peek;
 
     setCameraGeometry({
-      focusWidth: scaledPageWidth + peek,
+      focusWidth,
       scale,
       shift: Math.max(0, (scaledPageWidth - peek) / 2),
     });
@@ -141,23 +184,25 @@ export function ZineReader({
     if (pageIndex === null || pageIndex <= 0 || pageIndex >= lastPage) return;
     if (cameraMotionRef.current === "flipping") return;
     lastTapRef.current = null;
+    setPhotoSelection(null);
     measureCameraGeometry();
     viewModeRef.current = "focus";
     setViewMode("focus");
     focusedPageRef.current = pageIndex;
     setFocusedPage(pageIndex);
     beginCameraMotion();
-  }, [beginCameraMotion, lastPage, measureCameraGeometry]);
+  }, [beginCameraMotion, lastPage, measureCameraGeometry, setPhotoSelection]);
 
   const closeFocusedPage = useCallback(() => {
     if (viewModeRef.current !== "focus" || cameraMotionRef.current === "flipping") return;
+    setPhotoSelection(null);
     lastTapRef.current = null;
     focusedPageRef.current = null;
     setFocusedPage(null);
     viewModeRef.current = "spread";
     setViewMode("spread");
     beginCameraMotion();
-  }, [beginCameraMotion]);
+  }, [beginCameraMotion, setPhotoSelection]);
 
   const completePageTurn = useCallback(() => {
     const pending = pendingPageTurnRef.current;
@@ -185,9 +230,9 @@ export function ZineReader({
     pageTurnTimerRef.current = setTimeout(() => {
       const pending = pendingPageTurnRef.current;
       if (!pending) return;
-      if (pageFlip.getCurrentPageIndex() === getSpreadStart(pending.targetPage)) {
-        completePageTurn();
-      } else {
+      const expectedSpread = getSpreadStart(pending.targetPage);
+      if (pageFlip.getCurrentPageIndex() === expectedSpread) completePageTurn();
+      else {
         pendingPageTurnRef.current = null;
         cameraMotionRef.current = "idle";
         setCameraMotion("idle");
@@ -204,9 +249,10 @@ export function ZineReader({
     async function mountBook() {
       const source = sourceRef.current;
       const slot = bookSlotRef.current;
-      if (!source || !slot || pages.length === 0) return;
+      if (!source || !slot || lastPage < 0) return;
 
       try {
+        setStatus("loading");
         const pageFlipPackage = await import("page-flip");
         if (cancelled) return;
 
@@ -216,6 +262,10 @@ export function ZineReader({
         const pageElements = Array.from(source.children, (element) => (
           element.cloneNode(true) as HTMLElement
         ));
+        const startPage = Math.min(
+          Math.max(0, currentPageRef.current),
+          Math.max(0, lastPage),
+        );
         instance = new pageFlipPackage.PageFlip(engineRoot, {
           width: 360,
           height: 480,
@@ -224,6 +274,7 @@ export function ZineReader({
           maxWidth: 460,
           minHeight: 160,
           maxHeight: 614,
+          startPage,
           usePortrait: false,
           showCover: true,
           autoSize: true,
@@ -243,6 +294,7 @@ export function ZineReader({
           const nextPage = Number(event.data);
           currentPageRef.current = nextPage;
           setCurrentPage(nextPage);
+          if (viewModeRef.current === "spread") setPhotoSelection(null);
         });
         instance.on("changeState", (event) => {
           if (String(event.data) === "read" && pendingPageTurnRef.current) {
@@ -266,7 +318,17 @@ export function ZineReader({
       if (instance) instance.destroy();
       else engineRoot?.remove();
     };
-  }, [completePageTurn, measureCameraGeometry, pages]);
+  }, [completePageTurn, lastPage, measureCameraGeometry, setPhotoSelection, structureKey]);
+
+  useEffect(() => {
+    const viewport = viewportRef.current;
+    if (!viewport) return;
+    for (const figure of viewport.querySelectorAll<HTMLElement>("[data-zine-photo-id]")) {
+      figure.dataset.zinePhotoSelected = String(
+        figure.dataset.zinePhotoId === selectedPhotoId,
+      );
+    }
+  }, [selectedPhotoId, status]);
 
   useEffect(() => {
     function updateAfterResize() {
@@ -278,7 +340,7 @@ export function ZineReader({
 
   useEffect(() => {
     function closeOnEscape(event: KeyboardEvent) {
-      if (event.key === "Escape") closeFocusedPage();
+      if (event.key === "Escape" && selectedPhotoIdRef.current === null) closeFocusedPage();
     }
     window.addEventListener("keydown", closeOnEscape);
     return () => window.removeEventListener("keydown", closeOnEscape);
@@ -288,12 +350,6 @@ export function ZineReader({
     if (cameraTimerRef.current) clearTimeout(cameraTimerRef.current);
     if (pageTurnTimerRef.current) clearTimeout(pageTurnTimerRef.current);
   }, []);
-
-  function handleBookClick(event: MouseEvent<HTMLDivElement>) {
-    if (viewModeRef.current !== "spread") return;
-    const pageIndex = getPageIndex(event.target);
-    if (currentPageRef.current === 0 && pageIndex === 0) pageFlipRef.current?.flipNext();
-  }
 
   function handleDoubleClick(event: MouseEvent<HTMLDivElement>) {
     if (event.timeStamp < suppressNativeDoubleClickUntilRef.current) {
@@ -310,18 +366,100 @@ export function ZineReader({
       blockPointerGesture(event);
       return;
     }
+
+    const frame = getPhotoFrame(event.target);
+    const photoId = frame?.dataset.zinePhotoId ?? null;
+    const pageIndex = getPageIndex(event.target);
+    const selectedId = selectedPhotoIdRef.current;
+
+    if (selectedId !== null) {
+      blockPointerGesture(event);
+      if (!frame || !photoId) {
+        setPhotoSelection(null);
+        lastTapRef.current = null;
+        return;
+      }
+      if (selectedId === photoId) {
+        beginPhotoDrag(event, frame, photoId, pageIndex);
+        return;
+      }
+      pointerIntentRef.current = createPointerIntent(
+        event,
+        pageIndex,
+        photoId,
+        false,
+      );
+      return;
+    }
+
     const isFocus = viewModeRef.current === "focus";
     if (isFocus) blockPointerGesture(event);
-    pointerIntentRef.current = {
+    pointerIntentRef.current = createPointerIntent(
+      event,
+      pageIndex,
+      photoId,
+      isFocus,
+    );
+  }
+
+  function beginPhotoDrag(
+    event: PointerEvent<HTMLDivElement>,
+    frame: HTMLElement,
+    photoId: string,
+    pageIndex: number | null,
+  ) {
+    const photo = photoById.get(photoId);
+    if (!photo || pageIndex === null) return;
+    const imageFrame = frame.querySelector<HTMLElement>(":scope > div");
+    if (!imageFrame) return;
+    const overflow = getRenderedOverflow(
+      imageFrame.getBoundingClientRect(),
+      photo.width,
+      photo.height,
+    );
+    photoDragRef.current = {
       pointerId: event.pointerId,
-      pageIndex: getPageIndex(event.target),
+      photoId,
+      pageIndex,
       startClientX: event.clientX,
       startClientY: event.clientY,
+      startPositionX: photo.positionX,
+      startPositionY: photo.positionY,
+      overflowX: overflow.x,
+      overflowY: overflow.y,
+      positionX: photo.positionX,
+      positionY: photo.positionY,
       moved: false,
     };
   }
 
+  function blockPointerGesture(event: PointerEvent<HTMLDivElement>) {
+    blockedPointerRef.current = event.pointerId;
+    if (!event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.setPointerCapture(event.pointerId);
+    }
+    event.preventDefault();
+    event.stopPropagation();
+  }
+
   function handlePointerMove(event: PointerEvent<HTMLDivElement>) {
+    const photoDrag = photoDragRef.current;
+    if (photoDrag?.pointerId === event.pointerId) {
+      const deltaX = event.clientX - photoDrag.startClientX;
+      const deltaY = event.clientY - photoDrag.startClientY;
+      photoDrag.positionX = photoDrag.overflowX > 0
+        ? clampPercentage(photoDrag.startPositionX - (deltaX / photoDrag.overflowX) * 100)
+        : photoDrag.startPositionX;
+      photoDrag.positionY = photoDrag.overflowY > 0
+        ? clampPercentage(photoDrag.startPositionY - (deltaY / photoDrag.overflowY) * 100)
+        : photoDrag.startPositionY;
+      photoDrag.moved ||= Math.hypot(deltaX, deltaY) > 2;
+      setVisiblePhotoPosition(photoDrag.photoId, photoDrag.positionX, photoDrag.positionY);
+      event.preventDefault();
+      event.stopPropagation();
+      return;
+    }
+
     const intent = pointerIntentRef.current;
     if (intent?.pointerId === event.pointerId) {
       intent.moved ||= Math.hypot(
@@ -329,6 +467,7 @@ export function ZineReader({
         event.clientY - intent.startClientY,
       ) > 4;
     }
+
     if (blockedPointerRef.current === event.pointerId) {
       event.preventDefault();
       event.stopPropagation();
@@ -336,27 +475,50 @@ export function ZineReader({
   }
 
   function finishPointerGesture(event: PointerEvent<HTMLDivElement>) {
+    const photoDrag = photoDragRef.current;
+    if (photoDrag?.pointerId === event.pointerId) {
+      photoDragRef.current = null;
+      if (photoDrag.moved) {
+        onPhotoPositionChange(photoDrag.photoId, photoDrag.positionX, photoDrag.positionY);
+      } else if (event.type !== "pointercancel") {
+        confirmTap(`photo:${photoDrag.photoId}`, photoDrag.pageIndex, event.timeStamp);
+      }
+      finishBlockedPointer(event);
+      return;
+    }
+
     const intent = pointerIntentRef.current;
     if (intent?.pointerId === event.pointerId) {
       pointerIntentRef.current = null;
-      if (event.type !== "pointercancel" && intent.pageIndex !== null) {
-        if (!intent.moved) confirmTap(intent.pageIndex, event.timeStamp);
-        else if (viewModeRef.current === "focus") navigateFocusedPage(intent, event);
+      if (event.type !== "pointercancel") {
+        if (!intent.moved && intent.pageIndex !== null) {
+          if (intent.photoId) setPhotoSelection(intent.photoId);
+          confirmTap(
+            intent.photoId ? `photo:${intent.photoId}` : `page:${intent.pageIndex}`,
+            intent.pageIndex,
+            event.timeStamp,
+          );
+        } else if (intent.moved && intent.allowFocusNavigation) {
+          navigateFocusedPage(intent, event);
+        }
       }
+      if (blockedPointerRef.current === event.pointerId) finishBlockedPointer(event);
+      return;
     }
+
     if (blockedPointerRef.current === event.pointerId) finishBlockedPointer(event);
   }
 
-  function confirmTap(pageIndex: number, at: number) {
+  function confirmTap(key: string, pageIndex: number, at: number) {
     const lastTap = lastTapRef.current;
-    if (lastTap?.pageIndex === pageIndex && at - lastTap.at < 340) {
+    if (lastTap?.key === key && lastTap.pageIndex === pageIndex && at - lastTap.at < 340) {
       lastTapRef.current = null;
       suppressNativeDoubleClickUntilRef.current = at + 700;
       if (viewModeRef.current === "focus") closeFocusedPage();
       else openFocusedPage(pageIndex);
       return;
     }
-    lastTapRef.current = { pageIndex, at };
+    lastTapRef.current = { key, pageIndex, at };
   }
 
   function navigateFocusedPage(intent: PointerIntent, event: PointerEvent<HTMLDivElement>) {
@@ -380,15 +542,6 @@ export function ZineReader({
     startPageTurn(targetPage, direction as 1 | -1);
   }
 
-  function blockPointerGesture(event: PointerEvent<HTMLDivElement>) {
-    blockedPointerRef.current = event.pointerId;
-    if (!event.currentTarget.hasPointerCapture(event.pointerId)) {
-      event.currentTarget.setPointerCapture(event.pointerId);
-    }
-    event.preventDefault();
-    event.stopPropagation();
-  }
-
   function finishBlockedPointer(event: PointerEvent<HTMLDivElement>) {
     blockedPointerRef.current = null;
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
@@ -409,6 +562,16 @@ export function ZineReader({
     finishCameraMotion();
   }
 
+  function setVisiblePhotoPosition(photoId: string, positionX: number, positionY: number) {
+    const viewport = viewportRef.current;
+    if (!viewport) return;
+    for (const image of viewport.querySelectorAll<HTMLImageElement>(
+      `[data-zine-photo-id="${CSS.escape(photoId)}"] img`,
+    )) {
+      image.style.objectPosition = `${positionX}% ${positionY}%`;
+    }
+  }
+
   const focusSide = focusedPage === null ? null : focusedPage % 2 === 1 ? "left" : "right";
   const cameraX = focusSide === "left"
     ? cameraGeometry.shift
@@ -420,28 +583,21 @@ export function ZineReader({
   const cameraWindowStyle = {
     width: viewMode === "focus" ? `${cameraGeometry.focusWidth}px` : "100%",
   } as CSSProperties;
-  const stageClass = [
+  const stageClassName = [
     styles.bookStage,
     currentPage === 0 ? styles.coverStage : "",
     currentPage === lastPage ? styles.backStage : "",
   ].filter(Boolean).join(" ");
 
   return (
-    <main className={styles.reader}>
-      <header className={styles.readerHeader}>
-        <button type="button" onClick={onClose} aria-label="Return to zine overview">
-          <Icon name="close" size={17} />
-        </button>
-        <div><strong>{draft.name}</strong><span>Reader</span></div>
-        <span className={styles.readerStatus}>{status === "error" ? "Reader unavailable" : "Draft"}</span>
-      </header>
-
-      <section ref={viewportRef} className={styles.readerViewport} aria-label={`${draft.name} zine reader`}>
+    <section className={styles.manualLayoutStep} aria-labelledby="manual-layout-heading">
+      <h1 id="manual-layout-heading" className={styles.srOnly}>Arrange your zine</h1>
+      <div className={styles.manualStage}>
         <div
-          className={styles.cameraWindow}
-          data-view-mode={viewMode}
-          style={cameraWindowStyle}
-          onClickCapture={handleBookClick}
+          ref={viewportRef}
+          className={styles.bookViewport}
+          data-photo-selected={selectedPhotoId !== null}
+          data-camera-motion={cameraMotion}
           onDoubleClickCapture={handleDoubleClick}
           onMouseDownCapture={blockNativeBookGesture}
           onTouchStartCapture={blockNativeBookGesture}
@@ -453,48 +609,54 @@ export function ZineReader({
           onPointerCancelCapture={finishPointerGesture}
         >
           <div
-            className={stageClass}
-            style={bookStageStyle}
-            onTransitionEnd={handleCameraTransitionEnd}
+            className={styles.cameraWindow}
+            data-view-mode={viewMode}
+            data-focus-side={focusSide ?? undefined}
+            style={cameraWindowStyle}
           >
-            <div ref={bookSlotRef} className={styles.bookSlot} />
+            <div
+              className={stageClassName}
+              style={bookStageStyle}
+              onTransitionEnd={handleCameraTransitionEnd}
+            >
+              <div ref={bookSlotRef} className={styles.bookSlot} />
+            </div>
           </div>
-        </div>
 
-        <div ref={sourceRef} className={styles.sourcePages} aria-hidden="true">
-          {pages.map((page, index) => (
-            <ZineReaderPageView key={page.id} page={page} pageIndex={index} />
-          ))}
-        </div>
+          <div ref={sourceRef} className={styles.sourcePages} aria-hidden="true">
+            {pages.map((page, index) => (
+              <ZineReaderPageView key={page.id} page={page} pageIndex={index} />
+            ))}
+          </div>
 
-        {status === "loading" ? <p className={styles.loading}>Building your zine…</p> : null}
-        {status === "error" ? <p className={styles.loading}>The page-turning engine could not start.</p> : null}
-      </section>
-
-      <footer className={styles.readerControls}>
-        <button
-          type="button"
-          aria-label="Previous spread"
-          disabled={currentPage === 0 || status !== "ready" || viewMode !== "spread" || cameraMotion !== "idle"}
-          onClick={() => pageFlipRef.current?.flipPrev()}
-        >
-          <Icon name="arrow" size={17} />
-        </button>
-        <div>
-          <strong>{getProgressLabel(currentPage, lastPage)}</strong>
-          <span>{viewMode === "focus" ? "Double-click or double-tap to return" : currentPage === 0 ? "Click the cover to open" : "Swipe, drag, or double-click a page"}</span>
+          {status === "loading" ? <p className={styles.stageMessage}>Building your zine…</p> : null}
+          {status === "error" ? <p className={styles.stageMessage}>The live book could not start.</p> : null}
         </div>
-        <button
-          type="button"
-          aria-label="Next spread"
-          disabled={currentPage === lastPage || status !== "ready" || viewMode !== "spread" || cameraMotion !== "idle"}
-          onClick={() => pageFlipRef.current?.flipNext()}
-        >
-          <Icon name="arrow" size={17} />
-        </button>
-      </footer>
-    </main>
+      </div>
+    </section>
   );
+}
+
+function createPointerIntent(
+  event: PointerEvent<HTMLDivElement>,
+  pageIndex: number | null,
+  photoId: string | null,
+  allowFocusNavigation: boolean,
+): PointerIntent {
+  return {
+    pointerId: event.pointerId,
+    pageIndex,
+    photoId,
+    startClientX: event.clientX,
+    startClientY: event.clientY,
+    allowFocusNavigation,
+    moved: false,
+  };
+}
+
+function getPhotoFrame(target: EventTarget) {
+  if (!(target instanceof Element)) return null;
+  return target.closest<HTMLElement>("[data-zine-photo-id]");
 }
 
 function getPageIndex(target: EventTarget) {
@@ -509,9 +671,21 @@ function getSpreadStart(pageIndex: number) {
   return pageIndex % 2 === 1 ? pageIndex : pageIndex - 1;
 }
 
-function getProgressLabel(currentPage: number, lastPage: number) {
-  if (currentPage === 0) return "Cover";
-  if (currentPage === lastPage) return "Back cover";
-  const right = Math.min(currentPage + 1, lastPage - 1);
-  return `${currentPage}–${right} / ${lastPage - 1}`;
+function getRenderedOverflow(
+  frame: Pick<DOMRect, "width" | "height">,
+  imageWidth: number,
+  imageHeight: number,
+) {
+  if (frame.width <= 0 || frame.height <= 0 || imageWidth <= 0 || imageHeight <= 0) {
+    return { x: 0, y: 0 };
+  }
+  const scale = Math.max(frame.width / imageWidth, frame.height / imageHeight);
+  return {
+    x: Math.max(0, imageWidth * scale - frame.width),
+    y: Math.max(0, imageHeight * scale - frame.height),
+  };
+}
+
+function clampPercentage(value: number) {
+  return Math.min(100, Math.max(0, value));
 }

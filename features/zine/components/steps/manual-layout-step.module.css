@@ -1,0 +1,139 @@
+.manualLayoutStep {
+  width: 100%;
+  margin: 0 auto;
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.manualStage {
+  width: 100%;
+  min-height: clamp(450px, calc(100dvh - 205px), 720px);
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+
+.bookViewport {
+  position: relative;
+  width: 100%;
+  min-height: inherit;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  padding: 10px 6px;
+}
+
+.cameraWindow {
+  position: relative;
+  min-width: 0;
+  max-width: 100%;
+  min-height: inherit;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  transition: width 340ms cubic-bezier(.22, .72, .2, 1);
+  will-change: width;
+}
+
+.bookStage {
+  position: relative;
+  width: min(calc(100vw - 28px), 920px);
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  transform: translate3d(var(--camera-x, 0), 0, 0) scale(var(--camera-scale, 1));
+  transform-origin: center center;
+  transition: transform 340ms cubic-bezier(.22, .72, .2, 1);
+  will-change: transform;
+}
+
+.bookSlot { width: 100%; }
+.coverStage .bookSlot { transform: translateX(-25%); }
+.backStage .bookSlot { transform: translateX(25%); }
+
+.flipBook { width: 100%; margin-inline: auto; }
+.flipBook :global(.stf__wrapper) { position: relative; width: 100%; box-sizing: border-box; }
+.flipBook :global(.stf__item) { box-sizing: border-box; }
+.flipBook :global(.stf__block) { cursor: grab; touch-action: pan-y; }
+.flipBook :global(.stf__block:active) { cursor: grabbing; }
+
+.cameraWindow[data-view-mode="focus"] .flipBook :global(.stf__block),
+.bookViewport[data-photo-selected="true"] .flipBook :global(.stf__block),
+.bookViewport[data-camera-motion="flipping"] .flipBook :global(.stf__block) {
+  cursor: default;
+}
+
+.bookViewport [data-zine-photo-id] {
+  cursor: pointer;
+  touch-action: pan-y;
+}
+.bookViewport [data-zine-photo-id] img {
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.bookViewport [data-zine-photo-selected="true"] {
+  z-index: 8;
+  cursor: move;
+  touch-action: none;
+  outline: 2px solid #f5f1e9;
+  box-shadow: 0 0 0 3px #24231f, 0 8px 20px rgba(26, 24, 20, .22);
+}
+
+.bookViewport [data-zine-photo-selected="true"]::after {
+  position: absolute;
+  z-index: 5;
+  inset: 50% auto auto 50%;
+  width: 10px;
+  height: 10px;
+  border: 1px solid #f5f1e9;
+  border-radius: 50%;
+  background: #24231f;
+  box-shadow: 0 0 0 1px rgba(36, 35, 31, .32);
+  content: "";
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+}
+
+.sourcePages {
+  position: fixed;
+  left: -10000px;
+  top: 0;
+  width: 360px;
+  height: 480px;
+  overflow: hidden;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.stageMessage {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  color: var(--muted);
+  font-size: 8px;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  pointer-events: none;
+}
+
+@media (min-width: 641px) {
+  .bookViewport { padding: 14px 10px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cameraWindow,
+  .bookStage { transition-duration: 1ms; }
+}

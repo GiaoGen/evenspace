@@ -11,6 +11,8 @@ function photo(id: string): ZinePhoto {
     width: 4,
     height: 3,
     caption: "",
+    positionX: 50,
+    positionY: 50,
   };
 }
 

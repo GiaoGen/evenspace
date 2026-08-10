@@ -28,6 +28,14 @@ declare module "page-flip" {
     readonly disableFlipByClick?: boolean;
   };
 
+  export type PageFlipBounds = {
+    readonly left: number;
+    readonly top: number;
+    readonly width: number;
+    readonly height: number;
+    readonly pageWidth: number;
+  };
+
   export class PageFlip {
     constructor(root: HTMLElement, settings: PageFlipSettings);
     loadFromHTML(items: NodeListOf<HTMLElement> | HTMLElement[]): void;
@@ -35,6 +43,7 @@ declare module "page-flip" {
     off(eventName: string): void;
     flipNext(): void;
     flipPrev(): void;
+    getBoundsRect(): PageFlipBounds;
     getCurrentPageIndex(): number;
     getPageCount(): number;
     destroy(): void;

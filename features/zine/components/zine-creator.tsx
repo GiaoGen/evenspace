@@ -4,7 +4,6 @@ import { useEffect, useReducer, useRef, useState, type FormEvent } from "react";
 import { createUuid } from "@/core/domain/uuid";
 import {
   initialZineCreatorState,
-  zineSteps,
   zineCreatorReducer,
   type EditableZineStep,
   type ZinePhoto,
@@ -13,12 +12,14 @@ import { NameStep } from "./steps/name-step";
 import { OverviewStep } from "./steps/overview-step";
 import { PhotosStep } from "./steps/photos-step";
 import { StyleStep } from "./steps/style-step";
+import { ManualLayoutStep } from "./steps/manual-layout-step";
 import { ZineReader } from "./reader/zine-reader";
 import { ZineShell } from "./zine-shell";
 
 export function ZineCreator() {
   const [state, dispatch] = useReducer(zineCreatorReducer, initialZineCreatorState);
   const [nameAttempted, setNameAttempted] = useState(false);
+  const [aiLayoutEnabled, setAiLayoutEnabled] = useState(false);
   const previewUrls = useRef(new Set<string>());
   const hasName = Boolean(state.draft.name.trim());
   const hasPhotos = state.draft.photos.length > 0;
@@ -29,7 +30,7 @@ export function ZineCreator() {
       ? hasPhotos
       : state.step === "style"
         ? hasStyle
-        : state.step === "overview"
+        : state.step === "manual" || state.step === "overview"
           ? hasName && hasPhotos && hasStyle
           : false;
 
@@ -46,8 +47,15 @@ export function ZineCreator() {
     if (state.step === "reader") return;
     if (state.step === "name") setNameAttempted(true);
     if (!canContinue) return;
-    const currentIndex = zineSteps.indexOf(state.step);
-    const nextStep = zineSteps[currentIndex + 1];
+    const nextStep = state.step === "name"
+      ? "photos"
+      : state.step === "photos"
+        ? "style"
+        : state.step === "style"
+          ? aiLayoutEnabled ? "overview" : "manual"
+          : state.step === "manual" || state.step === "overview"
+            ? "reader"
+            : null;
     if (nextStep) dispatch({ type: "GO_TO", step: nextStep });
   }
 
@@ -73,16 +81,28 @@ export function ZineCreator() {
   }
 
   function goBack() {
-    const currentIndex = zineSteps.indexOf(state.step);
-    const previousStep = zineSteps[currentIndex - 1];
-    if (previousStep && previousStep !== "reader") dispatch({ type: "GO_TO", step: previousStep });
+    const previousStep = state.step === "photos"
+      ? "name"
+      : state.step === "style"
+        ? "photos"
+        : state.step === "manual" || state.step === "overview"
+          ? "style"
+          : null;
+    if (previousStep) dispatch({ type: "GO_TO", step: previousStep });
+  }
+
+  function setAiLayout(nextEnabled: boolean) {
+    setAiLayoutEnabled(nextEnabled);
+    if (state.step === "manual" || state.step === "overview") {
+      dispatch({ type: "GO_TO", step: nextEnabled ? "overview" : "manual" });
+    }
   }
 
   if (state.step === "reader") {
     return (
       <ZineReader
         draft={state.draft}
-        onClose={() => dispatch({ type: "GO_TO", step: "overview" })}
+        onClose={() => dispatch({ type: "GO_TO", step: aiLayoutEnabled ? "overview" : "manual" })}
       />
     );
   }
@@ -91,9 +111,11 @@ export function ZineCreator() {
     <ZineShell
       step={state.step}
       canContinue={canContinue}
+      aiLayoutEnabled={aiLayoutEnabled}
       onBack={goBack}
       canNavigate={canNavigate}
       onNavigate={(step) => dispatch({ type: "GO_TO", step })}
+      onAiLayoutChange={setAiLayout}
       onSubmit={submit}
     >
       {state.step === "name" ? (
@@ -118,6 +140,16 @@ export function ZineCreator() {
           selectedStyleId={state.draft.styleId}
           onSelect={(styleId) => dispatch({ type: "SET_STYLE", styleId })}
         />
+      ) : state.step === "manual" ? (
+        <ManualLayoutStep
+          draft={state.draft}
+          onPhotoPositionChange={(photoId, positionX, positionY) => dispatch({
+            type: "SET_PHOTO_POSITION",
+            photoId,
+            positionX,
+            positionY,
+          })}
+        />
       ) : (
         <OverviewStep
           draft={state.draft}
@@ -140,6 +172,8 @@ async function createZinePhoto(file: File): Promise<ZinePhoto> {
       width: dimensions.width,
       height: dimensions.height,
       caption: "",
+      positionX: 50,
+      positionY: 50,
     };
   } catch (error) {
     URL.revokeObjectURL(previewUrl);

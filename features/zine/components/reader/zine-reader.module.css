@@ -53,37 +53,40 @@
   background: var(--canvas);
 }
 
-.bookStage {
+.cameraWindow {
   position: relative;
-  width: min(calc(100vw - 24px), 840px);
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  height: 100%;
   display: grid;
   place-items: center;
-  transition: opacity 160ms ease;
+  overflow: hidden;
+  transition: width 340ms cubic-bezier(.22, .72, .2, 1);
+  will-change: width;
 }
 
-.bookSlot {
-  width: 100%;
-  transition: transform 520ms cubic-bezier(.22, .78, .22, 1);
+.bookStage {
+  position: relative;
+  width: min(calc(100vw - 24px), 920px);
+  display: grid;
+  place-items: center;
+  transform: translate3d(var(--camera-x, 0), 0, 0) scale(var(--camera-scale, 1));
+  transform-origin: center center;
+  transition: transform 340ms cubic-bezier(.22, .72, .2, 1);
   will-change: transform;
 }
 
+.bookSlot { width: 100%; }
+
 .coverStage .bookSlot { transform: translateX(-25%); }
 .backStage .bookSlot { transform: translateX(25%); }
-.cameraStage { z-index: 5; }
-
 .flipBook { width: 100%; margin-inline: auto; }
 .flipBook :global(.stf__wrapper) { position: relative; width: 100%; box-sizing: border-box; }
 .flipBook :global(.stf__item) { box-sizing: border-box; }
 .flipBook :global(.stf__block) { cursor: grab; touch-action: pan-y; }
 .flipBook :global(.stf__block:active) { cursor: grabbing; }
-
-.cameraOther { opacity: 0 !important; }
-.cameraTarget,
-.cameraOther { transition: opacity 180ms ease; }
-.cameraStage .flipBook :global(.stf__outerShadow),
-.cameraStage .flipBook :global(.stf__innerShadow),
-.cameraStage .flipBook :global(.stf__hardShadow),
-.cameraStage .flipBook :global(.stf__hardInnerShadow) { opacity: 0 !important; }
+.cameraWindow[data-view-mode="focus"] .flipBook :global(.stf__block) { cursor: default; }
 
 .sourcePages {
   position: fixed;
@@ -186,9 +189,9 @@
 .pageHeader small { font: inherit; }
 .pageFooter { display: flex; align-items: center; justify-content: space-between; font-size: clamp(5px, 1.05vw, 8px); font-weight: 700; letter-spacing: .07em; }
 
-.readerPhoto { position: relative; min-width: 0; min-height: 0; margin: 0; }
+.readerPhoto { position: relative; min-width: 0; min-height: 0; margin: 0; touch-action: pan-y; }
 .readerPhoto > div { width: 100%; height: 100%; display: grid; place-items: center; overflow: hidden; background: #ded8cd; }
-.readerPhoto img { width: 100%; height: 100%; display: block; object-fit: contain; }
+.readerPhoto img { width: 100%; height: 100%; display: block; object-fit: cover; }
 .readerPhoto figcaption {
   position: absolute;
   z-index: 3;
@@ -231,14 +234,6 @@
 .night .readerPhoto figcaption { background: #20211f; color: #f3efe7; box-shadow: 0 2px 7px rgba(0, 0, 0, .28); }
 .nightTitle { font-size: clamp(13px, 3.5vw, 29px); line-height: .86; letter-spacing: -.055em; overflow-wrap: anywhere; }
 
-.cameraGuard {
-  position: absolute;
-  z-index: 100;
-  inset: 0;
-  cursor: zoom-out;
-  touch-action: manipulation;
-}
-
 .readerControls {
   z-index: 30;
   display: grid;
@@ -278,6 +273,6 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .bookSlot,
-  .bookStage { transition: none; }
+  .cameraWindow,
+  .bookStage { transition-duration: 1ms; }
 }

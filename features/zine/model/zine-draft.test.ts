@@ -17,6 +17,8 @@ function photo(id: string, width: number, height: number): ZinePhoto {
     previewUrl: `blob:${id}`,
     fileName: `${id}.jpg`,
     caption: "",
+    positionX: 50,
+    positionY: 50,
   };
 }
 
@@ -58,6 +60,21 @@ describe("zineCreatorReducer", () => {
 
     expect(next.draft.styleId).toBe("margin");
     expect(next.draft.photos).toEqual([]);
+  });
+
+  it("stores bounded in-frame photo positions", () => {
+    const withPhoto = zineCreatorReducer(initialZineCreatorState, {
+      type: "ADD_PHOTOS",
+      photos: [photo("one", 4, 3)],
+    });
+    const positioned = zineCreatorReducer(withPhoto, {
+      type: "SET_PHOTO_POSITION",
+      photoId: "one",
+      positionX: -12,
+      positionY: 118,
+    });
+
+    expect(positioned.draft.photos[0]).toMatchObject({ positionX: 0, positionY: 100 });
   });
 });
 

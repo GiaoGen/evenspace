@@ -136,7 +136,7 @@ function ReaderPhoto({
   readonly index: number;
 }) {
   return (
-    <figure className={styles.readerPhoto}>
+    <figure className={styles.readerPhoto} data-zine-photo-id={photo.id}>
       <div>
         <Image
           unoptimized
@@ -146,12 +146,15 @@ function ReaderPhoto({
           width={photo.width}
           height={photo.height}
           sizes="(max-width: 640px) 45vw, 420px"
+          style={{ objectPosition: `${photo.positionX}% ${photo.positionY}%` }}
         />
       </div>
-      <figcaption className={side === "left" ? styles.captionLeft : styles.captionRight}>
-        <b>{twoDigits(index)}</b>
-        <span>{photo.caption.trim() || photo.fileName}</span>
-      </figcaption>
+      {photo.caption.trim() ? (
+        <figcaption className={side === "left" ? styles.captionLeft : styles.captionRight}>
+          <b>{twoDigits(index)}</b>
+          <span>{photo.caption.trim()}</span>
+        </figcaption>
+      ) : null}
     </figure>
   );
 }
