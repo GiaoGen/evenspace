@@ -149,6 +149,22 @@ export function ZineCreator() {
             positionX,
             positionY,
           })}
+          onAddPage={(spreadId, side) => dispatch({
+            type: "ADD_MANUAL_PAGE",
+            spreadId,
+            side,
+          })}
+          onPlacePhoto={(pageId, photoId, replacePhotoId) => dispatch({
+            type: "PLACE_MANUAL_PHOTO",
+            pageId,
+            photoId,
+            replacePhotoId,
+          })}
+          onSetSpreadStyle={(spreadId, styleId) => dispatch({
+            type: "SET_MANUAL_SPREAD_STYLE",
+            spreadId,
+            styleId,
+          })}
         />
       ) : (
         <OverviewStep

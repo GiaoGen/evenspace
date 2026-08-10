@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import {
   useCallback,
   useEffect,
@@ -12,14 +13,24 @@ import {
   type TouchEvent,
   type TransitionEvent,
 } from "react";
+import { createPortal } from "react-dom";
 import type { PageFlip } from "page-flip";
-import type { ZineDraft } from "../../model/zine-draft";
-import { createZineReaderPages } from "../../model/zine-pages";
+import { Icon } from "@/components/ui/icon";
+import {
+  splitPhotosIntoVisualRows,
+  type ZineDraft,
+  type ZineStyleId,
+} from "../../model/zine-draft";
+import type { ZinePageSide } from "../../model/zine-manual-layout";
+import { createManualEditorPages } from "../../model/zine-pages";
+import { zineStyleOptions } from "../../model/zine-styles";
+import { StylePagePreview } from "../style-page-preview";
 import { ZineReaderPageView } from "../reader/zine-reader-page";
 import styles from "./manual-layout-step.module.css";
 
 type ViewMode = "spread" | "focus";
 type CameraMotion = "idle" | "moving" | "flipping";
+type DrawerKind = "photos" | "layout";
 
 type CameraGeometry = {
   readonly focusWidth: number;
@@ -49,6 +60,7 @@ type PointerIntent = {
   readonly startClientX: number;
   readonly startClientY: number;
   readonly allowFocusNavigation: boolean;
+  readonly addPage: { readonly spreadId: string; readonly side: ZinePageSide } | null;
   moved: boolean;
 };
 
@@ -68,9 +80,17 @@ const defaultCameraGeometry: CameraGeometry = {
   shift: 205,
 };
 
+const styleWaterfallRows = [
+  zineStyleOptions.filter((_, index) => index % 2 === 0),
+  zineStyleOptions.filter((_, index) => index % 2 === 1),
+] as const;
+
 export function ManualLayoutStep({
   draft,
   onPhotoPositionChange,
+  onAddPage,
+  onPlacePhoto,
+  onSetSpreadStyle,
 }: {
   readonly draft: ZineDraft;
   readonly onPhotoPositionChange: (
@@ -78,8 +98,15 @@ export function ManualLayoutStep({
     positionX: number,
     positionY: number,
   ) => void;
+  readonly onAddPage: (spreadId: string, side: ZinePageSide) => void;
+  readonly onPlacePhoto: (
+    pageId: string,
+    photoId: string,
+    replacePhotoId?: string,
+  ) => void;
+  readonly onSetSpreadStyle: (spreadId: string, styleId: ZineStyleId) => void;
 }) {
-  const pages = useMemo(() => createZineReaderPages(draft), [draft]);
+  const pages = useMemo(() => createManualEditorPages(draft), [draft]);
   const photoById = useMemo(
     () => new Map(draft.photos.map((photo) => [photo.id, photo])),
     [draft.photos],
@@ -89,8 +116,9 @@ export function ManualLayoutStep({
       name: draft.name,
       styleId: draft.styleId,
       photos: draft.photos.map((photo) => ({ id: photo.id, caption: photo.caption })),
+      manualSpreads: draft.manualSpreads,
     }),
-    [draft.name, draft.photos, draft.styleId],
+    [draft.manualSpreads, draft.name, draft.photos, draft.styleId],
   );
   const sourceRef = useRef<HTMLDivElement>(null);
   const bookSlotRef = useRef<HTMLDivElement>(null);
@@ -117,11 +145,35 @@ export function ManualLayoutStep({
   const [selectedPhotoId, setSelectedPhotoId] = useState<string | null>(null);
   const [focusedPage, setFocusedPage] = useState<number | null>(null);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
+  const [portalReady, setPortalReady] = useState(false);
+  const [drawerKind, setDrawerKind] = useState<DrawerKind | null>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const drawerTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastPage = pages.length - 1;
 
   const setPhotoSelection = useCallback((photoId: string | null) => {
     selectedPhotoIdRef.current = photoId;
     setSelectedPhotoId(photoId);
+  }, []);
+
+  const closeDrawer = useCallback(() => {
+    setDrawerOpen(false);
+    if (drawerTimerRef.current) clearTimeout(drawerTimerRef.current);
+    drawerTimerRef.current = setTimeout(() => {
+      setDrawerKind(null);
+      drawerTimerRef.current = null;
+    }, 240);
+  }, []);
+
+  const openDrawer = useCallback((kind: DrawerKind) => {
+    if (cameraMotionRef.current !== "idle") return;
+    if (drawerTimerRef.current) {
+      clearTimeout(drawerTimerRef.current);
+      drawerTimerRef.current = null;
+    }
+    setDrawerKind(kind);
+    setDrawerOpen(false);
+    window.requestAnimationFrame(() => setDrawerOpen(true));
   }, []);
 
   const finishCameraMotion = useCallback(() => {
@@ -184,6 +236,7 @@ export function ManualLayoutStep({
     if (pageIndex === null || pageIndex <= 0 || pageIndex >= lastPage) return;
     if (cameraMotionRef.current === "flipping") return;
     lastTapRef.current = null;
+    closeDrawer();
     setPhotoSelection(null);
     measureCameraGeometry();
     viewModeRef.current = "focus";
@@ -191,10 +244,11 @@ export function ManualLayoutStep({
     focusedPageRef.current = pageIndex;
     setFocusedPage(pageIndex);
     beginCameraMotion();
-  }, [beginCameraMotion, lastPage, measureCameraGeometry, setPhotoSelection]);
+  }, [beginCameraMotion, closeDrawer, lastPage, measureCameraGeometry, setPhotoSelection]);
 
   const closeFocusedPage = useCallback(() => {
     if (viewModeRef.current !== "focus" || cameraMotionRef.current === "flipping") return;
+    closeDrawer();
     setPhotoSelection(null);
     lastTapRef.current = null;
     focusedPageRef.current = null;
@@ -202,7 +256,7 @@ export function ManualLayoutStep({
     viewModeRef.current = "spread";
     setViewMode("spread");
     beginCameraMotion();
-  }, [beginCameraMotion, setPhotoSelection]);
+  }, [beginCameraMotion, closeDrawer, setPhotoSelection]);
 
   const completePageTurn = useCallback(() => {
     const pending = pendingPageTurnRef.current;
@@ -220,6 +274,7 @@ export function ManualLayoutStep({
   const startPageTurn = useCallback((targetPage: number, direction: 1 | -1) => {
     const pageFlip = pageFlipRef.current;
     if (!pageFlip || pendingPageTurnRef.current) return;
+    closeDrawer();
     pendingPageTurnRef.current = { targetPage };
     cameraMotionRef.current = "flipping";
     setCameraMotion("flipping");
@@ -239,7 +294,12 @@ export function ManualLayoutStep({
       }
       pageTurnTimerRef.current = null;
     }, 900);
-  }, [completePageTurn]);
+  }, [closeDrawer, completePageTurn]);
+
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => setPortalReady(true));
+    return () => window.cancelAnimationFrame(frame);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -340,15 +400,21 @@ export function ManualLayoutStep({
 
   useEffect(() => {
     function closeOnEscape(event: KeyboardEvent) {
-      if (event.key === "Escape" && selectedPhotoIdRef.current === null) closeFocusedPage();
+      if (event.key !== "Escape") return;
+      if (drawerKind !== null) {
+        closeDrawer();
+        return;
+      }
+      if (selectedPhotoIdRef.current === null) closeFocusedPage();
     }
     window.addEventListener("keydown", closeOnEscape);
     return () => window.removeEventListener("keydown", closeOnEscape);
-  }, [closeFocusedPage]);
+  }, [closeDrawer, closeFocusedPage, drawerKind]);
 
   useEffect(() => () => {
     if (cameraTimerRef.current) clearTimeout(cameraTimerRef.current);
     if (pageTurnTimerRef.current) clearTimeout(pageTurnTimerRef.current);
+    if (drawerTimerRef.current) clearTimeout(drawerTimerRef.current);
   }, []);
 
   function handleDoubleClick(event: MouseEvent<HTMLDivElement>) {
@@ -492,6 +558,12 @@ export function ManualLayoutStep({
       pointerIntentRef.current = null;
       if (event.type !== "pointercancel") {
         if (!intent.moved && intent.pageIndex !== null) {
+          const addPage = intent.addPage;
+          if (addPage) {
+            onAddPage(addPage.spreadId, addPage.side);
+            finishBlockedPointer(event);
+            return;
+          }
           if (intent.photoId) setPhotoSelection(intent.photoId);
           confirmTap(
             intent.photoId ? `photo:${intent.photoId}` : `page:${intent.pageIndex}`,
@@ -588,6 +660,18 @@ export function ManualLayoutStep({
     currentPage === 0 ? styles.coverStage : "",
     currentPage === lastPage ? styles.backStage : "",
   ].filter(Boolean).join(" ");
+  const focusedPageData = focusedPage === null ? null : pages[focusedPage] ?? null;
+  const focusedContentPage = focusedPageData?.kind === "content" ? focusedPageData : null;
+  const focusedSpread = focusedContentPage
+    ? draft.manualSpreads?.find((spread) => (
+        spread.left?.id === focusedContentPage.id || spread.right?.id === focusedContentPage.id
+      )) ?? null
+    : null;
+  const photoRows = useMemo(() => splitPhotosIntoVisualRows(draft.photos), [draft.photos]);
+  const photoUseCounts = useMemo(
+    () => getPhotoUseCounts(draft.manualSpreads),
+    [draft.manualSpreads],
+  );
 
   return (
     <section className={styles.manualLayoutStep} aria-labelledby="manual-layout-heading">
@@ -633,6 +717,126 @@ export function ManualLayoutStep({
           {status === "error" ? <p className={styles.stageMessage}>The live book could not start.</p> : null}
         </div>
       </div>
+      {portalReady ? createPortal(
+        <>
+          {viewMode === "focus" && focusedContentPage ? (
+            <div className={styles.focusTools} aria-label="Page tools">
+              <button type="button" onClick={() => openDrawer("photos")}>
+                <Icon name="image" size={16} />
+                <span>Photos</span>
+              </button>
+              <button type="button" onClick={() => openDrawer("layout")}>
+                <Icon name="grid" size={16} />
+                <span>排版</span>
+              </button>
+            </div>
+          ) : null}
+
+          {drawerKind ? (
+            <div
+              className={styles.drawerBackdrop}
+              data-open={drawerOpen}
+              onPointerDown={closeDrawer}
+            >
+              <section
+                className={`${styles.drawer} ${drawerKind === "photos" ? styles.topDrawer : styles.bottomDrawer}`}
+                data-open={drawerOpen}
+                role="dialog"
+                aria-modal="true"
+                aria-label={drawerKind === "photos" ? "Choose photos" : "Choose page layout"}
+                onPointerDown={(event) => event.stopPropagation()}
+              >
+                <header className={styles.drawerHeader}>
+                  <div>
+                    <span>{drawerKind === "photos" ? "Photo library" : "Recipe library"}</span>
+                    <strong>{drawerKind === "photos" ? "Add a photograph" : "Choose a spread layout"}</strong>
+                  </div>
+                  <small>{drawerKind === "photos" ? `${draft.photos.length} photos` : "5 starting recipes"}</small>
+                </header>
+
+                {drawerKind === "photos" ? (
+                  <div className={styles.horizontalWaterfall}>
+                    {photoRows.map((row, rowIndex) => (
+                      <div className={styles.waterfallRow} key={rowIndex}>
+                        {row.map((photo) => {
+                          const useCount = photoUseCounts.get(photo.id) ?? 0;
+                          return (
+                            <button
+                              type="button"
+                              className={styles.photoChoice}
+                              key={photo.id}
+                              style={{ "--photo-ratio": getPhotoRatio(photo) } as CSSProperties}
+                              onClick={() => {
+                                if (!focusedContentPage) return;
+                                const replacePhotoId = selectedPhotoId && focusedContentPage.photos.some(
+                                  (item) => item.id === selectedPhotoId,
+                                ) ? selectedPhotoId : undefined;
+                                onPlacePhoto(focusedContentPage.id, photo.id, replacePhotoId);
+                                setPhotoSelection(null);
+                                closeDrawer();
+                              }}
+                            >
+                              <Image
+                                unoptimized
+                                src={photo.previewUrl}
+                                alt={photo.fileName}
+                                width={photo.width}
+                                height={photo.height}
+                                sizes="160px"
+                              />
+                              {useCount > 0 ? <span>{useCount}× used</span> : null}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className={`${styles.horizontalWaterfall} ${styles.recipeWaterfall}`}>
+                    {styleWaterfallRows.map((row, rowIndex) => (
+                      <div className={styles.waterfallRow} key={rowIndex}>
+                        {row.map((style) => {
+                          const selected = focusedSpread
+                            ? [focusedSpread.left, focusedSpread.right]
+                                .filter((page) => page !== null)
+                                .every((page) => page.styleId === style.id)
+                            : false;
+                          return (
+                            <button
+                              type="button"
+                              className={styles.recipeChoice}
+                              data-selected={selected}
+                              key={style.id}
+                              onClick={() => {
+                                if (!focusedSpread) return;
+                                onSetSpreadStyle(focusedSpread.id, style.id);
+                                closeDrawer();
+                              }}
+                            >
+                              <StylePagePreview styleId={style.id} photos={focusedContentPage?.photos ?? draft.photos} compact />
+                              <span><strong>{style.name}</strong><small>{style.pageNote}</small></span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <button
+                  type="button"
+                  className={styles.drawerCollapse}
+                  onClick={closeDrawer}
+                  aria-label={drawerKind === "photos" ? "Collapse photo menu" : "Collapse layout menu"}
+                >
+                  <Icon name="chevron" size={18} />
+                </button>
+              </section>
+            </div>
+          ) : null}
+        </>,
+        document.body,
+      ) : null}
     </section>
   );
 }
@@ -650,6 +854,7 @@ function createPointerIntent(
     startClientX: event.clientX,
     startClientY: event.clientY,
     allowFocusNavigation,
+    addPage: getAddPageTarget(event.target),
     moved: false,
   };
 }
@@ -665,6 +870,32 @@ function getPageIndex(target: EventTarget) {
   if (!page) return null;
   const value = Number(page.dataset.zinePageIndex);
   return Number.isInteger(value) ? value : null;
+}
+
+function getAddPageTarget(target: EventTarget) {
+  if (!(target instanceof Element)) return null;
+  const button = target.closest<HTMLElement>("[data-zine-add-page]");
+  const spreadId = button?.dataset.zineSpreadId;
+  const side = button?.dataset.zinePageSide;
+  if (!spreadId || (side !== "left" && side !== "right")) return null;
+  return { spreadId, side } as const;
+}
+
+function getPhotoUseCounts(spreads: ZineDraft["manualSpreads"]) {
+  const counts = new Map<string, number>();
+  for (const spread of spreads ?? []) {
+    for (const page of [spread.left, spread.right]) {
+      for (const photoId of page?.photoIds ?? []) {
+        counts.set(photoId, (counts.get(photoId) ?? 0) + 1);
+      }
+    }
+  }
+  return counts;
+}
+
+function getPhotoRatio(photo: { readonly width: number; readonly height: number }) {
+  if (photo.width <= 0 || photo.height <= 0) return "1";
+  return String(Math.min(1.8, Math.max(.72, photo.width / photo.height)));
 }
 
 function getSpreadStart(pageIndex: number) {

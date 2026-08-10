@@ -1,4 +1,11 @@
 import type { ZineDraft, ZinePhoto, ZineStyleId } from "./zine-draft";
+import {
+  createInitialManualSpreads,
+  pacePhotosForZine,
+  type ZineManualPage,
+  type ZineManualSpread,
+  type ZinePageSide,
+} from "./zine-manual-layout";
 
 export type ZineReaderPage =
   | {
@@ -24,6 +31,23 @@ export type ZineReaderPage =
       readonly side: "left" | "right";
     }
   | {
+      readonly id: string;
+      readonly kind: "blank";
+      readonly density: "soft";
+      readonly title: string;
+      readonly pageNumber: number;
+      readonly side: "left" | "right";
+    }
+  | {
+      readonly id: string;
+      readonly kind: "add";
+      readonly density: "soft";
+      readonly title: string;
+      readonly pageNumber: number;
+      readonly side: ZinePageSide;
+      readonly spreadId: string;
+    }
+  | {
       readonly id: "colophon";
       readonly kind: "colophon";
       readonly density: "soft";
@@ -46,6 +70,10 @@ const photosPerPage: Readonly<Record<ZineStyleId, number>> = {
  */
 export function createZineReaderPages(draft: ZineDraft): readonly ZineReaderPage[] {
   if (!draft.styleId) return [];
+
+  if (draft.manualSpreads !== null) {
+    return createPagesFromManualSpreads(draft, draft.manualSpreads, false);
+  }
 
   const orderedPhotos = pacePhotosForReader(draft.photos);
   const contentPages = chunk(orderedPhotos, photosPerPage[draft.styleId]).map(
@@ -81,21 +109,90 @@ export function createZineReaderPages(draft: ZineDraft): readonly ZineReaderPage
   return pages;
 }
 
+export function createManualEditorPages(draft: ZineDraft): readonly ZineReaderPage[] {
+  if (!draft.styleId) return [];
+  const spreads = draft.manualSpreads ?? createInitialManualSpreads(draft);
+  return createPagesFromManualSpreads(draft, spreads, true);
+}
+
 export function pacePhotosForReader(photos: readonly ZinePhoto[]): readonly ZinePhoto[] {
-  const paced: ZinePhoto[] = [];
-  let left = 0;
-  let right = photos.length - 1;
+  return pacePhotosForZine(photos);
+}
 
-  while (left <= right) {
-    paced.push(photos[right]);
-    right -= 1;
-    if (left <= right) {
-      paced.push(photos[left]);
-      left += 1;
-    }
+function createPagesFromManualSpreads(
+  draft: ZineDraft,
+  spreads: readonly ZineManualSpread[],
+  includeAddPages: boolean,
+) {
+  const photoById = new Map(draft.photos.map((photo) => [photo.id, photo]));
+  const pages: ZineReaderPage[] = [
+    { id: "cover", kind: "cover", density: "hard", title: draft.name },
+  ];
+  const visibleSpreads = includeAddPages
+    ? spreads
+    : spreads.filter((spread) => spread.left !== null || spread.right !== null);
+
+  for (const spread of visibleSpreads) {
+    pages.push(
+      createManualSidePage(draft, spread, "left", pages.length, photoById, includeAddPages),
+      createManualSidePage(draft, spread, "right", pages.length + 1, photoById, includeAddPages),
+    );
   }
+  pages.push({ id: "back", kind: "back", density: "hard", title: draft.name });
+  return pages;
+}
 
-  return paced;
+function createManualSidePage(
+  draft: ZineDraft,
+  spread: ZineManualSpread,
+  side: ZinePageSide,
+  pageNumber: number,
+  photoById: ReadonlyMap<string, ZinePhoto>,
+  includeAddPages: boolean,
+): ZineReaderPage {
+  const manualPage = spread[side];
+  if (manualPage) return manualPageToReaderPage(draft, manualPage, side, pageNumber, photoById);
+  if (includeAddPages) {
+    return {
+      id: `add-${spread.id}-${side}`,
+      kind: "add",
+      density: "soft",
+      title: draft.name,
+      pageNumber,
+      side,
+      spreadId: spread.id,
+    };
+  }
+  return {
+    id: `blank-${spread.id}-${side}`,
+    kind: "blank",
+    density: "soft",
+    title: draft.name,
+    pageNumber,
+    side,
+  };
+}
+
+function manualPageToReaderPage(
+  draft: ZineDraft,
+  page: ZineManualPage,
+  side: ZinePageSide,
+  pageNumber: number,
+  photoById: ReadonlyMap<string, ZinePhoto>,
+): ZineReaderPage {
+  return {
+    id: page.id,
+    kind: "content",
+    density: "soft",
+    title: draft.name,
+    styleId: page.styleId,
+    photos: page.photoIds.flatMap((id) => {
+      const photo = photoById.get(id);
+      return photo ? [photo] : [];
+    }),
+    pageNumber,
+    side,
+  };
 }
 
 function chunk<T>(items: readonly T[], size: number): readonly (readonly T[])[] {

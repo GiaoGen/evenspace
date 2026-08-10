@@ -1,4 +1,5 @@
 import Image from "next/image";
+import { Icon } from "@/components/ui/icon";
 import type { ZinePhoto } from "../../model/zine-draft";
 import type { ZineReaderPage } from "../../model/zine-pages";
 import styles from "./zine-reader.module.css";
@@ -18,7 +19,7 @@ export function ZineReaderPageView({
   readonly page: ZineReaderPage;
   readonly pageIndex: number;
 }) {
-  const sideClass = page.kind === "content" || page.kind === "colophon"
+  const sideClass = page.kind === "content" || page.kind === "colophon" || page.kind === "blank" || page.kind === "add"
     ? page.side === "left" ? styles.leftPage : styles.rightPage
     : "";
   const className = [
@@ -32,6 +33,7 @@ export function ZineReaderPageView({
       className={className}
       data-density={page.density}
       data-zine-page-index={pageIndex}
+      data-zine-manual-page-id={page.kind === "content" ? page.id : undefined}
       aria-label={getPageLabel(page)}
     >
       {page.kind === "cover" ? (
@@ -40,10 +42,28 @@ export function ZineReaderPageView({
         <BackCover title={page.title} />
       ) : page.kind === "colophon" ? (
         <Colophon title={page.title} pageNumber={page.pageNumber} />
-      ) : (
+      ) : page.kind === "add" ? (
+        <AddPage spreadId={page.spreadId} side={page.side} />
+      ) : page.kind === "blank" ? null : (
         <ContentPage page={page} />
       )}
     </article>
+  );
+}
+
+function AddPage({ spreadId, side }: { readonly spreadId: string; readonly side: "left" | "right" }) {
+  return (
+    <button
+      type="button"
+      className={styles.addPageButton}
+      data-zine-add-page="true"
+      data-zine-spread-id={spreadId}
+      data-zine-page-side={side}
+      aria-label={`Add ${side} page`}
+    >
+      <Icon name="plus" size={34} />
+      <span>Add page</span>
+    </button>
   );
 }
 
@@ -184,6 +204,8 @@ function PageFooter({ pageNumber }: { readonly pageNumber: number }) {
 function getPageLabel(page: ZineReaderPage) {
   if (page.kind === "cover") return `Cover: ${page.title}`;
   if (page.kind === "back") return `Back cover: ${page.title}`;
+  if (page.kind === "add") return `Add ${page.side} page`;
+  if (page.kind === "blank") return `Blank page ${page.pageNumber}`;
   return `Page ${page.pageNumber}: ${page.title}`;
 }
 

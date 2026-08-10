@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ZineDraft, ZinePhoto } from "./zine-draft";
-import { createZineReaderPages, pacePhotosForReader } from "./zine-pages";
+import { createManualEditorPages, createZineReaderPages, pacePhotosForReader } from "./zine-pages";
 
 function photo(id: string): ZinePhoto {
   return {
@@ -32,6 +32,7 @@ describe("zine reader pagination", () => {
       name: "Night notes",
       photos: [photo("one"), photo("two"), photo("three")],
       styleId: "editorial",
+      manualSpreads: null,
     };
     const pages = createZineReaderPages(draft);
 
@@ -46,10 +47,30 @@ describe("zine reader pagination", () => {
       name: "Contact",
       photos: [photo("1"), photo("2"), photo("3"), photo("4"), photo("5")],
       styleId: "contact",
+      manualSpreads: null,
     };
     const content = createZineReaderPages(draft).filter((page) => page.kind === "content");
 
     expect(content).toHaveLength(2);
     expect(content.map((page) => page.photos.length)).toEqual([4, 1]);
+  });
+
+  it("shows add pages only in the manual editor", () => {
+    const draft: ZineDraft = {
+      name: "Manual",
+      photos: [photo("one"), photo("two")],
+      styleId: "editorial",
+      manualSpreads: [
+        {
+          id: "spread-1",
+          left: { id: "page-1", styleId: "editorial", photoIds: ["one"] },
+          right: { id: "page-2", styleId: "editorial", photoIds: ["two"] },
+        },
+        { id: "spread-2", left: null, right: null },
+      ],
+    };
+
+    expect(createManualEditorPages(draft).filter((page) => page.kind === "add")).toHaveLength(2);
+    expect(createZineReaderPages(draft).some((page) => page.kind === "add")).toBe(false);
   });
 });
