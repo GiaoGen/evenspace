@@ -1,6 +1,6 @@
 # EventSpace Supabase 后端接入方案
 
-> 状态：2026-08-02 同步；首批后端基础任务已完成 8/8，BE-010 至 BE-022、
+> 状态：2026-08-10 同步；首批后端基础任务已完成 8/8，BE-010 至 BE-022、
 > DW-001 至 DW-010、2026-07-28 五项线上接入修复，以及头像/访客加入/真实 QR
 > 工作区改动均已记录；BE-009 支付规划按产品决策延期。
 > 建立日期：2026-07-27。  
@@ -706,12 +706,11 @@ Stripe Checkout 使用 Stripe 托管的支付页，应用不直接接触卡号�
 - 签名 Webhook、幂等 fulfillment 和退款事件。
 - room entitlement、配额和归档保留策略联动。
 
-### Phase 7 — Book MVP 候选设计
+### Phase 7 — 延后能力边界
 
-- 明确 Book 与 Photos 是同一份内容的阅读视图，还是独立编排聚合。
-- 完成交互原型、ERD、分页、版本控制和多人并发方案。
-- 通过范围评审后决定是否进入当前 MVP。
-- Book 未确认前不提前创建生产表。
+- Book/Zine、投票和自由 Board 不属于当前 MVP 实施路径，也没有当前生产表、RPC、迁移或验收任务。
+- 若未来重新启动 Book，必须重新提交产品、数据模型、权限、媒体快照和阅读器方案；不能恢复已撤回的历史实现或把菜单占位当作后端需求。
+- 当前阶段只维护 Photos 网格、照片详情/评论和 Rooms 照片预览；Book 相关内容不进入本阶段开发排期。
 
 ### Phase 8 — 生产化
 
@@ -1601,7 +1600,7 @@ Photos/语音 Storage、支付、Book 和投票仍按既定范围延后。
 - [x] **ROOM-MEDIA-002 前端读取兼容**：`data/supabase/media-variant-compat.ts` 在 variant 字段缺失或 PostgREST cache 未刷新时退回 legacy asset 字段，降低灰度期故障面；迁移完成后仍应以新 schema 为准。
 - [x] **ROOM-MEDIA-003 批量签名 URL**：`createSignedMediaUrls` 按 display/thumbnail 分组批量调用 Storage signed URL API，减少 Rooms 卡片和详情页逐图签名开销。
 - [x] **CACHE-001 Route snapshot**：`/rooms`、Room detail、Account 和 viewer avatar 增加 scope-bound 浏览器快照/头像缓存；写入前移除 signed URL，缓存只作为加载加速层。
-- [x] **CACHE-002 Room photo cache**：Room Photos 使用 `eventspace:room-photo-cache:v3`、display/thumbnail variant key 与 `media_revision` 做 IndexedDB read-through cache；401/403 作为签名 URL 过期处理并触发回源。
+- [x] **CACHE-002 Room photo cache**：Room Photos 使用 `eventspace:room-photo-cache:v3`、display/thumbnail variant key 与 `media_revision` 做 Cache Storage + IndexedDB read-through cache；401/403 作为签名 URL 过期处理并触发回源。
 - [x] **TEST-002 数据库覆盖**：新增 `025-room-card-media-projection.test.sql`，覆盖 authenticated 可执行、anon 禁止、投影返回超过旧 5 张限制、`photo_count` 正确以及 schema version 为 2。
 
 **仍需云端/环境验收**：
@@ -1611,3 +1610,21 @@ Photos/语音 Storage、支付、Book 和投票仍按既定范围延后。
 - [ ] 运行 `npm run supabase:test:db`，确认 023/024/025 以及既有 RLS 测试在云端测试环境通过。
 - [ ] 真机验证大图上传、HEIC/Live Photo 静态化、Worker fallback、thumbnail 显示、房间卡片超过 5 张照片横滑、签名 URL 过期刷新和清除站点数据后的重新回源。
 - [ ] 服务端媒体净化仍未完成：magic number、可信图像解码/重编码、EXIF 清理证明、恶意文件扫描、孤立 pending asset 清理和引用计数删除仍是上线前 P0。
+
+## 20. 2026-08-10 房间成员偏好与图片缓存解析
+
+> 状态：代码、migration 和本地数据库测试已进入 `main`；目标 Supabase 云项目的应用状态仍需 CLI / Dashboard 复核。
+
+- [x] **ROOM-PREF-001 成员级偏好字段**：`public.room_members` 新增 `is_favorite` 与 `hidden_at`；偏好绑定当前 membership，不改变房间共享属性或成员资格。
+- [x] **ROOM-PREF-002 读取投影**：`list_current_user_rooms` / `get_current_user_room` 返回 `viewer_is_favorite`；Rooms collection 排除 `hidden_at` 非空的个人入口，但直接房间读取仍按原有成员授权执行。
+- [x] **ROOM-PREF-003 写入 RPC 与权限**：`security.set_current_user_room_favorite` / `security.set_current_user_room_hidden` 负责校验当前 primary actor、active/muted membership、room 可读权限和公开 ID；public wrapper 使用 `security invoker`，只向 `authenticated` 授予执行权限，隐藏时清除收藏。
+- [x] **ROOM-PREF-004 前端 mutation**：`setRoomFavoriteAction` / `hideRoomAction` 使用 Server Action 和 `revalidatePath("/rooms")`；Rooms Edit 模式先乐观更新，失败恢复原状态。
+- [x] **CACHE-003 双层图片缓存**：授权图片同时尝试写入 Cache Storage `eventspace-cloud-images-v1` 与 IndexedDB；读取按 scope、asset、variant、revision 查找，display 缺失时回退 thumbnail，缓存失败不阻断云端上传。
+- [x] **TEST-003 数据库覆盖**：`026-room-member-preferences.test.sql` 覆盖字段、authenticated/anon execute 权限、security invoker/definer 边界、收藏投影、隐藏与恢复、跨用户拒绝和 schema version。
+
+**仍需云端/环境验收**：
+
+- [ ] 应用 `20260810014728_room_member_preferences.sql` 到目标 Supabase 项目，确认 PostgREST schema reload 后四个 public RPC 可用。
+- [ ] 重新生成并比对 `data/supabase/database.types.ts`，确认 `room_members` 字段、`viewer_is_favorite` 和两个 preference RPC 参数一致。
+- [ ] 运行 `npm run supabase:test:db`，确认 026 与既有成员、头像、媒体 RLS 测试通过。
+- [ ] 补真机/浏览器验证：双账号偏好隔离、隐藏后直接访问、恢复可见性、Server Action 失败回滚、Cache Storage 不可用、IndexedDB 配额失败和签名 URL 过期回源。

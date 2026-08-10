@@ -1,6 +1,6 @@
 # EventSpace 交互式 Mock 覆盖与边界
 
-> 状态：2026-08-02。正式产品路由已经进入 Supabase-backed 封闭 MVP 接线阶段；本文继续用于区分“本地 mock/fallback”“真实云端能力”“浏览器加速缓存”和“尚未达到生产安全承诺”的边界。
+> 状态：2026-08-10。正式产品路由已经进入 Supabase-backed 封闭 MVP 接线阶段；本文继续用于区分“本地 mock/fallback”“真实云端能力”“浏览器加速缓存”和“尚未达到生产安全承诺”的边界。
 
 ## 1. Mock 会话模型
 
@@ -16,7 +16,7 @@
 | 路由 | 当前可操作能力 |
 | --- | --- |
 | `/` | Landing、创建入口、样例邀请、账户与法律入口 |
-| `/rooms` | 读取当前 Supabase session 可见房间，All/Active/Achieved/Favorite、原位搜索、Magazine/Grid、真实横滑进度、照片牌堆预览、账号头像入口；Grid 偏好和 Magazine 最近卡片在当前标签页恢复 |
+| `/rooms` | 读取当前 Supabase session 可见房间，All/Active/Achieved/Favorite、原位搜索、Magazine/Grid、真实横滑进度、照片牌堆预览、账号头像入口；收藏和移除个人列表写入当前成员偏好，Grid 偏好和 Magazine 最近卡片在当前标签页恢复 |
 | `/rooms/new` | 登录门槛、三步创建状态机、草稿恢复、真实创建 RPC、真实 invite token/code、可扫描邀请 QR 和邀请卡 PNG 导出 |
 | `/rooms/[roomId]` | Chat / Photos / Itinerary 原生横滑切页、Room options、照片上传/详情评论、行程编辑 Portal、归档与访问终止状态 |
 | `/join` | 真实 8 位邀请码解析、失效反馈、跳转到当前有效邀请 |
@@ -58,6 +58,7 @@
 - `/rooms` 的 Grid 偏好使用 `sessionStorage` 键 `eventspace:rooms:grid`；`eventspace:rooms:active-room` 记录 Magazine 最近居中或打开的房间，以便返回列表时恢复位置。两者均不属于 `MockSession`，刷新当前标签页通常保留，关闭标签页、清除站点数据或换设备不保证保留。
 - `/rooms` 与 Room detail 另有 route snapshot cache，保存去签名 URL 的房间列表/详情展示快照；它只用于加速加载，页面仍以 Supabase 权威快照覆盖。
 - Grid 卡片的照片牌堆只限制同时可见和预渲染窗口；`list_room_card_media` 已返回房间全部 ready photos，卡片横滑和 Room Photos 不再被旧的 5 张 SQL 投影裁剪。
+- `/rooms` Edit 模式中的 Favorite 写入当前 membership 的 `is_favorite`；移除个人列表写入 `hidden_at`，只影响当前用户的 Rooms 集合。隐藏房间仍可通过直接房间路由读取，后端恢复可见性时会清除 `hidden_at`。
 
 ### 治理与生命周期
 
@@ -96,10 +97,17 @@
 ## 2026-08-02 当前同步：浏览器加速缓存与媒体变体
 
 - Photos 上传的云端路径已经是 display / thumbnail / placeholder 三件套；Rooms 卡片优先使用 thumbnail，详情页使用 display，legacy asset 缺少 variant 字段时才回退单图。
-- Room Photos 的 IndexedDB 图片缓存是 cloud image read-through cache，不是新的本地业务数据源；缓存键包含 scope、asset id、variant 和 revision，权限变化或签名 URL 过期后仍必须回源。
+- Room Photos 的 Cache Storage + IndexedDB 图片缓存是 cloud image read-through cache，不是新的本地业务数据源；缓存键包含 scope、asset id、variant 和 revision，权限变化或签名 URL 过期后仍必须回源。
 - Account snapshot、Rooms snapshot、Room detail snapshot 和 viewer avatar cache 都会剥离 signed URL 再保存；这些缓存不能被描述为离线访问、跨设备同步或生产授权。
 - Rooms 卡片照片牌堆新增确定性入场、decode 协调和 Grid/Magazine 淡入淡出；这些是 UI/性能状态，不进入 `MockSession` 或 Supabase。
 - `page-flip` 已从依赖中移除；Book 仍是延期能力，不存在隐藏的运行时翻页包。
+
+## 2026-08-10 当前同步：成员偏好与缓存解析
+
+- `/rooms` 的 Favorite 与“从个人列表移除”已经是 authenticated-only 的 Supabase Server Action / RPC 路径；它们不是本地 mock 命令，也不是当前标签页偏好。隐藏只改变当前 member 的 collection visibility，不删除 membership 或 room access。
+- `list_current_user_rooms` 和 `get_current_user_room` 都返回 `viewer_is_favorite`；隐藏的房间从 Rooms collection 排除，但直接 room route 仍可读取。
+- 图片授权缓存现在同时使用 Cache Storage `eventspace-cloud-images-v1` 与 IndexedDB；读取优先使用同 scope、同 variant、同 revision 的缓存，display 可作为更小请求的 fallback，缺失或签名失效时仍需回源。
+- Book/Zine 没有正式路由、数据模型、迁移或运行时阅读器；Rooms 菜单中的 `Book / Later` 只是禁用占位，不代表已实现或已进入当前 MVP。
 
 ## 2026-07-18 历史同步：旧本地优先 Mock 覆盖
 

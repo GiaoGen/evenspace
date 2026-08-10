@@ -1,13 +1,13 @@
 # EventSpace 类型化 Mock MVP 架构
 
-> 状态：2026-08-02 历史 Mock 架构与当前兼容壳说明。正式房间已接入 Supabase；`MockSession` 仍服务本地 mock、旧数据兼容和云端 UI contract，不再代表全部业务真相。
+> 状态：2026-08-10 历史 Mock 架构与当前兼容壳说明。正式房间已接入 Supabase；`MockSession` 仍服务本地 mock、旧数据兼容和云端 UI contract，不再代表全部业务真相。
 
 ## 1. 可运行范围
 
 | 路由 | 类型 | 当前能力 |
 | --- | --- | --- |
 | `/` | Server Component | 正式 Landing；进入房间列表或样例房间 |
-| `/rooms` | Server page + Client collection | 读取当前 mock viewer 的房间；状态筛选、搜索、杂志/双列视图、本地收藏 |
+| `/rooms` | Server page + Client collection | 读取当前 viewer 的 Supabase 房间集合；状态筛选、搜索、杂志/双列视图、成员级收藏/隐藏偏好 |
 | `/rooms/[roomId]` | Server page + Client experience | 校验参数并鉴权读取；通过顶部常驻按钮切换 Chat、Photos、Itinerary |
 | `/rooms/new` | Client state machine | 三步创建向导、逐步校验和明确的本地 Mock 完成态 |
 | `/join/[roomId]` | Server preview + Client wait state | 邀请预览、昵称、账号头像带入、anonymous guest、等待与审核结果轮询 |
@@ -198,6 +198,12 @@ data/rooms.ts           server-only 数据访问入口和最小 View DTO
 - 房间卡片照片数据现在由 `list_room_card_media` read model 返回全部 ready photos；`features/rooms/model/photo-stack-window.ts` 只控制可见/隐藏预渲染窗口，不能被理解为数据裁剪。
 - 图片处理链路拆到 `image-upload.ts` 与 `image-processing.worker.ts`：前者负责编排和主线程 fallback，后者负责 display/thumbnail/placeholder 生成。`compressImage` 只作为旧兼容入口，不应继续扩展。
 - Route loading skeleton 属于 App Router 页面体验层；它不改变数据契约、权限或 `MockSession` 恢复规则。
+
+## 2026-08-10 当前同步：服务端成员偏好与双层图片缓存
+
+- `RoomReadModel.viewer.isFavorite` 来自 `viewer_is_favorite`；Rooms 的 Favorite 筛选不再依赖本地 mock 收藏字段。`setRoomFavoriteAction` 和 `hideRoomAction` 是当前 `/rooms` Edit 模式的 Server Action 边界，失败会回滚乐观状态。
+- `room_members.is_favorite` / `hidden_at` 属于当前 membership，不是全局 room 属性。隐藏只从当前成员的 collection 查询中排除房间，直接 room read 仍以成员授权为准。
+- `features/local-assets` 现在把已授权图片同时写入 Cache Storage 和 IndexedDB；`readBestCachedImage` 先找 display，再在有 thumbnail 时回退 thumbnail。缓存 key 仍由 scope、asset、variant、revision 决定，不能被 `MockSession` 或普通 asset prune 当作业务数据处理。
 
 ## 2026-07-27 当前同步：浏览器导航状态
 

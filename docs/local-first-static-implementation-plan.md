@@ -1,6 +1,6 @@
 # EventSpace 本地优先静态实现计划
 
-> 状态：2026-08-02 历史计划；本地优先阶段已被 Supabase-backed 封闭 MVP 接线覆盖，当前本地存储只承担 mock/fallback、上传前临时 Blob、旧数据兼容与云端读取加速。
+> 状态：2026-08-10 历史计划；本地优先阶段已被 Supabase-backed 封闭 MVP 接线覆盖，当前本地存储只承担 mock/fallback、上传前临时 Blob、旧数据兼容与云端读取加速。
 > 目标：在不接入后端的前提下，将当前可操作 Mock 逐步改造成移动端优先、真实本地数据驱动、可被后端 Repository 替换的完整静态版本。  
 > 原则：不再把页面写死为样例 Mock；本地浏览器数据是当前真相来源，未来 Supabase/Postgres 是同一领域命令的远端真相来源。
 
@@ -192,7 +192,13 @@
 
 - 浏览器本地存储新增一类“云端读取加速”职责，但它仍不改变业务真相来源：Account snapshot、Rooms snapshot、Room detail snapshot、viewer avatar cache 和 room photo cache 都必须被视为可丢弃缓存。
 - `localStorage` 中的 route/account/avatar snapshot 保存 scope-bound 展示数据，且写入前剥离 signed URL；它们不能支持离线访问私密房间，也不能跨账号复用。
-- IndexedDB `eventspace-local-assets` 继续保存旧本地 mock Blob，同时保存云端 display/thumbnail read-through cache。云端缓存键包含 asset id、variant 和 revision，revision 变化后旧 Blob 应视为过期。
+- IndexedDB `eventspace-local-assets` 与 Cache Storage `eventspace-cloud-images-v1` 共同保存云端 display/thumbnail read-through cache；旧本地 mock Blob 仍在 IndexedDB。云端缓存键包含 viewer scope、asset id、variant 和 revision，revision 变化后旧 Blob 应视为过期。
 - Room photo cache v3 的优先级策略是性能实现：当前照片、前后窗口和前 12 张网格缩略图优先，其余缩略图/显示图后台下载；它不是新建照片排序、收藏或归档规则。
 - `/rooms` 的照片牌堆 entry animation、decode 协调和布局 fade 只属于 UI 状态；本地计划不再把这类状态提升为 repository 或 command。
 - 下一步本地侧只保留缓存失效、存储配额失败、签名 URL 过期回源和清站点数据恢复提示；不再把 PWA 离线房间内容、Book、投票或自由 Board 作为本地优先主线推进。
+
+## 2026-08-10 当前同步：成员偏好不进入本地优先层
+
+- Rooms 的 `is_favorite` 与 `hidden_at` 是当前 membership 的服务端偏好；本地 route snapshot 只能加速展示，不能决定 Favorites 筛选或个人列表可见性。
+- 隐藏房间不是本地删除，也不是退出房间。后端仍允许当前成员通过直接房间路由读取，恢复 collection visibility 时由 authenticated RPC 清除 `hidden_at`。
+- 图片缓存解析新增 display 优先、thumbnail 回退和 Cache Storage / IndexedDB 双写；这些缓存可以丢失、重建或因 scope/revision 变化而失效，不扩大本地离线能力。

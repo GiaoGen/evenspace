@@ -1,9 +1,9 @@
 # EventSpace 当前任务记录
 
-> 最后更新：2026-08-02
+> 最后更新：2026-08-10
 > 用途：记录最近任务做了什么、当前真实进度、验证结果、遗留事项和下一步。  
 > 规则：本文件保持为当前阶段活文档；更早阶段摘要迁移到 [`history_taks.md`](./history_taks.md)。  
-> 本次同步范围：基于 `git log` / `git diff c70547e..HEAD` 的文档校准；只同步文档，不修改业务代码。
+> 本次同步范围：基于 `main` 的最新提交 `7981e16` 及其父提交校准；只同步文档，不修改业务代码。
 
 ## 项目当前状态
 
@@ -12,13 +12,34 @@
 - 结构化本地会话 `eventspace:local-session:v1` 与 IndexedDB `eventspace-local-assets` 继续服务本地 mock、录音/图片采集的上传前临时 Blob，以及旧数据兼容；它不是云端业务真相。
 - 当前已经支持创建真实 Host-led 房间、真实邀请 token/code、可扫描 QR、匿名访客加入、待审核轮询、Host 审批、账号资料和头像上传、房间列表/详情、文字/语音 Chat、Photos 上传/评论/删除、行程和成员治理。Room 内联投票、Book 与回忆录编辑器仍不在当前正式范围。
 - 图片、语音与头像均走 `assets` + 私有 `room-media` Storage + 短期签名 URL；图片上传当前生成 display / thumbnail / placeholder / dimensions / revision 元数据，客户端仍需先持有本地 Blob 才能上传，服务端负责成员资格、状态、配额、对象归属和 variant 字段约束校验。
-- `/rooms`、`/rooms/[roomId]`、`/account` 和 viewer avatar 已增加浏览器快照/头像缓存与 IndexedDB 云端图片 read-through cache。它们只保存去签名 URL 的展示快照或媒体 Blob 加速读取，不是跨设备业务真相；权限、签名和最终内容仍以 Supabase 为准。
+- `/rooms`、`/rooms/[roomId]`、`/account` 和 viewer avatar 已增加浏览器快照/头像缓存与 Cache Storage + IndexedDB 云端图片 read-through cache。它们只保存去签名 URL 的展示快照或媒体 Blob 加速读取，不是跨设备业务真相；权限、签名和最终内容仍以 Supabase 为准。
+- `/rooms` 的收藏和“从个人列表移除”已经写入当前成员的 Supabase `room_members` 偏好；前端先乐观更新，Server Action 失败时回滚并显示错误。隐藏只影响当前成员的 Rooms 列表，不撤销该成员进入房间的权限。
 - 后端范围已冻结：仅 Host-led；Chat 文本/语音；Photos 与 Itinerary 进入首期；Stripe 一次性房间支付进入 MVP 但当前免费/封闭测试不阻塞；Book 延后设计，投票继续延后。
 - 后端实施、验收和任务 Mark 统一以 [`supabase-backend-integration-plan.md`](./supabase-backend-integration-plan.md) 为主计划书。
 - 生产构建不再依赖远程 Google Fonts / `next/font` 拉取；字体资源已通过 `public/fonts` 的本地 `@font-face` 加载，保留 Bodoni 衬线标题风格。
 - `/prototype` 系列路由只作为视觉历史参考，不再代表当前功能完成度。
 
 ## 最近完成任务
+
+### TASK-028 - 房间成员偏好与图片缓存解析同步
+
+- 日期：2026-08-10
+- 状态：代码和 migration 文件已进入 `main`；Supabase 云项目是否已应用 migration、远端 RPC 是否已刷新，仍需环境验收。
+- 完成内容：
+  - `room_members` 新增成员级 `is_favorite` 与 `hidden_at`；`list_current_user_rooms` / `get_current_user_room` 返回当前 viewer 的收藏状态，并对隐藏房间保留直接房间路由可读性。
+  - 新增 `set_current_user_room_favorite` / `set_current_user_room_hidden`，通过 authenticated-only 的 Server Action 写入，服务端校验当前 primary actor、成员状态、房间可读权限和公开 ID；隐藏时同步清除收藏。
+  - `/rooms` Edit 模式支持收藏切换和移除个人列表；操作先更新界面，RPC 失败后恢复原顺序/状态。Favorites 筛选使用服务端返回的成员偏好。
+  - 云端图片缓存增加 Cache Storage `eventspace-cloud-images-v1`，IndexedDB 作为并行持久化/回退；缓存键继续按 viewer scope、asset、variant 和 revision 隔离。display rendition 可满足更小的图片请求，缺失时才回退 thumbnail 或重新签名读取。
+  - IndexedDB 写入等待 transaction 完成后才返回；图片上传完成后尝试同时缓存 display 与 thumbnail，缓存失败不阻断云端上传。
+- 真实能力边界：
+  - 收藏和隐藏是当前用户/当前 membership 的真实后端偏好，不是 `MockSession` 或浏览器 `sessionStorage` 状态；隐藏不删除 membership，也不改变房间授权。
+  - 图片 Cache Storage / IndexedDB 只保存已经授权读取过的 Blob，不能离线授予访问权；快照仍剥离 signed URL，权限和最新内容继续以 Supabase 为准。
+- 已知问题：
+  - `set_current_user_room_hidden(false)` 已有后端契约和数据库测试覆盖，但当前 `/rooms` UI 只暴露隐藏入口；恢复隐藏房间需要直接房间访问或后续补恢复入口。
+  - `20260810014728_room_member_preferences.sql`、数据库测试 026 和远端生成 types 仍需在目标 Supabase 项目复核；当前本地没有云端权限证明已部署。
+- 验证：`npm run check` 通过，`npm run build` 通过（Next.js 16.2.10），`npm test` 通过（42 个测试文件、150 个测试），`git diff --check` 通过且无 whitespace error。
+- 环境限制：`npm run supabase:types:check` 因缺少 `SUPABASE_ACCESS_TOKEN` 未执行远端校验；`npm run supabase:test:db` 因 Supabase CLI 无法写入 `C:\Users\giaog\.supabase\telemetry.json.tmp.*`（EPERM）未完成数据库测试。
+- 下一步：应用并复核 room member preferences migration，运行数据库测试 026 及既有 RLS 测试；在两个账号间验证偏好隔离、隐藏后的直达房间、恢复可见性和失败回滚。
 
 ### TASK-027 - 媒体变体、路线快照与 Rooms 性能同步
 

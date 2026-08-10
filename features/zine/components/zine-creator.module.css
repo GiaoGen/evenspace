@@ -1,0 +1,608 @@
+.page {
+  --zine-footer-height: 82px;
+  min-height: 100dvh;
+  overflow-x: hidden;
+  background: var(--canvas);
+  color: var(--ink);
+  font-family: var(--font-geist-sans), Arial, sans-serif;
+}
+
+.header {
+  position: sticky;
+  z-index: 40;
+  top: 0;
+  height: 56px;
+  display: grid;
+  grid-template-columns: 42px 1fr 42px;
+  align-items: center;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--line);
+  background: color-mix(in srgb, var(--canvas) 96%, transparent);
+  backdrop-filter: blur(16px);
+}
+
+.header > a {
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  color: inherit;
+  text-decoration: none;
+}
+
+.header > strong {
+  justify-self: center;
+  font-size: 11px;
+  font-weight: 760;
+  letter-spacing: -.01em;
+}
+
+.header > span {
+  justify-self: end;
+  color: var(--muted);
+  font-size: 7px;
+  font-weight: 680;
+}
+
+.stepNavigation {
+  position: sticky;
+  z-index: 35;
+  top: 56px;
+  min-height: 48px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 28px;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 14px 7px;
+  border-bottom: 1px solid var(--line);
+  background: color-mix(in srgb, var(--canvas) 96%, transparent);
+  backdrop-filter: blur(16px);
+}
+
+.stepNavigation ol {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 5px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.stepNavigation button {
+  width: 100%;
+  min-width: 0;
+  display: grid;
+  gap: 5px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 6px;
+  font-weight: 680;
+  text-align: left;
+  cursor: pointer;
+}
+
+.stepNavigation button:disabled { cursor: default; opacity: .42; }
+.stepNavigation button i { height: 2px; border-radius: 99px; background: var(--line); }
+.stepNavigation .currentStep button,
+.stepNavigation .completedStep button { color: var(--ink); }
+.stepNavigation .currentStep button i,
+.stepNavigation .completedStep button i { background: var(--ink); }
+.stepNavigation > b { color: var(--muted); font-size: 7px; font-weight: 650; text-align: right; }
+
+.form { min-height: calc(100dvh - 104px); }
+.stepContent { padding: 24px 14px calc(var(--zine-footer-height) + 32px); animation: stepIn 260ms cubic-bezier(.2, .8, .22, 1) both; }
+.nameStep,
+.photosStep,
+.styleStep,
+.overviewStep { width: min(100%, 1180px); margin: 0 auto; }
+.nameStep { width: min(100%, 720px); }
+
+.stepIntro { margin-bottom: 22px; }
+.stepIntro > span {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--muted);
+  font-size: 8px;
+  font-weight: 760;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.stepIntro h1 {
+  max-width: 680px;
+  margin: 0;
+  font: 760 clamp(30px, 9.4vw, 46px)/.98 var(--font-geist-sans), Arial, sans-serif;
+  letter-spacing: -.055em;
+}
+
+.stepIntro p {
+  max-width: 520px;
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.nameCardStack { position: relative; isolation: isolate; padding: 9px 5px 0; }
+.nameCardStack > i {
+  position: absolute;
+  z-index: -1;
+  inset: 0 7px;
+  display: block;
+  border: 1px solid var(--line);
+  border-radius: 19px;
+  background: var(--surface-2);
+  transform-origin: 50% 100%;
+  transition: transform 220ms cubic-bezier(.2, .78, .25, 1);
+}
+
+.backPageOne { transform: translateY(1px) rotate(-1.3deg); }
+.backPageTwo { transform: translateY(5px) rotate(1.4deg); }
+.nameCardStack:focus-within .backPageOne { transform: translate(-3px, -2px) rotate(-2.2deg); }
+.nameCardStack:focus-within .backPageTwo { transform: translate(3px, 1px) rotate(2.2deg); }
+
+.nameCard {
+  position: relative;
+  min-height: 390px;
+  display: flex;
+  flex-direction: column;
+  padding: 20px;
+  border: 1px solid transparent;
+  border-radius: 18px;
+  background: var(--surface);
+  box-shadow: 0 18px 42px rgba(39, 34, 27, .09);
+  transition: border-color 180ms ease, transform 180ms ease, box-shadow 180ms ease;
+}
+
+.nameCard:focus-within {
+  border-color: color-mix(in srgb, var(--ink) 38%, transparent);
+  box-shadow: 0 22px 50px rgba(39, 34, 27, .12);
+  transform: translateY(-2px);
+}
+
+.nameCardInvalid { border-color: #98534b; }
+.nameCardMeta { display: flex; justify-content: space-between; color: var(--muted); font-size: 7px; }
+.nameCardMeta span { font-weight: 760; letter-spacing: .08em; text-transform: uppercase; }
+.nameCardMeta b { font-weight: 620; }
+
+.nameCard textarea {
+  width: 100%;
+  min-height: 175px;
+  margin: 31px 0 4px;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: inherit;
+  font: 760 clamp(40px, 12vw, 64px)/.9 var(--font-geist-sans), Arial, sans-serif;
+  letter-spacing: -.065em;
+  resize: none;
+}
+
+.nameCard textarea::placeholder { color: color-mix(in srgb, var(--muted) 42%, transparent); }
+.nameCard > p { margin: 0; color: var(--muted); font-size: 8px; }
+.nameCard > p.fieldError { margin-top: 5px; color: #8c4039; font-weight: 700; }
+
+.spinePreview {
+  min-height: 48px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  margin-top: auto;
+  padding: 0 14px;
+  border-radius: 7px;
+  background: var(--ink);
+  color: var(--canvas);
+}
+
+.spinePreview span,
+.spinePreview small { font-size: 6px; font-weight: 720; letter-spacing: .08em; text-transform: uppercase; }
+.spinePreview strong { overflow: hidden; font-size: 9px; font-weight: 720; text-align: center; text-overflow: ellipsis; white-space: nowrap; }
+
+.photoWorkspace {
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  background: var(--surface-2);
+  box-shadow: 0 16px 38px rgba(39, 34, 27, .07);
+  transition: border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.photoWorkspaceDragging { border-color: var(--ink); box-shadow: 0 0 0 3px color-mix(in srgb, var(--ink) 9%, transparent); }
+.photoWorkspaceHeader {
+  min-height: 58px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 10px 12px 10px 16px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.photoWorkspaceHeader span,
+.photoWorkspaceHeader strong,
+.photoWorkspaceHeader small { display: block; }
+.photoWorkspaceHeader strong { font-size: 9px; font-weight: 740; }
+.photoWorkspaceHeader small { margin-top: 3px; color: var(--muted); font-size: 7px; }
+.addMoreButton {
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 11px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--canvas);
+  font-size: 8px;
+  font-weight: 720;
+  cursor: pointer;
+}
+
+.photoWorkspaceBody {
+  min-height: 514px;
+  display: flex;
+  gap: 10px;
+  padding: 10px;
+}
+
+.photoWorkspaceEmpty {
+  position: relative;
+  align-items: center;
+  justify-content: center;
+}
+
+.uploadCard {
+  width: 138px;
+  min-width: 138px;
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 18px 12px;
+  border: 1px dashed color-mix(in srgb, var(--muted) 58%, transparent);
+  border-radius: 15px;
+  background: color-mix(in srgb, var(--surface) 76%, transparent);
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 160ms ease, background 160ms ease, transform 160ms ease;
+}
+
+.uploadCard:hover { border-color: var(--ink); background: var(--surface); }
+.uploadCard:active { transform: scale(.985); }
+.uploadCard > span {
+  width: 43px;
+  height: 43px;
+  display: grid;
+  place-items: center;
+  margin-bottom: 13px;
+  border-radius: 14px;
+  background: var(--ink);
+  color: var(--canvas);
+}
+.uploadCard strong { font-size: 10px; }
+.uploadCard small { margin-top: 7px; color: var(--muted); font-size: 7px; line-height: 1.45; }
+.photoWorkspaceEmpty .uploadCard { width: min(100%, 280px); min-height: 290px; }
+.emptyPhotoHint { position: absolute; right: 0; bottom: 18px; left: 0; margin: 0; color: var(--muted); font-size: 7px; text-align: center; }
+
+.photoRail {
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  padding-bottom: 2px;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--ink) 28%, transparent) transparent;
+}
+
+.photoRows { width: max-content; min-width: 100%; display: grid; gap: 10px; }
+.photoRow { min-height: 241px; display: flex; align-items: stretch; gap: 10px; }
+.photoRow:nth-child(2) { padding-left: 42px; }
+.photoCard {
+  width: clamp(164px, calc(178px * var(--photo-ratio)), 300px);
+  min-width: clamp(164px, calc(178px * var(--photo-ratio)), 300px);
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 15px;
+  background: var(--surface);
+  box-shadow: 0 8px 18px rgba(39, 34, 27, .07);
+}
+
+.photoImage { position: relative; height: 171px; display: grid; place-items: center; overflow: hidden; background: color-mix(in srgb, var(--canvas) 70%, var(--surface-2)); }
+.photoImage img { width: 100%; height: 100%; object-fit: contain; }
+.photoImage button {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 31px;
+  height: 31px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid rgba(35, 32, 28, .15);
+  border-radius: 10px;
+  background: rgba(255, 253, 249, .94);
+  color: #302e2a;
+  box-shadow: 0 4px 12px rgba(35, 32, 28, .12);
+  cursor: pointer;
+}
+
+.photoCard > label { display: block; padding: 10px 11px 11px; }
+.photoCard > label > span { display: flex; align-items: center; justify-content: space-between; color: var(--muted); font-size: 6px; font-weight: 720; letter-spacing: .05em; text-transform: uppercase; }
+.photoCard > label small { font: inherit; letter-spacing: 0; }
+.photoCard input { width: 100%; margin-top: 7px; padding: 0; overflow: hidden; border: 0; outline: 0; background: transparent; color: inherit; font-size: 8px; text-overflow: ellipsis; white-space: nowrap; }
+.photoCard input::placeholder { color: color-mix(in srgb, var(--muted) 68%, transparent); }
+.photoCard:focus-within { border-color: color-mix(in srgb, var(--ink) 42%, transparent); }
+
+.photoFootnote { margin: 11px 4px 0; color: var(--muted); font-size: 7px; text-align: center; }
+.uploadError { margin: 9px 4px 0; color: #8c4039; font-size: 8px; font-weight: 680; text-align: center; }
+.visuallyHidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; clip-path: inset(50%); }
+
+.styleWorkspace {
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  background: var(--surface-2);
+  box-shadow: 0 16px 38px rgba(39, 34, 27, .07);
+}
+
+.styleWorkspaceHeader {
+  min-height: 58px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.styleWorkspaceHeader strong { font-size: 9px; font-weight: 740; }
+.styleWorkspaceHeader small { color: var(--muted); font-size: 7px; }
+.styleRail {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: min(76vw, 292px);
+  gap: 14px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  padding: 16px 16px 19px;
+  scroll-padding-inline: 16px;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--ink) 28%, transparent) transparent;
+}
+
+.styleOption {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  scroll-snap-align: start;
+}
+
+.stylePage {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+  aspect-ratio: 3 / 4;
+  padding: 14px;
+  border: 1px solid rgba(38, 35, 30, .14);
+  border-radius: 0;
+  background: #f5f1e9;
+  color: #20201d;
+  box-shadow: 0 13px 26px rgba(35, 30, 24, .14);
+  transition: box-shadow 170ms ease, transform 170ms ease;
+}
+
+.styleOption:hover .stylePage { transform: translateY(-2px); }
+.styleOptionSelected .stylePage { box-shadow: 0 0 0 3px var(--ink), 0 15px 30px rgba(35, 30, 24, .16); }
+.stylePage small,
+.stylePage strong,
+.stylePage p { position: relative; z-index: 2; margin: 0; font-family: var(--font-geist-sans), Arial, sans-serif; }
+.stylePage small { font-size: 5px; font-weight: 720; letter-spacing: .08em; }
+.stylePage p { font-size: 5px; line-height: 1.35; }
+.pagePhoto,
+.pagePhotoPlaceholder { position: relative; z-index: 1; display: grid; place-items: center; overflow: hidden; background: #d6d0c5; }
+.pagePhoto img { width: 100%; height: 100%; object-fit: contain; }
+.pagePhotoPlaceholder { background: #c9c2b7; }
+
+.pageEditorial { display: grid; grid-template-rows: auto auto minmax(0, 1fr) auto; gap: 11px; }
+.pageEditorial > strong { font-size: 22px; font-weight: 780; line-height: .86; letter-spacing: -.065em; }
+.pageEditorial > .pagePhoto,
+.pageEditorial > .pagePhotoPlaceholder { width: 82%; height: 100%; justify-self: end; background: #ddd7cd; }
+.pageEditorial > p { justify-self: end; width: 64%; text-align: right; }
+
+.pageContact { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; gap: 11px; }
+.pageContact > header,
+.pageSplit > header,
+.pageNight > header { display: flex; align-items: flex-start; justify-content: space-between; }
+.pageContact > header strong { font-size: 13px; line-height: .85; letter-spacing: -.05em; }
+.contactTiles { min-height: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: repeat(2, minmax(0, 1fr)); gap: 5px; }
+.contactTiles .pagePhoto,
+.contactTiles .pagePhotoPlaceholder { width: 100%; height: 100%; background: #ddd8cf; }
+
+.pageMargin { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; gap: 15px; padding: 20px; }
+.pageMargin > small { justify-self: end; }
+.pageMargin > .pagePhoto,
+.pageMargin > .pagePhotoPlaceholder { width: 68%; height: 76%; align-self: center; justify-self: center; background: #dcd6cc; }
+.pageMargin > p { width: 68%; justify-self: end; text-align: right; }
+
+.pageSplit { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; gap: 10px; }
+.pageSplit > header strong { font-size: 10px; letter-spacing: -.035em; }
+.splitTiles { min-height: 0; display: grid; grid-template-rows: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.splitTiles .pagePhoto,
+.splitTiles .pagePhotoPlaceholder { width: 100%; height: 100%; background: #d9d4ca; }
+.pageSplit > p { width: 75%; }
+
+.pageNight { display: grid; grid-template-rows: auto minmax(0, 1fr) auto auto; gap: 10px; background: #20211f; color: #f3efe7; }
+.pageNight > .pagePhoto,
+.pageNight > .pagePhotoPlaceholder { width: 78%; height: 100%; justify-self: center; background: #343532; }
+.pageNight > strong { font-size: 19px; font-weight: 780; line-height: .84; letter-spacing: -.055em; }
+.pageNight > p { width: 72%; color: #bbb7af; }
+
+.styleOptionMeta { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 12px; }
+.styleOptionMeta > span,
+.styleOptionMeta strong,
+.styleOptionMeta small { display: block; }
+.styleOptionMeta strong { font-size: 11px; }
+.styleOptionMeta small { margin-top: 3px; color: var(--muted); font-size: 7px; }
+.styleOptionMeta > i {
+  width: 25px;
+  height: 25px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: var(--surface);
+  font-size: 9px;
+  font-style: normal;
+}
+.styleOptionSelected .styleOptionMeta > i { border-color: var(--ink); background: var(--ink); color: var(--canvas); }
+.styleOption > p { min-height: 32px; margin: 8px 0 0; color: var(--muted); font-size: 8px; line-height: 1.45; }
+
+.overviewGrid { display: grid; gap: 11px; }
+.overviewGrid > article {
+  min-width: 0;
+  padding: 17px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface);
+  box-shadow: 0 13px 30px rgba(39, 34, 27, .07);
+}
+.overviewCardHeader { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 18px; }
+.overviewCardHeader > span { color: var(--muted); font-size: 7px; font-weight: 740; letter-spacing: .07em; text-transform: uppercase; }
+.overviewCardHeader button { display: flex; align-items: center; gap: 5px; padding: 0; border: 0; background: transparent; color: var(--muted); font-size: 7px; font-weight: 700; cursor: pointer; }
+.overviewTitleCard h2 { margin: 0; font: 770 clamp(35px, 11vw, 58px)/.9 var(--font-geist-sans), Arial, sans-serif; letter-spacing: -.065em; overflow-wrap: anywhere; }
+.overviewTitleCard > div:last-child { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 27px; }
+.overviewTitleCard > div:last-child > span { padding: 8px 10px; border-radius: 8px; background: var(--surface-2); color: var(--muted); font-size: 7px; }
+.overviewTitleCard > div:last-child strong { color: var(--ink); font-size: 9px; }
+
+.overviewStyleBody { display: flex; align-items: center; gap: 18px; }
+.stylePageCompact { width: 112px; min-width: 112px; box-shadow: 0 8px 18px rgba(35, 30, 24, .13); }
+.stylePageCompact * { pointer-events: none; }
+.overviewStyleBody > span,
+.overviewStyleBody > span strong,
+.overviewStyleBody > span small { display: block; }
+.overviewStyleBody > span strong { font-size: 18px; letter-spacing: -.035em; }
+.overviewStyleBody > span small { max-width: 230px; margin-top: 7px; color: var(--muted); font-size: 8px; line-height: 1.5; }
+
+.overviewPhotosCard { grid-column: 1 / -1; overflow: hidden; }
+.overviewPhotoRail { display: flex; gap: 9px; overflow-x: auto; overscroll-behavior-x: contain; padding: 1px 1px 8px; scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--ink) 28%, transparent) transparent; }
+.overviewPhoto { width: 138px; min-width: 138px; }
+.overviewPhoto > span { height: 106px; display: grid; place-items: center; overflow: hidden; border-radius: 9px; background: var(--surface-2); }
+.overviewPhoto img { width: 100%; height: 100%; object-fit: contain; }
+.overviewPhoto strong,
+.overviewPhoto small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.overviewPhoto strong { margin-top: 7px; font-size: 7px; }
+.overviewPhoto small { margin-top: 3px; color: var(--muted); font-size: 7px; }
+.overviewPhotosCard > p { margin: 12px 0 0; color: var(--muted); font-size: 7px; }
+
+.footer {
+  position: fixed;
+  z-index: 50;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  min-height: var(--zine-footer-height);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px max(14px, calc((100vw - 1180px) / 2));
+  border-top: 1px solid var(--line);
+  background: color-mix(in srgb, var(--canvas) 97%, transparent);
+  backdrop-filter: blur(18px);
+}
+
+.footer button {
+  min-height: 48px;
+  border-radius: 14px;
+  font-size: 9px;
+  font-weight: 730;
+  cursor: pointer;
+}
+
+.backButton { min-width: 48px; display: flex; align-items: center; gap: 8px; padding: 0 14px; border: 1px solid var(--line); background: var(--surface); }
+.backButton svg { transform: rotate(180deg); }
+.continueButton { min-width: 148px; display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 0 15px 0 18px; border: 0; background: var(--ink); color: var(--canvas); }
+.footer button:disabled { cursor: default; opacity: .38; }
+
+.header > a:focus-visible,
+.stepNavigation button:focus-visible,
+.footer button:focus-visible,
+.uploadCard:focus-within,
+.addMoreButton:focus-within,
+.photoImage button:focus-visible,
+.styleOption:focus-visible,
+.overviewCardHeader button:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
+
+@keyframes stepIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (min-width: 641px) {
+  .header { grid-template-columns: 48px 1fr 48px; padding-inline: clamp(16px, 5vw, 72px); }
+  .stepNavigation { padding-inline: clamp(16px, 5vw, 72px); }
+  .stepNavigation button { font-size: 7px; }
+  .stepContent { padding: 38px clamp(18px, 5vw, 72px) calc(var(--zine-footer-height) + 48px); }
+  .nameCard { min-height: 460px; padding: 26px; }
+  .nameCard textarea { min-height: 215px; margin-top: 42px; }
+  .photoWorkspaceBody { min-height: 574px; padding: 14px; gap: 14px; }
+  .uploadCard { width: 164px; min-width: 164px; }
+  .photoRows { gap: 14px; }
+  .photoRow { min-height: 265px; gap: 14px; }
+  .photoCard { width: clamp(190px, calc(205px * var(--photo-ratio)), 345px); min-width: clamp(190px, calc(205px * var(--photo-ratio)), 345px); }
+  .photoImage { height: 195px; }
+  .photoCard > label { padding: 11px 13px 13px; }
+  .photoCard input { font-size: 9px; }
+  .styleRail { grid-auto-columns: 286px; gap: 19px; padding: 21px; scroll-padding-inline: 21px; }
+  .overviewGrid { grid-template-columns: minmax(0, 1.25fr) minmax(280px, .75fr); gap: 14px; }
+  .overviewGrid > article { padding: 21px; }
+  .overviewTitleCard { min-height: 330px; display: flex; flex-direction: column; }
+  .overviewTitleCard > div:last-child { margin-top: auto; }
+  .overviewStyleCard { min-height: 330px; }
+  .overviewStyleBody { align-items: flex-start; }
+  .stylePageCompact { width: 132px; min-width: 132px; }
+  .overviewPhoto { width: 164px; min-width: 164px; }
+  .overviewPhoto > span { height: 126px; }
+}
+
+@media (max-width: 420px) {
+  .stepNavigation button span { overflow: hidden; text-overflow: ellipsis; }
+  .nameCard { min-height: 370px; padding: 17px; }
+  .nameCard textarea { min-height: 165px; margin-top: 26px; }
+  .spinePreview { padding-inline: 10px; gap: 8px; }
+  .spinePreview span { display: none; }
+  .spinePreview { grid-template-columns: minmax(0, 1fr) auto; }
+  .spinePreview strong { text-align: left; }
+  .photoWorkspaceBody { min-height: 488px; }
+  .uploadCard { width: 124px; min-width: 124px; }
+  .photoWorkspaceEmpty .uploadCard { min-height: 270px; }
+  .photoRow { min-height: 228px; }
+  .photoCard { width: clamp(154px, calc(164px * var(--photo-ratio)), 262px); min-width: clamp(154px, calc(164px * var(--photo-ratio)), 262px); }
+  .photoImage { height: 158px; }
+  .backButton span { display: none; }
+  .backButton { padding: 0; justify-content: center; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stepContent { animation: none; }
+  .nameCardStack > i,
+  .nameCard,
+  .uploadCard { transition: none; }
+}

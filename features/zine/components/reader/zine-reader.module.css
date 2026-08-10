@@ -1,0 +1,283 @@
+.reader {
+  min-height: 100dvh;
+  display: grid;
+  grid-template-rows: 58px minmax(0, 1fr) 78px;
+  overflow: hidden;
+  background: var(--canvas);
+  color: var(--ink);
+  font-family: var(--font-geist-sans), Arial, sans-serif;
+}
+
+.readerHeader {
+  z-index: 30;
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) 72px;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--line);
+  background: var(--canvas);
+}
+
+.readerHeader > button,
+.readerControls > button {
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: inherit;
+  cursor: pointer;
+}
+
+.readerHeader > button {
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border-radius: 12px;
+}
+
+.readerHeader > div { min-width: 0; text-align: center; }
+.readerHeader strong,
+.readerHeader span { display: block; }
+.readerHeader strong { overflow: hidden; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.readerHeader div span { margin-top: 2px; color: var(--muted); font-size: 7px; letter-spacing: .07em; text-transform: uppercase; }
+.readerStatus { color: var(--muted); font-size: 7px; text-align: right; }
+
+.readerViewport {
+  position: relative;
+  min-height: 0;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  padding: 18px 12px;
+  background: var(--canvas);
+}
+
+.bookStage {
+  position: relative;
+  width: min(calc(100vw - 24px), 840px);
+  display: grid;
+  place-items: center;
+  transition: opacity 160ms ease;
+}
+
+.bookSlot {
+  width: 100%;
+  transition: transform 520ms cubic-bezier(.22, .78, .22, 1);
+  will-change: transform;
+}
+
+.coverStage .bookSlot { transform: translateX(-25%); }
+.backStage .bookSlot { transform: translateX(25%); }
+.cameraStage { z-index: 5; }
+
+.flipBook { width: 100%; margin-inline: auto; }
+.flipBook :global(.stf__wrapper) { position: relative; width: 100%; box-sizing: border-box; }
+.flipBook :global(.stf__item) { box-sizing: border-box; }
+.flipBook :global(.stf__block) { cursor: grab; touch-action: pan-y; }
+.flipBook :global(.stf__block:active) { cursor: grabbing; }
+
+.cameraOther { opacity: 0 !important; }
+.cameraTarget,
+.cameraOther { transition: opacity 180ms ease; }
+.cameraStage .flipBook :global(.stf__outerShadow),
+.cameraStage .flipBook :global(.stf__innerShadow),
+.cameraStage .flipBook :global(.stf__hardShadow),
+.cameraStage .flipBook :global(.stf__hardInnerShadow) { opacity: 0 !important; }
+
+.sourcePages {
+  position: fixed;
+  left: -10000px;
+  top: 0;
+  width: 360px;
+  height: 480px;
+  overflow: hidden;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.loading {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  color: var(--muted);
+  font-size: 8px;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  pointer-events: none;
+}
+
+.bookPage {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  padding: clamp(11px, 3.3vw, 25px);
+  border: 0;
+  border-radius: 0;
+  background: #f5f1e9;
+  color: #20201d;
+  box-shadow: inset 0 0 0 1px rgba(31, 29, 25, .08);
+  font-family: var(--font-geist-sans), Arial, sans-serif;
+  user-select: none;
+}
+
+.bookPage *,
+.bookPage *::before,
+.bookPage *::after { box-sizing: border-box; }
+
+.leftPage { box-shadow: inset -12px 0 20px -18px rgba(24, 21, 17, .45), inset 0 0 0 1px rgba(31, 29, 25, .07); }
+.rightPage { box-shadow: inset 12px 0 20px -18px rgba(24, 21, 17, .45), inset 0 0 0 1px rgba(31, 29, 25, .07); }
+
+.cover {
+  display: flex;
+  flex-direction: column;
+  padding: clamp(18px, 5vw, 40px);
+  background: #282722;
+  color: #f4f0e7;
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, .08);
+  cursor: pointer;
+}
+
+.coverMeta { display: flex; justify-content: space-between; gap: 12px; font-size: clamp(5px, 1.2vw, 9px); font-weight: 720; letter-spacing: .1em; }
+.cover h1 {
+  margin: auto 0 0;
+  font: 770 clamp(22px, 6vw, 58px)/.88 var(--font-geist-sans), Arial, sans-serif;
+  letter-spacing: -.065em;
+  overflow-wrap: anywhere;
+}
+.coverRule { width: 36%; height: 3px; margin: clamp(13px, 4vw, 31px) 0 9px; background: #f4f0e7; }
+.cover > p { margin: 0; font-size: clamp(5px, 1.2vw, 8px); letter-spacing: .08em; text-transform: uppercase; }
+
+.back {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: #282722;
+  color: #f4f0e7;
+  text-align: center;
+}
+.backMark { width: clamp(34px, 8vw, 65px); aspect-ratio: 1; display: grid; place-items: center; border: 1px solid currentColor; border-radius: 50%; font-size: clamp(8px, 2vw, 15px); font-weight: 760; }
+.back p { max-width: 75%; margin: 18px 0 5px; font-size: clamp(8px, 2.4vw, 18px); font-weight: 720; overflow-wrap: anywhere; }
+.back small { color: rgba(244, 240, 231, .65); font-size: clamp(5px, 1.1vw, 8px); }
+
+.colophon { display: grid; grid-template-rows: auto 1fr auto; }
+.colophon > small,
+.colophon > span { font-size: clamp(5px, 1.1vw, 8px); font-weight: 700; letter-spacing: .08em; }
+.colophon > div { align-self: center; }
+.colophon strong { display: block; font-size: clamp(15px, 4vw, 34px); line-height: .9; letter-spacing: -.055em; overflow-wrap: anywhere; }
+.colophon p { max-width: 74%; margin: 12px 0 0; color: #746f66; font-size: clamp(6px, 1.3vw, 9px); line-height: 1.5; }
+.colophon > span { justify-self: end; }
+
+.pageHeader {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 7px;
+  font-size: clamp(5px, 1.05vw, 8px);
+  letter-spacing: .07em;
+  text-transform: uppercase;
+}
+.pageHeader b { overflow: hidden; color: #817c73; font-size: .9em; text-align: center; text-overflow: ellipsis; white-space: nowrap; }
+.pageHeader small { font: inherit; }
+.pageFooter { display: flex; align-items: center; justify-content: space-between; font-size: clamp(5px, 1.05vw, 8px); font-weight: 700; letter-spacing: .07em; }
+
+.readerPhoto { position: relative; min-width: 0; min-height: 0; margin: 0; }
+.readerPhoto > div { width: 100%; height: 100%; display: grid; place-items: center; overflow: hidden; background: #ded8cd; }
+.readerPhoto img { width: 100%; height: 100%; display: block; object-fit: contain; }
+.readerPhoto figcaption {
+  position: absolute;
+  z-index: 3;
+  bottom: -6px;
+  max-width: 80%;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 5px;
+  background: #f5f1e9;
+  color: #383630;
+  box-shadow: 0 2px 7px rgba(31, 28, 23, .12);
+  font-size: clamp(4px, .95vw, 7px);
+  line-height: 1.2;
+}
+.readerPhoto figcaption b { flex: 0 0 auto; }
+.readerPhoto figcaption span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.captionLeft { left: -4px; }
+.captionRight { right: -4px; flex-direction: row-reverse; text-align: right; }
+
+.editorial { display: grid; grid-template-rows: auto auto minmax(0, 1fr) auto; gap: clamp(7px, 2vw, 15px); }
+.editorial h2 { max-width: 86%; margin: 0; font-size: clamp(13px, 3.6vw, 30px); line-height: .88; letter-spacing: -.06em; overflow-wrap: anywhere; }
+.editorial > .readerPhoto { width: 86%; height: 100%; min-height: 0; justify-self: end; }
+
+.margin { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; gap: clamp(8px, 2.4vw, 18px); padding: clamp(16px, 5.5vw, 42px); }
+.margin > .readerPhoto { width: 70%; height: 72%; align-self: center; justify-self: center; }
+
+.contact { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; gap: clamp(8px, 2vw, 16px); }
+.contactGrid { min-height: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: repeat(2, minmax(0, 1fr)); gap: clamp(5px, 1.4vw, 11px); }
+.contactGrid .readerPhoto { width: 100%; height: 100%; }
+
+.split { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; gap: clamp(8px, 2vw, 16px); }
+.splitGrid { min-height: 0; display: grid; grid-template-rows: repeat(2, minmax(0, 1fr)); gap: clamp(6px, 1.5vw, 12px); }
+.splitGrid .readerPhoto { width: 100%; height: 100%; }
+
+.night { display: grid; grid-template-rows: auto minmax(0, 1fr) auto auto; gap: clamp(7px, 1.8vw, 14px); background: #20211f; color: #f3efe7; }
+.night .pageHeader b { color: #aaa79f; }
+.night > .readerPhoto { width: 80%; height: 100%; justify-self: center; }
+.night .readerPhoto > div { background: #343532; }
+.night .readerPhoto figcaption { background: #20211f; color: #f3efe7; box-shadow: 0 2px 7px rgba(0, 0, 0, .28); }
+.nightTitle { font-size: clamp(13px, 3.5vw, 29px); line-height: .86; letter-spacing: -.055em; overflow-wrap: anywhere; }
+
+.cameraGuard {
+  position: absolute;
+  z-index: 100;
+  inset: 0;
+  cursor: zoom-out;
+  touch-action: manipulation;
+}
+
+.readerControls {
+  z-index: 30;
+  display: grid;
+  grid-template-columns: 46px minmax(0, 1fr) 46px;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-top: 1px solid var(--line);
+  background: var(--canvas);
+}
+.readerControls > button { width: 44px; height: 44px; display: grid; place-items: center; padding: 0; border-radius: 14px; }
+.readerControls > button:first-child svg { transform: rotate(180deg); }
+.readerControls > button:disabled { cursor: default; opacity: .35; }
+.readerControls > div { min-width: 0; text-align: center; }
+.readerControls strong,
+.readerControls span { display: block; }
+.readerControls strong { font-size: 9px; }
+.readerControls span { margin-top: 3px; overflow: hidden; color: var(--muted); font-size: 7px; text-overflow: ellipsis; white-space: nowrap; }
+
+.readerHeader button:focus-visible,
+.readerControls button:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
+
+@media (min-width: 641px) {
+  .reader { grid-template-rows: 64px minmax(0, 1fr) 84px; }
+  .readerHeader { grid-template-columns: 48px minmax(0, 1fr) 90px; padding-inline: clamp(16px, 4vw, 56px); }
+  .readerViewport { padding: 26px; }
+  .readerControls { grid-template-columns: 52px minmax(0, 1fr) 52px; padding-inline: clamp(18px, 4vw, 58px); }
+  .readerControls > button { width: 48px; height: 48px; }
+}
+
+@media (max-height: 620px) {
+  .reader { grid-template-rows: 50px minmax(0, 1fr) 62px; }
+  .readerHeader { padding-block: 5px; }
+  .readerHeader > button { width: 34px; height: 34px; }
+  .readerControls { padding-block: 7px; }
+  .readerControls > button { width: 40px; height: 40px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bookSlot,
+  .bookStage { transition: none; }
+}

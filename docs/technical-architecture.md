@@ -1,6 +1,6 @@
 # EventSpace 第一版技术架构方案
 
-> 状态：2026-08-02 Supabase 封闭 MVP 接线校准；详细实施与任务状态以 [`supabase-backend-integration-plan.md`](./supabase-backend-integration-plan.md) 为准。
+> 状态：2026-08-10 Supabase 封闭 MVP 接线校准；详细实施与任务状态以 [`supabase-backend-integration-plan.md`](./supabase-backend-integration-plan.md) 为准。
 > 原则：个人开发者可维护、移动端优先、数十人房间实时协作、严格服务端授权、托管加密而非 E2EE。
 
 ## 1. 选型总览
@@ -45,7 +45,7 @@
 
 ## 4. 数据与授权模型
 
-Postgres 是真相来源。首期核心实体包括：`profiles`、`actors`、`terms_acceptances`、`rooms`、`room_members`、`room_preferences`、`room_invites`、`room_join_requests`、`actor_claim_challenges`、`messages`、`message_reactions`、`message_pins`、`assets`、`photos`、`photo_comments`、`itineraries`、`reports`、`room_bans`、`archive_entries`、`audit_events`、`command_receipts` 和 `outbox_jobs`。`profiles`、`room_members` 与 `room_join_requests` 当前已携带 `avatar_variant` / `avatar_asset_id`，头像 asset 继续复用私有 `assets` + `room-media`。图片类 asset 当前还携带 `thumbnail_object_key`、`thumbnail_byte_size`、`placeholder_data_url`、`image_width`、`image_height` 与 `media_revision`，用于区分 display 与 thumbnail 衍生资源。支付模块包括 `products`、`prices`、`checkout_sessions`、`payment_events`、`room_entitlements` 和 `refund_events`。Book 与投票均不进入首批 schema；旧 `board_items` / `board_comments` 只作为本地兼容来源评估。
+Postgres 是真相来源。首期核心实体包括：`profiles`、`actors`、`terms_acceptances`、`rooms`、`room_members`、`room_preferences`、`room_invites`、`room_join_requests`、`actor_claim_challenges`、`messages`、`message_reactions`、`message_pins`、`assets`、`photos`、`photo_comments`、`itineraries`、`reports`、`room_bans`、`archive_entries`、`audit_events`、`command_receipts` 和 `outbox_jobs`。`profiles`、`room_members` 与 `room_join_requests` 当前已携带 `avatar_variant` / `avatar_asset_id`，`room_members` 另有当前成员级 `is_favorite` / `hidden_at`；头像 asset 继续复用私有 `assets` + `room-media`。图片类 asset 当前还携带 `thumbnail_object_key`、`thumbnail_byte_size`、`placeholder_data_url`、`image_width`、`image_height` 与 `media_revision`，用于区分 display 与 thumbnail 衍生资源。支付模块包括 `products`、`prices`、`checkout_sessions`、`payment_events`、`room_entitlements` 和 `refund_events`。Book 与投票均不进入首批 schema；旧 `board_items` / `board_comments` 只作为本地兼容来源评估。
 
 所有暴露到 Data API 的表均启用 RLS。每项读取和写入策略至少同时验证：
 
@@ -93,7 +93,7 @@ Secret/service role key 只在服务端环境使用，绝不发送到浏览器�
 - 目标设备支持 120Hz 时，输入、拖动和切换尽可能接近 120fps；普通设备最低保证 60fps。
 - 动画只使用 `transform`/`opacity` 等合成友好属性；支持 `prefers-reduced-motion`。
 - 图片懒加载、缩略图优先、长列表虚拟化；避免将全量聊天或全部 Photos 原图一次性渲染。
-- `/rooms`、Room detail、Account 与 viewer avatar 使用浏览器 snapshot/cache 作为路由加速层：本地仅保存 scope-bound、去签名 URL 的展示快照；进入页面后仍要读取 Supabase 权威快照。房间照片另用 IndexedDB read-through cache 保存 display/thumbnail Blob，并用 asset id、variant 和 revision 组成缓存键。
+- `/rooms`、Room detail、Account 与 viewer avatar 使用浏览器 snapshot/cache 作为路由加速层：本地仅保存 scope-bound、去签名 URL 的展示快照；进入页面后仍要读取 Supabase 权威快照。房间照片另用 Cache Storage 与 IndexedDB read-through cache 保存 display/thumbnail Blob，并用 viewer scope、asset id、variant 和 revision 组成缓存键。
 
 ## 8. 第三方服务边界
 
@@ -164,6 +164,12 @@ Secret/service role key 只在服务端环境使用，绝不发送到浏览器�
 - `eventspace:room-photo-cache:v3` 是云端图片 Blob 加速缓存，不是业务状态。它按 display/thumbnail variant 和 revision 缓存，优先当前照片窗口与前 12 张网格缩略图，后台再缓存其余资源；401/403 视为签名 URL 过期并触发刷新。
 - Rooms UI 的照片堆 entry animation、decode 协调和 Grid/Magazine fade 只属于表现层；其状态不进入 Supabase，也不应成为跨设备同步需求。
 
+## 2026-08-10 当前同步：成员偏好与图片读取层
+
+- `room_members.is_favorite` / `hidden_at` 是当前 primary actor 的 membership 偏好；`security.*` 使用 `security definer` + 空 `search_path` 实现，`public.*` wrapper 保持 `security invoker`，且只向 `authenticated` 授予执行权限。
+- `list_current_user_rooms` 使用 `hidden_at is null` 形成个人 Rooms collection；`get_current_user_room` 不因隐藏而拒绝已授权成员的直接读取。写入 RPC 同时校验当前 actor、membership 状态、room 可读权限和公开 ID，隐藏时清除收藏。
+- `readBestCachedImage` 和 `getImageVariantReference` 让 display 缓存满足较小图片请求，缺失时回退 thumbnail；缓存失效、scope 改变或 revision 更新都不能跳过 Supabase 重新授权。
+
 ## 2026-07-18 历史同步：技术架构现状与后端接入提醒
 
 本节为历史同步，保留用于理解旧本地优先阶段；当前判断以 2026-08-02 同步为准。
@@ -218,7 +224,7 @@ Secret/service role key 只在服务端环境使用，绝不发送到浏览器�
 
 ## 2026-07-23 历史同步：回忆录数据与翻页依赖
 
-- 当时 `page-flip@2.0.7` 未被运行时代码引用；截至 2026-08-02 依赖和旧类型声明已移除，恢复 Book 前必须重新评估。
+- 当时 `page-flip@2.0.7` 未被运行时代码引用；截至 2026-08-10 依赖和旧类型声明仍已移除，Book/Zine 没有正式数据模型或运行时阅读器，未来若重启必须重新立项。
 - 当前本地 schema 以 `BoardPhoto`/`boardItems`、`boardComments` 和 `AssetReference` 驱动 Photos 网格。生产建议拆分为 photo、comment、asset 等领域 DTO，不应直接复制兼容字段名称。
 - 添加照片与 caption 必须是同一服务端事务：服务端复核成员资格、房间状态、目标页、asset 所有权、照片配额和正文长度，并写入服务器作者/时间。
 - 新增 spread 和修改纸张样式需要 expected revision 或等价乐观并发控制；Realtime 只广播权威页版本，不传播 StPageFlip 动画状态。

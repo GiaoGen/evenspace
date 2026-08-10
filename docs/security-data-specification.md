@@ -94,10 +94,17 @@
 - 图片 asset 当前除 display object 外，还可保存 thumbnail object、placeholder data URL、width/height 和 `media_revision`。这些字段是展示和缓存元数据，不降低照片本身的私密等级。
 - display 与 thumbnail 都位于私有 `room-media` bucket；Storage select/insert/delete policy 必须同时覆盖 display object key 与 thumbnail object key，并继续按房间成员/头像读取策略授权。
 - 浏览器 snapshot/cache 不得保存 signed read URL。`/rooms`、Room detail、Account 和 viewer avatar 缓存写入前会剥离 `remoteUrl` / `avatarUrl`，并以当前 viewer scope 隔离，避免同一浏览器中切换账号后直接复用他人短期链接。
-- IndexedDB 的 cloud image read-through cache 保存的是已授权下载过的 display/thumbnail Blob；这提升当前设备重开体验，但清除站点数据、换设备、权限变更或签名 URL 过期都需要重新经过服务端授权路径。
+- Cache Storage 与 IndexedDB 的 cloud image read-through cache 保存的是已授权下载过的 display/thumbnail Blob；这提升当前设备重开体验，但清除站点数据、换设备、权限变更或签名 URL 过期都需要重新经过服务端授权路径。
 - `eventspace:room-photo-cache:v3` 使用 asset id、variant 和 revision 组成缓存键；当 revision 变化时旧缓存必须被视为 stale 并可清理，不能继续作为当前照片内容。
 - `placeholder_data_url` 虽然体积小，仍可能泄露照片颜色/构图轮廓；它只能随授权房间快照返回，不应进入公开 HTML、日志或跨用户缓存。
 - `list_room_card_media` 现在可返回房间全部 ready photos。UI 的有限渲染窗口只是性能策略，服务端仍应按房间权限、成员状态、照片状态和私有 Storage 签名控制每张照片读取。
+
+## 2026-08-10 当前同步：成员偏好与浏览器图片缓存
+
+- `room_members.is_favorite` 与 `hidden_at` 是当前成员的个人集合偏好，不是共享房间设置。收藏/隐藏 RPC 只允许 `authenticated` 执行，并在服务端复核当前 primary actor、成员状态、房间可读权限和公开 ID。
+- 隐藏只从当前成员的 Rooms collection 中排除房间，不删除 membership、不撤销直接房间访问，也不删除房间内容；隐藏时服务端清除该成员的收藏状态，避免个人集合状态不一致。
+- Cache Storage `eventspace-cloud-images-v1` 与 IndexedDB 只保存已经通过授权读取的 display/thumbnail Blob。缓存命中不等同于当前授权，账号切换、权限变化、revision 变化和 signed URL 失效仍必须回到服务端读取路径。
+- 缓存键包含 viewer scope、asset、variant 和 revision；不得以 signed URL 作为持久 key，也不得把 `placeholder_data_url` 放入公开 HTML、日志或跨用户缓存。
 
 ### 仍待补齐的生产安全要求
 
