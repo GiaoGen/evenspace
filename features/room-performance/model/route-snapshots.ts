@@ -127,7 +127,7 @@ export function subscribeRoomsRouteSnapshot(onChange: () => void) {
 
 export function saveRoomRouteSnapshot(payload: BackendRoomSession) {
   const storage = browserStorage();
-  const scope = payload.session.viewer.actorId;
+  const scope = payload.cacheScope ?? payload.session.viewer.actorId;
   if (!storage || !scope) return;
   const snapshot: RoomRouteSnapshot = {
     scope,

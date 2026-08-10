@@ -40,7 +40,7 @@ export function presentRoomSummary(room: RoomReadModel, media?: RoomCardMedia): 
     boardPreview: media?.boardItems.filter((item) => item.kind === "photo").map((item) => item.variant) ?? [],
     boardNote: "",
     boardBackground: backgroundFor(room),
-    isFavorite: false,
+    isFavorite: room.viewer.isFavorite,
   };
 }
 

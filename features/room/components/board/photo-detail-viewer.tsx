@@ -84,11 +84,11 @@ export function PhotoDetailViewer({ photo, photos, comments, members, canDelete,
           <button type="button" className={`${styles.photoDetailArrow} ${styles.photoDetailNext}`} disabled={!nextPhoto} onClick={() => navigate(1)} aria-label="Next photo"><Icon name="chevron" /></button>
         </div>
         <div className={styles.photoDetailConversation}>
-          <header className={styles.photoDetailAuthor}><Avatar className={styles.personAvatar} src={owner?.avatarUrl} text={owner?.initials ?? "?"} displayName={owner?.displayName ?? "Member"} decorative /><span><strong>{owner?.displayName ?? "Member"}</strong><small>Shared this photo</small></span></header>
+          <header className={styles.photoDetailAuthor}><Avatar className={styles.personAvatar} src={owner?.avatarUrl} asset={owner?.avatarAsset} cacheScope={cacheScope} text={owner?.initials ?? "?"} displayName={owner?.displayName ?? "Member"} decorative /><span><strong>{owner?.displayName ?? "Member"}</strong><small>Shared this photo</small></span></header>
           <div className={styles.photoCommentList} aria-label="Photo comments">
             {comments.length ? comments.map((comment) => {
               const author = members.find((member) => member.actorId === comment.actorId) ?? null;
-              return <article key={comment.id} className={comment.kind === "caption" ? styles.pinnedCaption : undefined}><Avatar className={styles.personAvatar} src={author?.avatarUrl} text={author?.initials ?? "?"} displayName={author?.displayName ?? "Member"} decorative /><div><header><strong>{author?.displayName ?? "Member"}</strong><time>{comment.kind === "caption" ? "Caption" : formatCommentTime(comment.createdAt)}</time></header><p>{comment.body}</p></div></article>;
+              return <article key={comment.id} className={comment.kind === "caption" ? styles.pinnedCaption : undefined}><Avatar className={styles.personAvatar} src={author?.avatarUrl} asset={author?.avatarAsset} cacheScope={cacheScope} text={author?.initials ?? "?"} displayName={author?.displayName ?? "Member"} decorative /><div><header><strong>{author?.displayName ?? "Member"}</strong><time>{comment.kind === "caption" ? "Caption" : formatCommentTime(comment.createdAt)}</time></header><p>{comment.body}</p></div></article>;
             }) : <div className={styles.photoCommentEmpty}><strong>No comments yet.</strong><span>Leave the first note below.</span></div>}
           </div>
           <form className={styles.photoDetailComposer} onSubmit={submit}>

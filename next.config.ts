@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { hostname, networkInterfaces } from "node:os";
 
 import { parsePublicSupabaseEnv } from "./data/supabase/env-schema";
 
@@ -8,9 +9,18 @@ const publicSupabaseEnv = parsePublicSupabaseEnv({
     process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
 });
 const supabaseUrl = new URL(publicSupabaseEnv.url);
+const localDevOrigins = Array.from(new Set([
+  hostname(),
+  ...Object.values(networkInterfaces()).flatMap((addresses) =>
+    (addresses ?? [])
+      .filter((address) => address.family === "IPv4" && !address.internal)
+      .map((address) => address.address),
+  ),
+]));
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  allowedDevOrigins: localDevOrigins,
   images: {
     remotePatterns: [{
       protocol: "https",

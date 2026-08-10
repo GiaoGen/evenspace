@@ -27,6 +27,7 @@ const room = {
     role: "host" as const,
     state: "active" as const,
     archiveEligible: true,
+    isFavorite: false,
   },
 };
 
@@ -46,6 +47,15 @@ describe("room read presenter", () => {
       isFavorite: false,
     });
     expect(item.boardItems).toEqual([]);
+  });
+
+  it("presents the persisted current-member favorite preference", () => {
+    const [item] = presentRoomCollection({
+      items: [{ ...room, viewer: { ...room.viewer, isFavorite: true } }],
+      nextCursor: null,
+    });
+
+    expect(item.room.isFavorite).toBe(true);
   });
 
   it("maps non-writable lifecycle states to the existing read-only card state", () => {

@@ -53,6 +53,7 @@ const roomReadRowSchema = z.object({
   viewer_role: z.enum(["host", "member"]),
   viewer_state: z.enum(["active", "muted"]),
   viewer_archive_eligible: z.boolean(),
+  viewer_is_favorite: z.boolean(),
   member_count: z.number().int().nonnegative(),
 });
 
@@ -131,6 +132,7 @@ function mapRow(input: unknown): RoomReadModel {
       role: row.viewer_role,
       state: row.viewer_state,
       archiveEligible: row.viewer_archive_eligible,
+      isFavorite: row.viewer_is_favorite,
     },
   };
 }

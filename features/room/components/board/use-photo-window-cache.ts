@@ -7,11 +7,18 @@ import type { BoardPhoto } from "@/core/domain/room";
 import {
   deleteLocalAsset,
   getCachedAssetKey,
-  getCachedLocalAssetBlob,
   type CachedAssetOptions,
 } from "@/features/local-assets/model/local-asset-repository";
-import { resolveCachedImage } from "@/features/local-assets/model/cached-image-resolver";
-import { getRoomPhotoCachePlan, type PhotoCacheResource } from "@/features/room/model/photo-cache-plan";
+import {
+  getImageVariantReference,
+  readCachedImageVariant,
+  resolveCachedImage,
+} from "@/features/local-assets/model/cached-image-resolver";
+import {
+  getRoomPhotoCacheInventory,
+  getRoomPhotoCachePlan,
+  type PhotoCacheResource,
+} from "@/features/room/model/photo-cache-plan";
 
 const MANIFEST_KEY = "eventspace:room-photo-cache:v3";
 const DOWNLOAD_CONCURRENCY = 2;
@@ -57,18 +64,31 @@ function cachedOptions(scope: string, resource: PhotoCacheResource): CachedAsset
 }
 
 function remoteUrl(resource: PhotoCacheResource): string | undefined {
-  return resource.variant === "thumbnail" ? resource.asset.thumbnail?.remoteUrl : resource.asset.remoteUrl;
+  return getImageVariantReference(resource.asset, resource.variant).remoteUrl;
 }
 
 function resourceKey(scope: string, resource: PhotoCacheResource): string {
-  return getCachedAssetKey(resource.asset, cachedOptions(scope, resource));
+  return getCachedAssetKey(
+    getImageVariantReference(resource.asset, resource.variant),
+    cachedOptions(scope, resource),
+  );
+}
+
+async function resourceIsCached(resource: PhotoCacheResource, scope: string) {
+  if (resource.variant === "thumbnail") {
+    const display = await readCachedImageVariant(resource.asset, scope, "display");
+    if (display) return true;
+  }
+  return Boolean(await readCachedImageVariant(resource.asset, scope, resource.variant));
 }
 
 async function cacheResource(resource: PhotoCacheResource, scope: string, signal: AbortSignal, onExpiredRemoteUrl?: () => void): Promise<boolean> {
   if (signal.aborted) return false;
+  if (await resourceIsCached(resource, scope)) return true;
   const options = cachedOptions(scope, resource);
+  const reference = getImageVariantReference(resource.asset, resource.variant);
   const url = remoteUrl(resource);
-  const result = await resolveCachedImage(resource.asset, options, url);
+  const result = await resolveCachedImage(reference, options, url);
   if (result.expiredRemoteUrl) onExpiredRemoteUrl?.();
   return Boolean(result.blob);
 }
@@ -123,13 +143,14 @@ async function reconcileRoomManifest(
   const resourcesByKey = new Map(resources.map((resource) => [resourceKey(scope, resource), resource]));
   const expectedKeys = new Set(resourcesByKey.keys());
   const previous = manifest.rooms[roomKey]?.readyKeys ?? [];
-  await Promise.all(previous.filter((key) => !expectedKeys.has(key)).map((key) => deleteLocalAsset(key).catch(() => undefined)));
+  const removedKeys = previous.filter((key) => !expectedKeys.has(key));
+  await Promise.all(removedKeys.map((key) => deleteLocalAsset(key).catch(() => undefined)));
 
   const verified = await Promise.all(previous.flatMap((key) => {
     const resource = resourcesByKey.get(key);
     if (!resource) return [];
-    return [getCachedLocalAssetBlob(resource.asset, cachedOptions(scope, resource))
-      .then((blob) => blob ? key : null)
+    return [resourceIsCached(resource, scope)
+      .then((ready) => ready ? key : null)
       .catch(() => null)];
   }));
   const readyKeys = new Set(verified.filter((key): key is string => Boolean(key)));
@@ -140,12 +161,12 @@ async function reconcileRoomManifest(
 function requestPersistentStorage() {
   if (persistenceRequested || !navigator.storage?.persist) return;
   persistenceRequested = true;
-  void navigator.storage.persist().catch(() => false);
+  void navigator.storage.persist().catch(() => undefined);
 }
 
 /**
- * The selected photo and its three neighbours download first. The rest of the
- * room's compressed display images and thumbnails continue silently afterward.
+ * The selected photo and its three neighbours get display priority. Remaining
+ * thumbnails continue silently afterward; large renditions stay demand-driven.
  */
 export function useRoomPhotoCache({
   roomPublicId,
@@ -165,13 +186,13 @@ export function useRoomPhotoCache({
   useEffect(() => {
     requestPersistentStorage();
     const plan = getRoomPhotoCachePlan(photos, selectedPhotoId);
-    const resources = [...plan.priority, ...plan.background];
+    const inventory = getRoomPhotoCacheInventory(photos);
     const roomKey = `${viewerCacheScope}:${roomPublicId}`;
     const controller = new AbortController();
     let running: Promise<void> | null = null;
 
     const cacheRoom = async () => {
-      const readyKeys = await reconcileRoomManifest(roomKey, resources, viewerCacheScope, controller.signal);
+      const readyKeys = await reconcileRoomManifest(roomKey, inventory, viewerCacheScope, controller.signal);
       if (controller.signal.aborted) return;
       await cacheResources(plan.priority, viewerCacheScope, controller.signal, readyKeys, onExpiredRemoteUrl);
       if (!controller.signal.aborted) saveReadyKeys(roomKey, readyKeys);

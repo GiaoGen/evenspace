@@ -502,6 +502,8 @@ export type Database = {
           archive_eligible: boolean
           avatar_asset_id: string | null
           avatar_variant: string
+          hidden_at: string | null
+          is_favorite: boolean
           joined_at: string
           left_at: string | null
           nickname: string
@@ -516,6 +518,8 @@ export type Database = {
           archive_eligible?: boolean
           avatar_asset_id?: string | null
           avatar_variant?: string
+          hidden_at?: string | null
+          is_favorite?: boolean
           joined_at?: string
           left_at?: string | null
           nickname: string
@@ -530,6 +534,8 @@ export type Database = {
           archive_eligible?: boolean
           avatar_asset_id?: string | null
           avatar_variant?: string
+          hidden_at?: string | null
+          is_favorite?: boolean
           joined_at?: string
           left_at?: string | null
           nickname?: string
@@ -767,6 +773,7 @@ export type Database = {
           updated_at: string
           viewer_actor_id: string
           viewer_archive_eligible: boolean
+          viewer_is_favorite: boolean
           viewer_nickname: string
           viewer_role: string
           viewer_state: string
@@ -840,9 +847,30 @@ export type Database = {
           updated_at: string
           viewer_actor_id: string
           viewer_archive_eligible: boolean
+          viewer_is_favorite: boolean
           viewer_nickname: string
           viewer_role: string
           viewer_state: string
+        }[]
+      }
+      set_current_user_room_favorite: {
+        Args: {
+          requested_is_favorite: boolean
+          requested_public_id: string
+        }
+        Returns: {
+          is_favorite: boolean
+          room_id: string
+        }[]
+      }
+      set_current_user_room_hidden: {
+        Args: {
+          requested_hidden: boolean
+          requested_public_id: string
+        }
+        Returns: {
+          hidden_at: string
+          room_id: string
         }[]
       }
       list_pending_join_requests: {

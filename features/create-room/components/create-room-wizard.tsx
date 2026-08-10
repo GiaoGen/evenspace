@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useReducer, useRef, useState, type FormEvent } from "react";
 import { createRoomAction } from "@/app/rooms/new/actions";
 import { Icon } from "@/components/ui/icon";
+import { createUuid } from "@/core/domain/uuid";
 import { useBrowserOrigin } from "@/core/web/use-browser-origin";
 import { clearCreateRoomDraft, loadCreateRoomDraft, saveCreateRoomDraft } from "../model/create-room-draft-storage";
 import { createRoomReducer, initialCreateRoomState, validateDraft } from "../model/create-room-machine";
@@ -68,38 +69,44 @@ export function CreateRoomWizard() {
     submittingRef.current = true;
     setSubmitting(true);
     setSubmissionError("");
-    idempotencyKeyRef.current ??= crypto.randomUUID();
-    inviteSecretsRef.current ??= createInviteSecrets();
-    const result = await createRoomAction({
-      ...state.draft,
-      timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
-      idempotencyKey: idempotencyKeyRef.current,
-      inviteToken: inviteSecretsRef.current.token,
-      inviteCode: inviteSecretsRef.current.code,
-    });
+    try {
+      idempotencyKeyRef.current ??= createUuid();
+      inviteSecretsRef.current ??= createInviteSecrets();
+      const result = await createRoomAction({
+        ...state.draft,
+        timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
+        idempotencyKey: idempotencyKeyRef.current,
+        inviteToken: inviteSecretsRef.current.token,
+        inviteCode: inviteSecretsRef.current.code,
+      });
 
-    if (result.status === "error") {
-      setSubmissionError(result.message);
+      if (result.status === "error") {
+        setSubmissionError(result.message);
+        return;
+      }
+
+      clearCreateRoomDraft();
+      dispatch({
+        type: "COMPLETE",
+        room: {
+          id: result.room.id,
+          publicId: result.room.publicId,
+          name: result.room.name,
+          createdAt: result.room.startsAt,
+          endsAt: result.room.endsAt,
+          inviteToken: result.room.inviteToken,
+          inviteCode: result.room.inviteCode,
+          inviteRevision: result.room.inviteRevision,
+          draft: state.draft,
+        },
+      });
+    } catch (error) {
+      console.error("Create room submission failed", error);
+      setSubmissionError("The room could not be created right now. Please try again.");
+    } finally {
       setSubmitting(false);
       submittingRef.current = false;
-      return;
     }
-
-    clearCreateRoomDraft();
-    dispatch({
-      type: "COMPLETE",
-      room: {
-        id: result.room.id,
-        publicId: result.room.publicId,
-        name: result.room.name,
-        createdAt: result.room.startsAt,
-        endsAt: result.room.endsAt,
-        inviteToken: result.room.inviteToken,
-        inviteCode: result.room.inviteCode,
-        inviteRevision: result.room.inviteRevision,
-        draft: state.draft,
-      },
-    });
   }
 
   const content = state.step === "details"

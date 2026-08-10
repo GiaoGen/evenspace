@@ -42,13 +42,17 @@ export default async function RoomsRoute() {
     getRoomCardMembers(page),
   ]);
   const identity = page.items[0]?.viewer.nickname ?? fallbackIdentity;
+  const collectionRevision = page.items
+    .map((room) => `${room.id}:${room.viewer.isFavorite ? 1 : 0}`)
+    .join("|");
 
   return (
     <RoomsPage
+      key={collectionRevision}
       initialRooms={presentRoomCollection(page, cardMedia, cardMembers)}
       viewerInitials={initials(identity)}
       viewerAvatarUrl={null}
-      viewerCacheScope={page.items[0]?.viewer.actorId}
+      viewerCacheScope={data.claims.sub}
       viewerAccountScope={data.claims.sub}
     />
   );

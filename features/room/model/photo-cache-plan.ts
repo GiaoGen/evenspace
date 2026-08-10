@@ -15,13 +15,13 @@ export type PhotoCachePlan = {
 const INITIAL_GRID_THUMBNAILS = 12;
 
 function displayResource(photo: BoardPhoto): PhotoCacheResource | null {
-  return photo.asset?.kind === "image" && photo.asset.remoteUrl
+  return photo.asset?.kind === "image"
     ? { asset: photo.asset, variant: "display" }
     : null;
 }
 
 function thumbnailResource(photo: BoardPhoto): PhotoCacheResource | null {
-  return photo.asset?.kind === "image" && photo.asset.thumbnail?.remoteUrl
+  return photo.asset?.kind === "image" && photo.asset.thumbnail
     ? { asset: photo.asset, variant: "thumbnail" }
     : null;
 }
@@ -41,10 +41,19 @@ function unique(resources: readonly (PhotoCacheResource | null)[]): PhotoCacheRe
   });
 }
 
+/** Every valid room rendition that may remain cached, whether prefetched now or not. */
+export function getRoomPhotoCacheInventory(photos: readonly BoardPhoto[]) {
+  return unique([
+    ...photos.map(thumbnailResource),
+    ...photos.map(displayResource),
+  ]);
+}
+
 /**
  * A selected photo plus three photos on either side gets display priority.
- * On the grid, the first visible thumbnails win. Every remaining compressed
- * rendition is still cached silently afterward.
+ * On the grid, the first visible thumbnails win and remaining thumbnails are
+ * cached silently afterward. Display renditions are demand-driven so opening a
+ * room never downloads every large image in the background.
  */
 export function getRoomPhotoCachePlan(photos: readonly BoardPhoto[], selectedPhotoId: string | null): PhotoCachePlan {
   const nearby = getPhotoCacheWindow(photos, selectedPhotoId);
@@ -53,10 +62,8 @@ export function getRoomPhotoCachePlan(photos: readonly BoardPhoto[], selectedPho
     ...photos.slice(0, INITIAL_GRID_THUMBNAILS).map(thumbnailResource),
   ]);
   const priorityIds = new Set(priority.map(resourceId));
-  const background = unique([
-    ...photos.map(thumbnailResource),
-    ...photos.map(displayResource),
-  ]).filter((resource) => !priorityIds.has(resourceId(resource)));
+  const background = unique(photos.map(thumbnailResource))
+    .filter((resource) => !priorityIds.has(resourceId(resource)));
   return {
     priority,
     background,

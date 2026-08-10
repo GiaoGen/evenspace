@@ -97,7 +97,8 @@ export async function getRoomCardMedia(
           }
           : {}),
         ...(photo.placeholder_data_url ? { placeholderDataUrl: photo.placeholder_data_url } : {}),
-        ...(photo.image_width && photo.image_height ? { width: photo.image_width, height: photo.image_height, revision: photo.media_revision } : {}),
+        ...(photo.image_width && photo.image_height ? { width: photo.image_width, height: photo.image_height } : {}),
+        revision: photo.media_revision,
       };
       return [{
         id: photo.photo_id,

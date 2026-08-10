@@ -277,6 +277,7 @@
 .empty svg { margin-bottom: 15px; }
 .empty h1 { margin: 0; font-family: var(--font-bodoni),Georgia,serif; font-size: 40px; }
 .empty p { color: var(--muted); font-size: 9px; }
+.actionError { margin: -7px 0 10px; color: #9a3c31; font-size: 9px; text-align: center; }
 .mobileCreate { display: none; }
 
 .sheetOpen { overflow: hidden; }

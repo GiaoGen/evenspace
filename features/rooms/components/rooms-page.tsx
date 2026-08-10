@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState, useSyncExternalStore, type CSSProperties } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties } from "react";
+import { hideRoomAction, setRoomFavoriteAction } from "@/app/rooms/actions";
 import { AppHeader } from "@/components/app-header/app-header";
 import { Avatar } from "@/components/ui/avatar";
 import { Icon } from "@/components/ui/icon";
@@ -9,6 +10,7 @@ import { filterRoomCollection, getRoomFilterCounts, type RoomCollectionItem, typ
 import { rememberRoomCarouselItem, useRoomCarousel } from "../model/use-room-carousel";
 import { useRoomsLayoutFade } from "../model/use-rooms-layout-fade";
 import { RoomCard } from "./room-card";
+import { RoomDeleteSheet } from "./room-delete-sheet";
 import { RoomsCreateMenu } from "./rooms-create-menu";
 import { RoomProgress } from "./room-progress";
 import { RoomsToolbar } from "./rooms-toolbar";
@@ -56,16 +58,24 @@ function RoomsCardsLoading({ grid }: { readonly grid: boolean }) {
 }
 
 export function RoomsPage({ initialRooms, viewerInitials, viewerAvatarUrl, viewerCacheScope, viewerAccountScope, loading = false }: { readonly initialRooms: readonly RoomCollectionItem[]; readonly viewerInitials: string; readonly viewerAvatarUrl: string | null; readonly viewerCacheScope?: string; readonly viewerAccountScope?: string; readonly loading?: boolean }) {
+  const [rooms, setRooms] = useState(initialRooms);
   const [filter, setFilter] = useState<RoomFilter>("all");
   const [filterOpen, setFilterOpen] = useState(false);
   const grid = useSyncExternalStore(subscribeToGridPreference, readGridPreference, () => false);
-  const editing = false;
+  const [editing, setEditing] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const pendingRoomIds = useRef(new Set<string>());
   const [avatarUrl, setAvatarUrl] = useState(viewerAvatarUrl);
   const [avatarAsset, setAvatarAsset] = useState<AssetReference | null>(null);
-  const counts = useMemo(() => getRoomFilterCounts(initialRooms), [initialRooms]);
-  const visibleRooms = useMemo(() => filterRoomCollection(initialRooms, filter, query), [filter, initialRooms, query]);
+  const counts = useMemo(() => getRoomFilterCounts(rooms), [rooms]);
+  const visibleRooms = useMemo(() => filterRoomCollection(rooms, filter, query), [filter, query, rooms]);
+  const roomPendingDelete = useMemo(
+    () => rooms.find((item) => item.room.publicId === deleteTarget)?.room ?? null,
+    [deleteTarget, rooms],
+  );
   const roomKeys = useMemo(() => visibleRooms.map((item) => item.room.publicId), [visibleRooms]);
   const { containerRef, activeIndex, progress } = useRoomCarousel(roomKeys, !grid);
   const activeRoomKey = roomKeys[activeIndex];
@@ -136,15 +146,63 @@ export function RoomsPage({ initialRooms, viewerInitials, viewerAvatarUrl, viewe
     };
   }, [loading, viewerAccountScope, viewerAvatarUrl]);
   function closeSearch() { setSearchOpen(false); setQuery(""); }
+  function toggleEditing() {
+    setEditing((current) => !current);
+    setFilterOpen(false);
+    closeSearch();
+    setActionError(null);
+  }
+  async function toggleFavorite(roomPublicId: string) {
+    if (pendingRoomIds.current.has(roomPublicId)) return;
+    const item = rooms.find((candidate) => candidate.room.publicId === roomPublicId);
+    if (!item) return;
+    const previous = item.room.isFavorite;
+    const next = !previous;
+    pendingRoomIds.current.add(roomPublicId);
+    setActionError(null);
+    setRooms((current) => current.map((candidate) => candidate.room.publicId === roomPublicId
+      ? { ...candidate, room: { ...candidate.room, isFavorite: next } }
+      : candidate));
+    const result = await setRoomFavoriteAction({ roomPublicId, isFavorite: next });
+    pendingRoomIds.current.delete(roomPublicId);
+    if (result.status === "ok") return;
+    setRooms((current) => current.map((candidate) => candidate.room.publicId === roomPublicId
+      ? { ...candidate, room: { ...candidate.room, isFavorite: previous } }
+      : candidate));
+    setActionError("The favorite change could not be saved. Please try again.");
+  }
+  async function confirmHideRoom() {
+    if (!deleteTarget || pendingRoomIds.current.has(deleteTarget)) return;
+    const removedIndex = rooms.findIndex((candidate) => candidate.room.publicId === deleteTarget);
+    const removed = rooms[removedIndex];
+    if (!removed) return;
+    const roomPublicId = deleteTarget;
+    pendingRoomIds.current.add(roomPublicId);
+    setDeleteTarget(null);
+    setActionError(null);
+    setRooms((current) => current.filter((candidate) => candidate.room.publicId !== roomPublicId));
+    const result = await hideRoomAction({ roomPublicId });
+    pendingRoomIds.current.delete(roomPublicId);
+    if (result.status === "ok") return;
+    setRooms((current) => {
+      if (current.some((candidate) => candidate.room.publicId === roomPublicId)) return current;
+      const restored = [...current];
+      restored.splice(Math.min(removedIndex, restored.length), 0, removed);
+      return restored;
+    });
+    setActionError("The room could not be removed from your list. Please try again.");
+  }
 
   return (
     <div className={styles.page}>
       <AppHeader leading={<Link href="/account" className={styles.avatar} aria-label="Open account"><Avatar src={avatarUrl} asset={avatarAsset} cacheScope={viewerAccountScope} text={viewerInitials} displayName="Your account" decorative /></Link>} actions={<RoomsCreateMenu />} />
       <main className={styles.main}>
-        <RoomsToolbar filter={filter} counts={counts} filterOpen={filterOpen} searchOpen={searchOpen} editing={editing} grid={grid} query={query} visibleCount={visibleRooms.length} canEdit={false} layoutFading={isTransitioning} setFilterOpen={setFilterOpen} setFilter={setFilter} openSearch={() => { setSearchOpen(true); setFilterOpen(false); }} closeSearch={closeSearch} setQuery={setQuery} toggleEditing={() => undefined} toggleGrid={toggleLayout} />
-        {loading ? <RoomsCardsLoading grid={grid} /> : visibleRooms.length ? <section ref={containerRef} key={`${filter}:${grid}:${query}`} className={`${styles.cards} ${grid ? styles.cardsGrid : ""} ${isTransitioning ? styles.cardsLayoutFading : ""} ${layoutFadePhase === "out" ? styles.cardsFadeOut : layoutFadePhase === "in" ? styles.cardsFadeIn : ""}`} aria-label="Your rooms" aria-busy={isTransitioning || undefined}>{visibleRooms.map(({ room, boardItems, memberPreviews = [] }, index) => <RoomCard key={room.id} room={room} boardItems={boardItems} memberPreviews={memberPreviews} grid={grid} editing={editing} active={grid || index === activeIndex} index={index} toggleFavorite={() => undefined} requestDelete={() => undefined} rememberRoom={() => rememberRoomCarouselItem(room.publicId)} cacheScope={viewerCacheScope} />)}</section> : <section className={styles.empty}><Icon name="board" size={26} /><h1>No rooms here.</h1><p>{query ? "Try a different room name." : "The next shared moment will appear here."}</p></section>}
+        <RoomsToolbar filter={filter} counts={counts} filterOpen={filterOpen} searchOpen={searchOpen} editing={editing} grid={grid} query={query} visibleCount={visibleRooms.length} canEdit={!loading && rooms.length > 0} layoutFading={isTransitioning} setFilterOpen={setFilterOpen} setFilter={setFilter} openSearch={() => { setSearchOpen(true); setFilterOpen(false); }} closeSearch={closeSearch} setQuery={setQuery} toggleEditing={toggleEditing} toggleGrid={toggleLayout} />
+        {actionError ? <p className={styles.actionError} role="status">{actionError}</p> : null}
+        {loading ? <RoomsCardsLoading grid={grid} /> : visibleRooms.length ? <section ref={containerRef} key={`${filter}:${grid}:${query}`} className={`${styles.cards} ${grid ? styles.cardsGrid : ""} ${isTransitioning ? styles.cardsLayoutFading : ""} ${layoutFadePhase === "out" ? styles.cardsFadeOut : layoutFadePhase === "in" ? styles.cardsFadeIn : ""}`} aria-label="Your rooms" aria-busy={isTransitioning || undefined}>{visibleRooms.map(({ room, boardItems, memberPreviews = [] }, index) => <RoomCard key={room.id} room={room} boardItems={boardItems} memberPreviews={memberPreviews} grid={grid} editing={editing} active={grid || index === activeIndex} index={index} toggleFavorite={() => void toggleFavorite(room.publicId)} requestDelete={() => setDeleteTarget(room.publicId)} rememberRoom={() => rememberRoomCarouselItem(room.publicId)} cacheScope={viewerCacheScope} />)}</section> : <section className={styles.empty}><Icon name="board" size={26} /><h1>No rooms here.</h1><p>{query ? "Try a different room name." : "The next shared moment will appear here."}</p></section>}
         {!loading && !grid && visibleRooms.length > 0 ? <RoomProgress activeIndex={activeIndex} total={visibleRooms.length} progress={progress} /> : null}
       </main>
+      {roomPendingDelete ? <RoomDeleteSheet roomName={roomPendingDelete.name} close={() => setDeleteTarget(null)} confirm={() => void confirmHideRoom()} /> : null}
     </div>
   );
 }

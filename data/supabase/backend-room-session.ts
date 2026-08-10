@@ -318,7 +318,7 @@ export async function getBackendRoomSession(
     boardPreview: [],
     boardNote: "",
     boardBackground: "stone",
-    isFavorite: false,
+    isFavorite: roomRead.viewer.isFavorite,
     memberListVisibility: roomRead.memberListVisibility === "host" ? "moderators" : "members",
     members,
     messages,

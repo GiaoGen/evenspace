@@ -36,6 +36,7 @@ const roomRow = {
   viewer_role: "host",
   viewer_state: "active",
   viewer_archive_eligible: true,
+  viewer_is_favorite: true,
   member_count: 2,
 };
 
@@ -58,7 +59,7 @@ describe("SupabaseRoomReadRepository", () => {
     expect(result.items[0]).toMatchObject({
       publicId: "room_repository_test",
       memberCount: 2,
-      viewer: { role: "host" },
+      viewer: { role: "host", isFavorite: true },
     });
     expect(result.nextCursor).toEqual({
       updatedAt: roomRow.updated_at,

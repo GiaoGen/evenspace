@@ -3,11 +3,17 @@ import { describe, expect, it } from "vitest";
 import {
   PHOTO_WALL_ENTRY_LEAD_MS,
   PHOTO_WALL_ENTRY_STAGGER_MS,
+  claimPhotoEntryAnimation,
   schedulePhotoEntryBatch,
   shufflePhotoIds,
 } from "./photo-wall-entry";
 
 describe("photo wall entry", () => {
+  it("only claims one entrance animation across route remounts", () => {
+    expect(claimPhotoEntryAnimation("room-remount", "photo-remount")).toBe(true);
+    expect(claimPhotoEntryAnimation("room-remount", "photo-remount")).toBe(false);
+  });
+
   it("shuffles without dropping or duplicating photos", () => {
     const shuffled = shufflePhotoIds(["a", "b", "c"], () => 0);
 

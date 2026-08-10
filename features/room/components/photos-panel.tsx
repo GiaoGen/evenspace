@@ -13,7 +13,7 @@ import { useMockSession } from "@/features/mock-session/components/mock-session-
 import { blobToDataUrl, prepareImage, validateImageFile } from "./board/image-upload";
 import { PhotoDetailViewer } from "./board/photo-detail-viewer";
 import { useRoomPhotoCache } from "./board/use-photo-window-cache";
-import { schedulePhotoEntryBatch } from "../model/photo-wall-entry";
+import { claimPhotoEntryAnimation, schedulePhotoEntryBatch } from "../model/photo-wall-entry";
 import styles from "./photos-panel.module.css";
 
 const photoVariants: readonly ArtVariant[] = ["one", "two", "three", "four"];
@@ -39,6 +39,7 @@ export function PhotosPanel({
   comments,
   members,
   viewerActorId,
+  cacheScope,
   photoCount,
   maxPhotos,
   canAdd,
@@ -50,6 +51,7 @@ export function PhotosPanel({
   readonly comments: readonly BoardComment[];
   readonly members: readonly PersonSummary[];
   readonly viewerActorId: ActorId;
+  readonly cacheScope: string;
   readonly photoCount: number;
   readonly maxPhotos: number;
   readonly canAdd: boolean;
@@ -85,7 +87,7 @@ export function PhotosPanel({
   }, [router]);
   useRoomPhotoCache({
     roomPublicId,
-    viewerCacheScope: viewerActorId,
+    viewerCacheScope: cacheScope,
     photos,
     selectedPhotoId: detailPhotoId,
     archived,
@@ -128,7 +130,8 @@ export function PhotosPanel({
     if (scheduledPhotoIdsRef.current.has(photoId)) return;
     scheduledPhotoIdsRef.current.add(photoId);
 
-    const shouldAnimate = entranceCandidateIdsRef.current?.has(photoId)
+    const shouldAnimate = claimPhotoEntryAnimation(roomPublicId, photoId)
+      && entranceCandidateIdsRef.current?.has(photoId)
       && !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     if (!shouldAnimate) {
       setPhotoEntries((current) => {
@@ -143,7 +146,7 @@ export function PhotosPanel({
     if (entryBatchTimerRef.current === null) {
       entryBatchTimerRef.current = window.setTimeout(flushDecodedPhotoEntries, PHOTO_ENTRY_BATCH_WINDOW_MS);
     }
-  }, [flushDecodedPhotoEntries]);
+  }, [flushDecodedPhotoEntries, roomPublicId]);
 
   const markPhotoVisible = useCallback((photoId: string) => {
     setPhotoEntries((current) => {
@@ -317,7 +320,7 @@ export function PhotosPanel({
           onClick={() => setDetailPhotoId(photo.id)}
           aria-label={`Open ${photo.imageName ?? `photo ${index + 1}`}`}
         >
-          {photo.asset ? <LocalAssetImage asset={photo.asset} variant="thumbnail" alt="" fill sizes="(max-width: 700px) 33vw, 300px" className={styles.image} preferLocal cacheScope={viewerActorId} reveal="manual" onDecoded={() => markPhotoDecoded(photo.id)} /> : <span className={styles.placeholder}><Icon name="image" /></span>}
+          {photo.asset ? <LocalAssetImage asset={photo.asset} variant="thumbnail" alt="" fill sizes="(max-width: 700px) 33vw, 300px" className={styles.image} preferLocal cacheScope={cacheScope} reveal="manual" onDecoded={() => markPhotoDecoded(photo.id)} /> : <span className={styles.placeholder}><Icon name="image" /></span>}
           {syncingPhotoIds.has(photo.id) ? <span className={styles.processingBadge}>Syncing</span> : null}
         </button>;
       })}
@@ -342,7 +345,7 @@ export function PhotosPanel({
       members={members}
       canDelete={detailPhoto.ownerActorId === viewerActorId || canModerate}
       preferLocalImage
-      cacheScope={viewerActorId}
+      cacheScope={cacheScope}
       onClose={() => setDetailPhotoId(null)}
       onPhotoChange={setDetailPhotoId}
       onComment={(body) => {

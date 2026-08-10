@@ -99,11 +99,13 @@ export function MockSessionProvider({ initialSession, children }: { readonly ini
  */
 export function BackendSessionProvider({
   initialSession,
+  cacheScope,
   children,
   onCommand,
   onSettled,
 }: {
   readonly initialSession: MockSession;
+  readonly cacheScope?: string;
   readonly children: ReactNode;
   readonly onCommand: (command: MockCommand) => Promise<{ readonly status: string }>;
   readonly onSettled: (command: MockCommand) => void;
@@ -155,6 +157,7 @@ export function BackendSessionProvider({
         placeholderDataUrl: command.item.asset.placeholderDataUrl,
         width: command.item.asset.width,
         height: command.item.asset.height,
+        cacheScope: cacheScope ?? command.actorId,
       });
       const created = await createRoomPhotoAction({
         roomPublicId: command.roomPublicId,
@@ -174,7 +177,7 @@ export function BackendSessionProvider({
     }
     const result = await onCommand(command);
     return result.status === "ok" || result.status === "ignored" ? { status: "ok" } : { status: "error", message: "This room action could not be completed." };
-  }, [onCommand]);
+  }, [cacheScope, onCommand]);
 
   useEffect(() => {
     baseDispatch({ type: "HYDRATE", session: initialSession });

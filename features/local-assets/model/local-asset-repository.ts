@@ -1,6 +1,12 @@
 import type { AssetKind, AssetReference } from "@/core/domain/asset";
 import { createUuid } from "@/core/domain/uuid";
 import type { AssetRepository } from "@/data/contracts/asset-repository";
+import {
+  clearCloudImageBlobs,
+  deleteCloudImageBlob,
+  getCloudImageBlob,
+  putCloudImageBlob,
+} from "./cloud-image-cache";
 
 const DATABASE_NAME = "eventspace-local-assets";
 const STORE_NAME = "assets";
@@ -13,6 +19,21 @@ export type CachedAssetOptions = {
   readonly scope: string;
   readonly variant: CachedImageVariant;
 };
+
+type CachedAssetListener = (key: string) => void;
+
+const cachedAssetListeners = new Set<CachedAssetListener>();
+
+function notifyCachedAssetChanged(key: string) {
+  cachedAssetListeners.forEach((listener) => listener(key));
+}
+
+export function subscribeCachedAssetChanges(listener: CachedAssetListener) {
+  cachedAssetListeners.add(listener);
+  return () => {
+    cachedAssetListeners.delete(listener);
+  };
+}
 
 interface LocalAssetRecord extends AssetReference {
   readonly blob: Blob;
@@ -40,7 +61,15 @@ function requestResult<T>(request: IDBRequest<T>): Promise<T> {
 async function withStore<T>(mode: IDBTransactionMode, operation: (store: IDBObjectStore) => IDBRequest<T>): Promise<T> {
   const database = await openDatabase();
   try {
-    return await requestResult(operation(database.transaction(STORE_NAME, mode).objectStore(STORE_NAME)));
+    const transaction = database.transaction(STORE_NAME, mode);
+    const result = requestResult(operation(transaction.objectStore(STORE_NAME)));
+    const completed = new Promise<void>((resolve, reject) => {
+      transaction.oncomplete = () => resolve();
+      transaction.onabort = () => reject(transaction.error ?? new Error("Local asset storage transaction was aborted."));
+      transaction.onerror = () => reject(transaction.error ?? new Error("Local asset storage transaction failed."));
+    });
+    const [value] = await Promise.all([result, completed]);
+    return value;
   } finally {
     database.close();
   }
@@ -73,7 +102,13 @@ export const localAssetRepository: AssetRepository = new IndexedDbAssetRepositor
 
 export const saveLocalAsset = (blob: Blob, kind: AssetKind) => localAssetRepository.save(blob, kind);
 export const getLocalAssetBlob = (reference: AssetReference) => localAssetRepository.read(reference);
-export const deleteLocalAsset = (id: string) => localAssetRepository.remove(id);
+export async function deleteLocalAsset(id: string): Promise<void> {
+  const operations: Promise<unknown>[] = [localAssetRepository.remove(id)];
+  if (id.startsWith(CACHED_ASSET_PREFIX)) operations.push(deleteCloudImageBlob(id));
+  const results = await Promise.allSettled(operations);
+  const failure = results.find((result) => result.status === "rejected");
+  if (failure?.status === "rejected") throw failure.reason;
+}
 
 /** A cache key is scoped to a viewer, rendition, and media revision, never to a signed URL. */
 export function getCachedAssetKey(reference: AssetReference, options: CachedAssetOptions): string {
@@ -86,8 +121,10 @@ function cachedReference(reference: AssetReference, options: CachedAssetOptions)
 
 /** Stores an already-authorized remote asset without colliding with another rendition. */
 export async function cacheLocalAsset(reference: AssetReference, blob: Blob, options: CachedAssetOptions): Promise<void> {
+  const key = getCachedAssetKey(reference, options);
   const record: LocalAssetRecord = {
-    ...cachedReference(reference, options),
+    ...reference,
+    id: key,
     kind: reference.kind,
     mimeType: blob.type || reference.mimeType,
     byteSize: blob.size,
@@ -97,21 +134,42 @@ export async function cacheLocalAsset(reference: AssetReference, blob: Blob, opt
     blob,
     createdAt: new Date().toISOString(),
   };
-  await withStore("readwrite", (store) => store.put(record));
+  const [indexedDatabase, cacheStorage] = await Promise.allSettled([
+    withStore("readwrite", (store) => store.put(record)),
+    putCloudImageBlob(key, blob),
+  ]);
+  const indexedDatabaseSucceeded = indexedDatabase.status === "fulfilled";
+  const cacheStorageSucceeded = cacheStorage.status === "fulfilled" && cacheStorage.value;
+  if (!indexedDatabaseSucceeded && !cacheStorageSucceeded) {
+    throw indexedDatabase.status === "rejected"
+      ? indexedDatabase.reason
+      : cacheStorage.status === "rejected"
+        ? cacheStorage.reason
+        : new Error("Cloud image bytes could not be cached locally.");
+  }
+  notifyCachedAssetChanged(key);
 }
 
 /** Reads a locally cached remote rendition. Old display entries remain readable during the cache-key migration. */
 export async function getCachedLocalAssetBlob(reference: AssetReference, options: CachedAssetOptions): Promise<Blob | null> {
-  const cached = await getLocalAssetBlob(cachedReference(reference, options));
+  const key = getCachedAssetKey(reference, options);
+  const durable = await getCloudImageBlob(key).catch(() => null);
+  if (durable) return durable;
+  const cached = await getLocalAssetBlob(cachedReference(reference, options)).catch(() => null);
   if (cached || options.variant !== "display" || (reference.revision ?? 1) !== 1) return cached;
-  return getLocalAssetBlob(reference);
+  return getLocalAssetBlob(reference).catch(() => null);
 }
 
 export const deleteCachedLocalAsset = (reference: AssetReference, options: CachedAssetOptions) =>
   deleteLocalAsset(getCachedAssetKey(reference, options));
 
 export async function clearLocalAssets(): Promise<void> {
-  await withStore("readwrite", (store) => store.clear());
+  const results = await Promise.allSettled([
+    withStore("readwrite", (store) => store.clear()),
+    clearCloudImageBlobs(),
+  ]);
+  const failure = results.find((result) => result.status === "rejected");
+  if (failure?.status === "rejected") throw failure.reason;
 }
 
 export async function pruneLocalAssets(referencedIds: ReadonlySet<string>): Promise<void> {
@@ -119,7 +177,7 @@ export async function pruneLocalAssets(referencedIds: ReadonlySet<string>): Prom
   try {
     const transaction = database.transaction(STORE_NAME, "readwrite");
     const store = transaction.objectStore(STORE_NAME);
-    await new Promise<void>((resolve, reject) => {
+    const cursorCompleted = new Promise<void>((resolve, reject) => {
       const cursor = store.openCursor();
       cursor.onsuccess = () => {
         const current = cursor.result;
@@ -130,8 +188,13 @@ export async function pruneLocalAssets(referencedIds: ReadonlySet<string>): Prom
         current.continue();
       };
       cursor.onerror = () => reject(cursor.error ?? new Error("Local assets could not be pruned."));
-      transaction.onabort = () => reject(transaction.error ?? new Error("Local asset pruning was aborted."));
     });
+    const transactionCompleted = new Promise<void>((resolve, reject) => {
+      transaction.oncomplete = () => resolve();
+      transaction.onabort = () => reject(transaction.error ?? new Error("Local asset pruning was aborted."));
+      transaction.onerror = () => reject(transaction.error ?? new Error("Local asset pruning failed."));
+    });
+    await Promise.all([cursorCompleted, transactionCompleted]);
   } finally {
     database.close();
   }

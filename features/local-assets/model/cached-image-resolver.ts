@@ -3,7 +3,9 @@ import {
   cacheLocalAsset,
   getCachedAssetKey,
   getCachedLocalAssetBlob,
+  getLocalAssetBlob,
   type CachedAssetOptions,
+  type CachedImageVariant,
 } from "./local-asset-repository";
 
 export type CachedImageResolution = {
@@ -11,7 +13,55 @@ export type CachedImageResolution = {
   readonly expiredRemoteUrl: boolean;
 };
 
+export type CachedImageMatch = {
+  readonly blob: Blob;
+  readonly key: string;
+  readonly reference: AssetReference;
+  readonly variant: CachedImageVariant;
+};
+
 const pendingDownloads = new Map<string, Promise<CachedImageResolution>>();
+
+export function getImageVariantReference(
+  asset: AssetReference,
+  variant: CachedImageVariant,
+): AssetReference {
+  if (variant !== "thumbnail" || !asset.thumbnail) return asset;
+  return {
+    id: asset.thumbnail.id,
+    kind: "image",
+    mimeType: asset.thumbnail.mimeType,
+    byteSize: asset.thumbnail.byteSize,
+    remoteUrl: asset.thumbnail.remoteUrl,
+    revision: asset.revision,
+  };
+}
+
+/** Reads one rendition without starting a network request. */
+export async function readCachedImageVariant(
+  asset: AssetReference,
+  scope: string,
+  variant: CachedImageVariant,
+): Promise<CachedImageMatch | null> {
+  const reference = getImageVariantReference(asset, variant);
+  const options = { scope, variant } as const;
+  let blob = await getCachedLocalAssetBlob(reference, options);
+  // Freshly prepared uploads still use their temporary local rendition ids.
+  if (!blob && !reference.remoteUrl) blob = await getLocalAssetBlob(reference);
+  return blob
+    ? { blob, key: getCachedAssetKey(reference, options), reference, variant }
+    : null;
+}
+
+/** A display rendition satisfies every smaller image request. */
+export async function readBestCachedImage(
+  asset: AssetReference,
+  scope: string,
+): Promise<CachedImageMatch | null> {
+  const display = await readCachedImageVariant(asset, scope, "display");
+  if (display || !asset.thumbnail) return display;
+  return readCachedImageVariant(asset, scope, "thumbnail");
+}
 
 async function downloadAndCache(
   reference: AssetReference,
@@ -43,8 +93,12 @@ export async function resolveCachedImage(
   remoteUrl?: string,
 ): Promise<CachedImageResolution> {
   const cached = await getCachedLocalAssetBlob(reference, options);
-  if (cached) return { blob: cached, expiredRemoteUrl: false };
-  if (!remoteUrl) return { blob: null, expiredRemoteUrl: false };
+  if (cached) {
+    return { blob: cached, expiredRemoteUrl: false };
+  }
+  if (!remoteUrl) {
+    return { blob: null, expiredRemoteUrl: false };
+  }
 
   const key = getCachedAssetKey(reference, options);
   const existing = pendingDownloads.get(key);

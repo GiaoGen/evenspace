@@ -147,9 +147,9 @@ export function BackendRoomRoute({
 
   useEffect(() => {
     if (!payload) return;
-    rememberViewerCacheScope(payload.session.viewer.actorId);
+    rememberViewerCacheScope(cacheScope);
     saveRoomRouteSnapshot(payload);
-  }, [payload]);
+  }, [cacheScope, payload]);
 
   useEffect(() => {
     if (!payload) return;
@@ -200,6 +200,7 @@ export function BackendRoomRoute({
   return (
     <BackendSessionProvider
       initialSession={payload.session}
+      cacheScope={cacheScope}
       onCommand={execute}
       onSettled={handleSettled}
     >

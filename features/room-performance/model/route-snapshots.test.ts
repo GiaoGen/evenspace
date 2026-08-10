@@ -1,8 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
+  readRoomRouteSnapshot,
   readRoomsRouteSnapshot,
   rememberViewerCacheScope,
+  saveRoomRouteSnapshot,
   saveRoomsRouteSnapshot,
 } from "./route-snapshots";
 
@@ -66,5 +68,17 @@ describe("rooms route snapshot", () => {
 
     expect(readRoomsRouteSnapshot()?.viewerAccountScope).toBe("user-after");
     expect(dispatchEvent).toHaveBeenCalledTimes(2);
+  });
+
+  it("stores room snapshots under the account cache scope", () => {
+    browserWindow();
+    rememberViewerCacheScope("user-account");
+    saveRoomRouteSnapshot({
+      cacheScope: "user-account",
+      session: { viewer: { actorId: "actor-room" } },
+      room: { publicId: "room_cache" },
+    } as never);
+
+    expect(readRoomRouteSnapshot("room_cache")?.scope).toBe("user-account");
   });
 });

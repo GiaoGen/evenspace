@@ -1,10 +1,20 @@
 export const PHOTO_WALL_ENTRY_STAGGER_MS = 90;
 export const PHOTO_WALL_ENTRY_LEAD_MS = 60;
 
+const revealedPhotos = new Set<string>();
+
 export type ScheduledPhotoEntry = {
   readonly id: string;
   readonly delayMs: number;
 };
+
+/** Prevents a loading snapshot and the resolved route from animating the same photo twice. */
+export function claimPhotoEntryAnimation(roomPublicId: string, photoId: string) {
+  const key = `${roomPublicId}:${photoId}`;
+  if (revealedPhotos.has(key)) return false;
+  revealedPhotos.add(key);
+  return true;
+}
 
 export function shufflePhotoIds(
   ids: readonly string[],

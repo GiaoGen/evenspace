@@ -3,9 +3,10 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type SyntheticEvent } from "react";
 import Image from "next/image";
 import type { AssetReference } from "@/core/domain/asset";
+import { getImageVariantReference } from "../model/cached-image-resolver";
 import { getImageReadinessKey, isImageDecoded, markImageDecoded } from "../model/image-readiness";
 import type { CachedImageVariant } from "../model/local-asset-repository";
-import { useLocalAssetUrl } from "./use-local-asset-url";
+import { useCachedImageUrl, useLocalAssetUrl } from "./use-local-asset-url";
 
 export type ImageVariant = "thumbnail" | "display";
 export type ImageRevealMode = "fade" | "manual";
@@ -67,24 +68,14 @@ function ReadyImage({ url, readinessKey, asset, alt, fill, width, height, sizes,
   </>;
 }
 
-function resolveVariant(asset: AssetReference, variant: ImageVariant): AssetReference {
-  if (variant !== "thumbnail" || !asset.thumbnail) return asset;
-  return {
-    id: asset.thumbnail.id,
-    kind: "image",
-    mimeType: asset.thumbnail.mimeType,
-    byteSize: asset.thumbnail.byteSize,
-    remoteUrl: asset.thumbnail.remoteUrl,
-    revision: asset.revision,
-  };
-}
-
 export function LocalAssetImage({ asset, alt, fill, width, height, sizes, className, variant = "display", preferLocal = false, cacheScope, loading, reveal = "fade", onDecoded, onError }: { readonly asset: AssetReference; readonly alt: string; readonly fill?: boolean; readonly width?: number; readonly height?: number; readonly sizes?: string; readonly className?: string; readonly variant?: ImageVariant; readonly preferLocal?: boolean; readonly cacheScope?: string; readonly loading?: "eager" | "lazy"; readonly reveal?: ImageRevealMode; readonly onDecoded?: () => void; readonly onError?: () => void }) {
   const cacheVariant: CachedImageVariant = variant === "thumbnail" && asset.thumbnail ? "thumbnail" : "display";
-  const reference = useMemo(() => resolveVariant(asset, variant), [asset, variant]);
-  const cachedOptions = useMemo(() => cacheScope ? { scope: cacheScope, variant: cacheVariant } : undefined, [cacheScope, cacheVariant]);
-  const url = useLocalAssetUrl(reference, preferLocal, cachedOptions);
-  const readinessKey = getImageReadinessKey(asset, cacheVariant, cacheScope);
+  const reference = useMemo(() => getImageVariantReference(asset, cacheVariant), [asset, cacheVariant]);
+  const cached = useCachedImageUrl(preferLocal && cacheScope ? asset : null, cacheVariant, preferLocal ? cacheScope ?? null : null);
+  const directUrl = useLocalAssetUrl(preferLocal && cacheScope ? null : reference, preferLocal);
+  const url = cached?.url ?? directUrl;
+  const resolvedVariant = cached?.variant ?? cacheVariant;
+  const readinessKey = getImageReadinessKey(asset, resolvedVariant, cacheScope);
 
   return url
     ? <ReadyImage key={readinessKey} url={url} readinessKey={readinessKey} asset={asset} alt={alt} fill={fill} width={width} height={height} sizes={sizes} className={className} loading={loading} reveal={reveal} onDecoded={onDecoded} onError={onError} />

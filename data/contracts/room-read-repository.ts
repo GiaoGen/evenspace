@@ -18,6 +18,7 @@ export interface RoomViewerMembership {
   readonly role: "host" | "member";
   readonly state: "active" | "muted";
   readonly archiveEligible: boolean;
+  readonly isFavorite: boolean;
 }
 
 export interface RoomReadModel {
