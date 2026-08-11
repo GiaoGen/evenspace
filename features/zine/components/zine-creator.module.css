@@ -439,6 +439,9 @@
   transition: box-shadow 170ms ease, transform 170ms ease;
 }
 
+.stylePageGeneric { padding: 0; }
+.stylePageGeneric > div { position: absolute; inset: 0; }
+
 .styleOption:hover .stylePage { transform: translateY(-2px); }
 .styleOptionSelected .stylePage { box-shadow: 0 0 0 3px var(--ink), 0 15px 30px rgba(35, 30, 24, .16); }
 .stylePage small,

@@ -106,6 +106,13 @@
 - Cache Storage `eventspace-cloud-images-v1` 与 IndexedDB 只保存已经通过授权读取的 display/thumbnail Blob。缓存命中不等同于当前授权，账号切换、权限变化、revision 变化和 signed URL 失效仍必须回到服务端读取路径。
 - 缓存键包含 viewer scope、asset、variant 和 revision；不得以 signed URL 作为持久 key，也不得把 `placeholder_data_url` 放入公开 HTML、日志或跨用户缓存。
 
+## 2026-08-11 当前同步：Zine 浏览器内存隐私边界
+
+- `/zine` 当前只在浏览器组件内存中持有用户选择的 `File`、Object URL、Photo Note、手动页面和裁切焦点；没有上传到 Supabase Storage，也没有数据库、日志、分析或分享路径。
+- 该边界不等同于正式隐私保护：浏览器扩展、同机用户、截图、下载或开发者工具仍可能读取/复制本地内容；产品文案不得声称 Zine 内容已加密或具有远程删除能力。
+- 刷新、关闭页面或离开路由会丢失草稿；当前没有账号隔离、发布权限、导出权限或重新打开机制。
+- 如果未来将 Zine 接入后端，照片、Photo Note 和页面结构都应按私密内容处理：使用私有 Storage、asset ownership、RLS、短期 signed URL、服务端 MIME/大小/解码/EXIF/恶意文件校验，并单独定义删除、版本、分享和审计策略。
+
 ### 仍待补齐的生产安全要求
 
 1. Cloudflare Turnstile 或等价机制、服务端速率限制和匿名用户清理任务。

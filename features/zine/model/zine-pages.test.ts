@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { createRecipeApplication, getRecipeDefinition } from "./recipe-contract";
 import type { ZineDraft, ZinePhoto } from "./zine-draft";
 import { createManualEditorPages, createZineReaderPages, pacePhotosForReader } from "./zine-pages";
 
@@ -11,8 +12,8 @@ function photo(id: string): ZinePhoto {
     width: 4,
     height: 3,
     caption: "",
-    positionX: 50,
-    positionY: 50,
+    defaultFocusX: 50,
+    defaultFocusY: 50,
   };
 }
 
@@ -63,8 +64,8 @@ describe("zine reader pagination", () => {
       manualSpreads: [
         {
           id: "spread-1",
-          left: { id: "page-1", styleId: "editorial", photoIds: ["one"] },
-          right: { id: "page-2", styleId: "editorial", photoIds: ["two"] },
+          left: { id: "page-1", styleId: "editorial", photoIds: ["one"], contentItemIds: ["page-1:content-1"], recipeApplication: null },
+          right: { id: "page-2", styleId: "editorial", photoIds: ["two"], contentItemIds: ["page-2:content-1"], recipeApplication: null },
         },
         { id: "spread-2", left: null, right: null },
       ],
@@ -72,5 +73,49 @@ describe("zine reader pagination", () => {
 
     expect(createManualEditorPages(draft).filter((page) => page.kind === "add")).toHaveLength(2);
     expect(createZineReaderPages(draft).some((page) => page.kind === "add")).toBe(false);
+  });
+
+  it("shares spread application assets with both rendered page halves", () => {
+    const recipe = getRecipeDefinition("recipe-reference-cross-gutter-v1");
+    expect(recipe).not.toBeNull();
+    if (!recipe) return;
+    const application = createRecipeApplication({
+      recipe,
+      content: {
+        photoIds: ["bridge", "extra"],
+        contentItemIds: ["left:content-1", "right:content-1"],
+        notesByPhotoId: {},
+      },
+      anchorPageId: "page-left",
+      targetPageIds: ["page-left", "page-right"],
+    });
+    const draft: ZineDraft = {
+      name: "Spread assets",
+      photos: [photo("bridge"), photo("extra")],
+      styleId: "editorial",
+      manualSpreads: [{
+        id: "spread-1",
+        left: {
+          id: "page-left",
+          styleId: "editorial",
+          photoIds: ["bridge"],
+          contentItemIds: ["left:content-1"],
+          recipeApplication: application,
+        },
+        right: {
+          id: "page-right",
+          styleId: "editorial",
+          photoIds: ["extra"],
+          contentItemIds: ["right:content-1"],
+          recipeApplication: application,
+        },
+      }],
+    };
+    const contentPages = createManualEditorPages(draft).filter((page) => page.kind === "content");
+
+    expect(contentPages).toHaveLength(2);
+    expect(contentPages[0]?.photos.map((item) => item.id)).toEqual(["bridge", "extra"]);
+    expect(contentPages[1]?.photos.map((item) => item.id)).toEqual(["bridge", "extra"]);
+    expect(contentPages[0]?.recipeApplication?.unplacedPhotoIds).toEqual(["extra"]);
   });
 });

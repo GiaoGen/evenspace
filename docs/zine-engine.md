@@ -1,7 +1,7 @@
 # Zine Engine 需求规格
 
-> 状态：需求基线草案，尚未实现  
-> 更新日期：2026-08-10  
+> 状态：未来排版引擎需求；当前代码已实现本地创建器、手动排版切片和 Reader，本文其余 Recipe/AI/Page Plan 目标尚未实现。
+> 更新日期：2026-08-11
 > 适用范围：`/zine` 创建流程、自动排版、手动排版、页面 Recipe、封面、封底与 Reader 页面计划  
 > 关联文档：`docs/zine-system-handoff.md`
 
@@ -12,6 +12,23 @@
 Recipe 用于描述：一组照片和 Photo Note 如何被选择、排序、分组、放入页面模板，并最终生成可由 Reader 消费的页面计划。
 
 本文档记录的是后续开发目标，不代表当前代码已经具备以下能力。当前 Zine 的真实完成范围仍以 `docs/zine-system-handoff.md` 和代码现状为准。
+
+## 1.1 当前代码对照
+
+`main` 当前已经具备：
+
+- `/zine` 本地创建器：Name、Photos、5 种 Style，以及 AI layout 开关分出的 Overview / Arrange 路径。
+- 浏览器内存中的 `ZineDraft`、`ZinePhoto`、`ZineManualSpread` 和 reducer；照片使用 `File` 与 Object URL。
+- Arrange 的初始 spread 生成、左右加页、照片放置/替换、按 spread 切换现有样式，以及照片裁切焦点位置调整。
+- `createZineReaderPages` 将草稿转换为封面、内容页、空白/加页页和封底；Reader 使用 `page-flip@2.0.7`，支持 spread、单页焦点镜头和手势翻页。
+
+当前仍未实现：
+
+- 真正的 AI 排版、Recipe registry、72 个 Recipe、Page Plan 持久化和生成任务。
+- 页面删除/拖拽重排、文字页、自由图层、导出、发布、分享和重新打开。
+- localStorage、IndexedDB、Supabase Auth、Storage、RLS、Realtime 或任何 Zine 后端写入。
+
+因此，“AI Layout”在当前实现中只是流程分支开关；不得把 Overview 或现有样式选择器写成自动排版已完成。
 
 如果本文档与旧交接文档在以下方面发生冲突，以本文档为准：
 
@@ -498,4 +515,3 @@ AI 或规则引擎选择 Recipe 时至少可以使用以下输入：
   <https://www.blurb.com/blog/zine-layouts-dos-and-donts/>
 - People of Print Riso Projects：有限色组、逐色叠印和多色 Riso 实例。  
   <https://peopleofprint.com/best-of/pop-member-showcase-15-riso-projects/>
-

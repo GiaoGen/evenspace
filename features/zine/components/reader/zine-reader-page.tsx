@@ -1,23 +1,17 @@
-import Image from "next/image";
 import { Icon } from "@/components/ui/icon";
-import type { ZinePhoto } from "../../model/zine-draft";
+import { getRecipeDefinition } from "../../model/recipe-contract";
 import type { ZineReaderPage } from "../../model/zine-pages";
+import { RecipeRenderer } from "../recipe-renderer";
 import styles from "./zine-reader.module.css";
-
-const styleClasses = {
-  editorial: styles.editorial,
-  contact: styles.contact,
-  margin: styles.margin,
-  split: styles.split,
-  night: styles.night,
-} as const;
 
 export function ZineReaderPageView({
   page,
   pageIndex,
+  mode,
 }: {
   readonly page: ZineReaderPage;
   readonly pageIndex: number;
+  readonly mode: "editor" | "reader";
 }) {
   const sideClass = page.kind === "content" || page.kind === "colophon" || page.kind === "blank" || page.kind === "add"
     ? page.side === "left" ? styles.leftPage : styles.rightPage
@@ -25,7 +19,7 @@ export function ZineReaderPageView({
   const className = [
     styles.bookPage,
     sideClass,
-    page.kind === "content" ? styleClasses[page.styleId] : styles[page.kind],
+    page.kind === "content" ? styles.content : styles[page.kind],
   ].filter(Boolean).join(" ");
 
   return (
@@ -45,7 +39,7 @@ export function ZineReaderPageView({
       ) : page.kind === "add" ? (
         <AddPage spreadId={page.spreadId} side={page.side} />
       ) : page.kind === "blank" ? null : (
-        <ContentPage page={page} />
+        <ContentPage page={page} mode={mode} />
       )}
     </article>
   );
@@ -101,104 +95,32 @@ function Colophon({ title, pageNumber }: { readonly title: string; readonly page
   );
 }
 
-function ContentPage({ page }: { readonly page: Extract<ZineReaderPage, { kind: "content" }> }) {
-  if (page.styleId === "contact") {
-    return (
-      <>
-        <PageHeader title={page.title} pageNumber={page.pageNumber} label="INDEX" />
-        <div className={styles.contactGrid}>
-          {page.photos.map((photo, index) => (
-            <ReaderPhoto key={photo.id} photo={photo} side={page.side} index={index + 1} />
-          ))}
-        </div>
-        <PageFooter pageNumber={page.pageNumber} />
-      </>
-    );
-  }
-
-  if (page.styleId === "split") {
-    return (
-      <>
-        <PageHeader title={page.title} pageNumber={page.pageNumber} label="TWO VIEWS" />
-        <div className={styles.splitGrid}>
-          {page.photos.map((photo, index) => (
-            <ReaderPhoto key={photo.id} photo={photo} side={page.side} index={index + 1} />
-          ))}
-        </div>
-        <PageFooter pageNumber={page.pageNumber} />
-      </>
-    );
-  }
-
-  const photo = page.photos[0];
-  return (
-    <>
-      <PageHeader
-        title={page.title}
-        pageNumber={page.pageNumber}
-        label={page.styleId === "night" ? "NIGHT INDEX" : "EVENTSPACE"}
-      />
-      {page.styleId === "editorial" ? <h2>{page.title}</h2> : null}
-      {photo ? <ReaderPhoto photo={photo} side={page.side} index={1} /> : null}
-      {page.styleId === "night" ? <strong className={styles.nightTitle}>{page.title}</strong> : null}
-      <PageFooter pageNumber={page.pageNumber} />
-    </>
-  );
-}
-
-function ReaderPhoto({
-  photo,
-  side,
-  index,
+function ContentPage({
+  page,
+  mode,
 }: {
-  readonly photo: ZinePhoto;
-  readonly side: "left" | "right";
-  readonly index: number;
+  readonly page: Extract<ZineReaderPage, { kind: "content" }>;
+  readonly mode: "editor" | "reader";
 }) {
+  const application = page.recipeApplication;
+  const recipe = application ? getRecipeDefinition(application.recipeId) : null;
+  if (!recipe || !application) {
+    return <span className={styles.missingRecipe}>Recipe unavailable</span>;
+  }
   return (
-    <figure className={styles.readerPhoto} data-zine-photo-id={photo.id}>
-      <div>
-        <Image
-          unoptimized
-          loading="eager"
-          src={photo.previewUrl}
-          alt={photo.fileName}
-          width={photo.width}
-          height={photo.height}
-          sizes="(max-width: 640px) 45vw, 420px"
-          style={{ objectPosition: `${photo.positionX}% ${photo.positionY}%` }}
-        />
-      </div>
-      {photo.caption.trim() ? (
-        <figcaption className={side === "left" ? styles.captionLeft : styles.captionRight}>
-          <b>{twoDigits(index)}</b>
-          <span>{photo.caption.trim()}</span>
-        </figcaption>
-      ) : null}
-    </figure>
+    <RecipeRenderer
+      recipe={recipe}
+      application={application}
+      photos={page.photos}
+      environment={{
+        pageId: page.id,
+        pageSide: page.side,
+        mode,
+        pageNumber: page.pageNumber,
+        title: page.title,
+      }}
+    />
   );
-}
-
-function PageHeader({
-  title,
-  pageNumber,
-  label,
-}: {
-  readonly title: string;
-  readonly pageNumber: number;
-  readonly label: string;
-}) {
-  return (
-    <header className={styles.pageHeader}>
-      <span>{label}</span>
-      <b>{title}</b>
-      <small>{twoDigits(pageNumber)}</small>
-    </header>
-  );
-}
-
-function PageFooter({ pageNumber }: { readonly pageNumber: number }) {
-  return <footer className={styles.pageFooter}><span>EVENTSPACE</span><b>{twoDigits(pageNumber)}</b></footer>;
 }
 
 function getPageLabel(page: ZineReaderPage) {

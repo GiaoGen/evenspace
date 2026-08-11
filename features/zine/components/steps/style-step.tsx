@@ -1,5 +1,6 @@
 import { zineStyleOptions } from "../../model/zine-styles";
 import type { ZinePhoto, ZineStyleId } from "../../model/zine-draft";
+import { getRecipeForStyle } from "../../model/recipe-contract";
 import { StylePagePreview } from "../style-page-preview";
 import styles from "../zine-creator.module.css";
 
@@ -28,6 +29,8 @@ export function StyleStep({
         <div className={styles.styleRail}>
           {zineStyleOptions.map((style) => {
             const selected = style.id === selectedStyleId;
+            const recipe = getRecipeForStyle(style.id);
+            if (!recipe) return null;
             return (
               <button
                 key={style.id}
@@ -36,7 +39,7 @@ export function StyleStep({
                 aria-pressed={selected}
                 onClick={() => onSelect(style.id)}
               >
-                <StylePagePreview styleId={style.id} photos={photos} />
+                <StylePagePreview recipe={recipe} photos={photos} />
                 <span className={styles.styleOptionMeta}>
                   <span><strong>{style.name}</strong><small>{style.pageNote}</small></span>
                   <i aria-hidden="true">{selected ? "✓" : ""}</i>

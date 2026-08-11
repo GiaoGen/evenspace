@@ -1,6 +1,6 @@
 # EventSpace 类型化 Mock MVP 架构
 
-> 状态：2026-08-10 历史 Mock 架构与当前兼容壳说明。正式房间已接入 Supabase；`MockSession` 仍服务本地 mock、旧数据兼容和云端 UI contract，不再代表全部业务真相。
+> 状态：2026-08-11 Mock 架构与当前兼容壳说明。正式房间已接入 Supabase；`MockSession` 仍服务本地 mock、旧数据兼容和云端 UI contract，不再代表全部业务真相。独立 `/zine` 使用自己的本地 reducer，不属于 `MockSession`。
 
 ## 1. 可运行范围
 
@@ -12,6 +12,7 @@
 | `/rooms/new` | Client state machine | 三步创建向导、逐步校验和明确的本地 Mock 完成态 |
 | `/join/[roomId]` | Server preview + Client wait state | 邀请预览、昵称、账号头像带入、anonymous guest、等待与审核结果轮询 |
 | `/account` | Server profile + Client settings | Supabase profile、昵称/主题、账号头像上传、退出登录 |
+| `/zine` | Client-only creator + reader | Zine 草稿、手动排版和 Reader 只存在当前组件内存 |
 | `/legal/[document]` | Server page | 法律文档结构草案与专业审阅警告 |
 
 本地 mock 路由共享版本化 `MockSession`。创建、消息、投票、旧回忆录、Itinerary、治理和个人归档操作通过同一纯 reducer 命令写入 `localStorage`；媒体 Blob 写入 IndexedDB。云端房间使用同一前端 contract，但先由 Supabase 读取权威快照，再通过 `BackendSessionProvider` 将支持的命令转为 Server Action / RPC / Storage 操作。
@@ -29,15 +30,19 @@ features/create-room/   创建草稿类型、独立草稿存储、纯 reducer �
 features/mock-session/  版本化浏览器会话、云端兼容 provider、领域命令、selectors 与恢复校验
 features/join/          私密邀请与申请状态机
 features/account/       Mock 身份、主题、重置与法律入口
+features/zine/          独立 Zine draft reducer、手动 spread/page 模型与 PageFlip Reader
 core/domain/            领域类型、品牌 ID、状态枚举
 core/security/          与 UI 无关的权限派生
 data/contracts/         Repository 接口
 data/mock/              经过运行时检查的 fixture 与 Mock Repository
 data/supabase/          Supabase Auth、RLS read model、RPC adapter、Storage 签名与生成 types
 data/rooms.ts           server-only 数据访问入口和最小 View DTO
+types/page-flip.d.ts    page-flip 第三方包的本地类型声明
 ```
 
 依赖只允许由页面/feature 指向领域和数据接口；`core` 不依赖 React、Next.js 或 Supabase。云端 Server Component 和 Server Action 可以调用 `data/supabase/*`，Client Component 不直接查表或持有 service secret。
+
+Zine 是一条独立的 Client-only vertical slice：`features/zine/components/zine-creator.tsx` 使用自己的 `useReducer`，`ZineDraft` 直接持有浏览器 `File` 与 Object URL；`zine-manual-layout.ts` / `zine-pages.ts` 负责领域模型和 Reader 页面生成，Reader 再把 React 源页克隆到命令式 DOM 交给 `page-flip`。它不读取或写入 `MockSession`，也没有 Repository、Server Action、Storage 或 RLS 边界。
 
 ## 3. Server / Client 边界
 
@@ -204,6 +209,13 @@ data/rooms.ts           server-only 数据访问入口和最小 View DTO
 - `RoomReadModel.viewer.isFavorite` 来自 `viewer_is_favorite`；Rooms 的 Favorite 筛选不再依赖本地 mock 收藏字段。`setRoomFavoriteAction` 和 `hideRoomAction` 是当前 `/rooms` Edit 模式的 Server Action 边界，失败会回滚乐观状态。
 - `room_members.is_favorite` / `hidden_at` 属于当前 membership，不是全局 room 属性。隐藏只从当前成员的 collection 查询中排除房间，直接 room read 仍以成员授权为准。
 - `features/local-assets` 现在把已授权图片同时写入 Cache Storage 和 IndexedDB；`readBestCachedImage` 先找 display，再在有 thumbnail 时回退 thumbnail。缓存 key 仍由 scope、asset、variant、revision 决定，不能被 `MockSession` 或普通 asset prune 当作业务数据处理。
+
+## 2026-08-11 当前同步：Zine 独立本地架构
+
+- `/zine` 不使用 `MockSession`、`BackendSessionProvider` 或现有房间 Repository；创建器自己的 reducer 管理 `ZineDraft`、`ZinePhoto` 和 `manualSpreads`。
+- `zine-manual-layout.ts` 负责 spread/page 模型、样式容量和初始照片分配；`zine-pages.ts` 将草稿转换为 Reader 页面数据，避免 UI 卡片位置决定阅读顺序。
+- Reader 与 Arrange 都通过 React 屏幕外源页 → 克隆页面 → 独立命令式根节点的边界接入 `page-flip`；第三方库不直接接管 React 正在维护的 DOM。
+- 当前 Zine 没有本地持久化或服务端数据层，因此不能复用现有房间 session 的缓存、权限或恢复语义。未来若进入生产，应先建立独立的 draft/version/page/asset DTO 和 Repository。
 
 ## 2026-07-27 当前同步：浏览器导航状态
 

@@ -6,6 +6,17 @@ import {
   type ZineManualSpread,
   type ZinePageSide,
 } from "./zine-manual-layout";
+import {
+  createNotesByPhotoId,
+  createRecipeApplication,
+  getRecipeDefinition,
+  getRecipeForStyle,
+  type RecipeApplication,
+} from "./recipe-contract";
+import {
+  createContentItemIds,
+  createPhotoFocusDefaults,
+} from "./recipe-placement";
 
 export type ZineReaderPage =
   | {
@@ -29,6 +40,7 @@ export type ZineReaderPage =
       readonly photos: readonly ZinePhoto[];
       readonly pageNumber: number;
       readonly side: "left" | "right";
+      readonly recipeApplication: RecipeApplication | null;
     }
   | {
       readonly id: string;
@@ -86,6 +98,7 @@ export function createZineReaderPages(draft: ZineDraft): readonly ZineReaderPage
       photos,
       pageNumber: index + 1,
       side: (index + 1) % 2 === 1 ? "left" : "right",
+      recipeApplication: createReaderRecipeApplication(draft, photos, `content-${index + 1}`),
     }),
   );
 
@@ -151,7 +164,7 @@ function createManualSidePage(
   includeAddPages: boolean,
 ): ZineReaderPage {
   const manualPage = spread[side];
-  if (manualPage) return manualPageToReaderPage(draft, manualPage, side, pageNumber, photoById);
+  if (manualPage) return manualPageToReaderPage(draft, spread, manualPage, side, pageNumber, photoById);
   if (includeAddPages) {
     return {
       id: `add-${spread.id}-${side}`,
@@ -175,24 +188,61 @@ function createManualSidePage(
 
 function manualPageToReaderPage(
   draft: ZineDraft,
+  spread: ZineManualSpread,
   page: ZineManualPage,
   side: ZinePageSide,
   pageNumber: number,
   photoById: ReadonlyMap<string, ZinePhoto>,
 ): ZineReaderPage {
+  const recipeApplication = page.recipeApplication ?? createReaderRecipeApplication(
+    draft,
+    page.photoIds.flatMap((id) => {
+      const photo = photoById.get(id);
+      return photo ? [photo] : [];
+    }),
+    page.id,
+  );
+  const visiblePhotoIds = recipeApplication?.scope === "spread"
+    ? [spread.left, spread.right]
+        .filter((candidate): candidate is ZineManualPage => (
+          candidate !== null && recipeApplication.targetPageIds.includes(candidate.id)
+        ))
+        .flatMap((candidate) => candidate.photoIds)
+    : page.photoIds;
   return {
     id: page.id,
     kind: "content",
     density: "soft",
     title: draft.name,
     styleId: page.styleId,
-    photos: page.photoIds.flatMap((id) => {
+    photos: visiblePhotoIds.flatMap((id) => {
       const photo = photoById.get(id);
       return photo ? [photo] : [];
     }),
     pageNumber,
     side,
+    recipeApplication,
   };
+}
+
+function createReaderRecipeApplication(
+  draft: ZineDraft,
+  photos: readonly ZinePhoto[],
+  pageId: string,
+): RecipeApplication | null {
+  if (!draft.styleId) return null;
+  const recipe = getRecipeForStyle(draft.styleId) ?? getRecipeDefinition(`recipe-${draft.styleId}-v1`);
+  if (!recipe) return null;
+  return createRecipeApplication({
+    recipe,
+    content: {
+      photoIds: photos.map((photo) => photo.id),
+      contentItemIds: createContentItemIds(pageId, photos.length),
+      notesByPhotoId: createNotesByPhotoId(draft.photos),
+      defaultFocusByPhotoId: createPhotoFocusDefaults(draft.photos),
+    },
+    anchorPageId: pageId,
+  });
 }
 
 function chunk<T>(items: readonly T[], size: number): readonly (readonly T[])[] {

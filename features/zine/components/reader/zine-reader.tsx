@@ -463,7 +463,7 @@ export function ZineReader({
 
         <div ref={sourceRef} className={styles.sourcePages} aria-hidden="true">
           {pages.map((page, index) => (
-            <ZineReaderPageView key={page.id} page={page} pageIndex={index} />
+            <ZineReaderPageView key={page.id} page={page} pageIndex={index} mode="reader" />
           ))}
         </div>
 

@@ -1,6 +1,6 @@
 # EventSpace 本地优先静态实现计划
 
-> 状态：2026-08-10 历史计划；本地优先阶段已被 Supabase-backed 封闭 MVP 接线覆盖，当前本地存储只承担 mock/fallback、上传前临时 Blob、旧数据兼容与云端读取加速。
+> 状态：2026-08-11 历史计划；本地优先阶段已被 Supabase-backed 封闭 MVP 接线覆盖，当前本地存储只承担 mock/fallback、上传前临时 Blob、旧数据兼容与云端读取加速。独立 `/zine` 另有不持久化的浏览器内存切片。
 > 目标：在不接入后端的前提下，将当前可操作 Mock 逐步改造成移动端优先、真实本地数据驱动、可被后端 Repository 替换的完整静态版本。  
 > 原则：不再把页面写死为样例 Mock；本地浏览器数据是当前真相来源，未来 Supabase/Postgres 是同一领域命令的远端真相来源。
 
@@ -77,6 +77,13 @@
 
 后端替换点：
 - 本地媒体记录未来对应私有 Storage object + signed URL；本地 Blob ID 对应未来 storage path/asset id。Photos、评论、排序与删除策略应使用独立 repository/DTO。
+
+### Zine 当前本地边界（不等同于本地优先产品阶段）
+
+- `/zine` 使用组件内 `useReducer` 保存 `ZineDraft`；选中的图片以浏览器 `File` 和 Object URL 作为预览来源。
+- Arrange 的 `manualSpreads`、照片放置/替换、样式和焦点位置只在当前页面生命周期内存在；没有 localStorage、IndexedDB、PWA 离线恢复或跨标签同步。
+- 因此 Zine 当前只是 local-only prototype，不满足本文“刷新、关闭浏览器、重新打开仍可恢复”的本地优先验收。未来若要持久化，应先把 File/Object URL 转成独立 asset/blob repository，再设计版本化 draft/page model。
+- 后端替换点应独立于 `MockSession`：生产需要私有 Storage、asset ownership、页面版本/并发控制、RLS 和发布权限，不能把浏览器 reducer 直接当成服务端 mutation。
 
 ### Phase E — Itinerary、Poll 与治理
 

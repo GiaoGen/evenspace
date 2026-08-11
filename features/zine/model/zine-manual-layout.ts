@@ -1,9 +1,21 @@
 import type { ZineDraft, ZinePhoto, ZineStyleId } from "./zine-draft";
+import {
+  createNotesByPhotoId,
+  createRecipeApplication,
+  getRecipeForStyle,
+  type RecipeApplication,
+} from "./recipe-contract";
+import {
+  createContentItemIds,
+  createPhotoFocusDefaults,
+} from "./recipe-placement";
 
 export type ZineManualPage = {
   readonly id: string;
   readonly styleId: ZineStyleId;
   readonly photoIds: readonly string[];
+  readonly contentItemIds: readonly string[];
+  readonly recipeApplication: RecipeApplication | null;
 };
 
 export type ZineManualSpread = {
@@ -30,10 +42,26 @@ export function createInitialManualSpreads(draft: ZineDraft): readonly ZineManua
   const pageSize = photosPerManualPage[styleId];
 
   for (let index = 0; index < pacedPhotos.length; index += pageSize) {
+    const pageId = `manual-page-${pages.length + 1}`;
+    const photoIds = pacedPhotos.slice(index, index + pageSize).map((photo) => photo.id);
+    const recipe = getRecipeForStyle(styleId);
     pages.push({
-      id: `manual-page-${pages.length + 1}`,
+      id: pageId,
       styleId,
-      photoIds: pacedPhotos.slice(index, index + pageSize).map((photo) => photo.id),
+      photoIds,
+      contentItemIds: createContentItemIds(pageId, photoIds.length),
+      recipeApplication: recipe
+        ? createRecipeApplication({
+            recipe,
+            content: {
+              photoIds,
+              contentItemIds: createContentItemIds(pageId, photoIds.length),
+              notesByPhotoId: createNotesByPhotoId(draft.photos),
+              defaultFocusByPhotoId: createPhotoFocusDefaults(draft.photos),
+            },
+            anchorPageId: pageId,
+          })
+        : null,
     });
   }
 

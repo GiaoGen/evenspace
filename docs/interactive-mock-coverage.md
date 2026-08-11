@@ -1,6 +1,6 @@
 # EventSpace 交互式 Mock 覆盖与边界
 
-> 状态：2026-08-10。正式产品路由已经进入 Supabase-backed 封闭 MVP 接线阶段；本文继续用于区分“本地 mock/fallback”“真实云端能力”“浏览器加速缓存”和“尚未达到生产安全承诺”的边界。
+> 状态：2026-08-11。正式产品路由已经进入 Supabase-backed 封闭 MVP 接线阶段；另有独立 `/zine` 本地创建/阅读切片。本文继续用于区分“本地 mock/fallback”“真实云端能力”“浏览器加速缓存”和“尚未达到生产安全承诺”的边界。
 
 ## 1. Mock 会话模型
 
@@ -22,6 +22,7 @@
 | `/join` | 真实 8 位邀请码解析、失效反馈、跳转到当前有效邀请 |
 | `/join/[roomId]` | 真实私密邀请预览、昵称、账号头像带入、匿名访客 session、免审核直入或 Host 审核 pending；pending 页面轮询审批结果 |
 | `/account` | 真实 Supabase profile、昵称/主题更新、账号头像上传、房间/照片统计、退出登录、法律入口 |
+| `/zine` | 浏览器内存中的 Name、Photos/Photo Note、Style、Overview 或 Arrange、真实翻页 Reader；不接入 Room、MockSession 或 Supabase |
 | `/legal/[document]` | Terms、Privacy、Community Rules、Cookie Notice 的结构草案与法律审阅警告 |
 
 ## 3. 房间交互覆盖
@@ -41,6 +42,14 @@
 - 短点击照片打开全屏详情与纵向评论；云端房间的评论/删除通过 Server Action / RPC 持久化，旧本地 mock/fallback 仍通过 `ADD_BOARD_COMMENT` 写入本地 session。
 - 没有 Book、双页 spread、caption 提交层、相机入口、Chat 内容导入、纸张样式或复杂自由排版。
 - `MockSession` v7 的 `boardItems` / `boardComments` 是当前本地兼容存储，而不是未来生产 API 的推荐命名。
+
+### Zine
+
+- `/zine` 是独立的客户端创建器，使用 `useReducer` 管理 `ZineDraft`；照片以浏览器 `File` 和 Object URL 保存在当前组件生命周期内。
+- 关闭 `AI layout` 进入 Arrange：支持初始 spread、左右加页、照片放置/替换、每个 spread 的样式切换、双击/双触焦点模式和照片裁切焦点调整。
+- 打开 `AI layout` 进入 Overview，但当前没有 AI provider 或自动布局；开关只是流程分支选择。
+- Reader 使用客户端动态加载的 `page-flip@2.0.7`，支持封面打开、spread 翻页、焦点单页、焦点内滑动、Esc 退出和照片 `object-fit: cover`。
+- 刷新、关闭 `/zine` 或离开路由会丢失草稿；没有 localStorage、IndexedDB、远程 Storage、数据库、发布、分享、导出或重新打开路径。
 
 ### Itinerary
 
@@ -100,14 +109,21 @@
 - Room Photos 的 Cache Storage + IndexedDB 图片缓存是 cloud image read-through cache，不是新的本地业务数据源；缓存键包含 scope、asset id、variant 和 revision，权限变化或签名 URL 过期后仍必须回源。
 - Account snapshot、Rooms snapshot、Room detail snapshot 和 viewer avatar cache 都会剥离 signed URL 再保存；这些缓存不能被描述为离线访问、跨设备同步或生产授权。
 - Rooms 卡片照片牌堆新增确定性入场、decode 协调和 Grid/Magazine 淡入淡出；这些是 UI/性能状态，不进入 `MockSession` 或 Supabase。
-- `page-flip` 已从依赖中移除；Book 仍是延期能力，不存在隐藏的运行时翻页包。
+- `page-flip` 已从 Room/Photos 运行时移除；Book 仍是延期能力。后续独立 `/zine` 本地切片重新引入 `page-flip@2.0.7`，不代表 Room 已有翻页包。
 
 ## 2026-08-10 当前同步：成员偏好与缓存解析
 
 - `/rooms` 的 Favorite 与“从个人列表移除”已经是 authenticated-only 的 Supabase Server Action / RPC 路径；它们不是本地 mock 命令，也不是当前标签页偏好。隐藏只改变当前 member 的 collection visibility，不删除 membership 或 room access。
 - `list_current_user_rooms` 和 `get_current_user_room` 都返回 `viewer_is_favorite`；隐藏的房间从 Rooms collection 排除，但直接 room route 仍可读取。
 - 图片授权缓存现在同时使用 Cache Storage `eventspace-cloud-images-v1` 与 IndexedDB；读取优先使用同 scope、同 variant、同 revision 的缓存，display 可作为更小请求的 fallback，缺失或签名失效时仍需回源。
-- Book/Zine 没有正式路由、数据模型、迁移或运行时阅读器；Rooms 菜单中的 `Book / Later` 只是禁用占位，不代表已实现或已进入当前 MVP。
+- Room 内 Book 仍没有正式路由、数据模型、迁移或运行时阅读器；Rooms 菜单中的 `Book / Later` 只是禁用占位。独立 `/zine` 已在后续提交中作为本地创建/阅读实验切片出现，但不代表已进入当前 Room MVP。
+
+## 2026-08-11 当前同步：Zine 创建器重写
+
+- `/zine` 已存在并可操作：Name、Photos/Photo Note、Style、Overview/Arrange 和 Reader。
+- Arrange 的手动模型是 `manualSpreads`，支持加页、放置/替换照片、spread 样式和照片焦点位置；这与 Step 2 的照片视觉分行独立。
+- `page-flip@2.0.7` 仅在客户端动态加载，Reader/Arrange 的翻页状态和源页面克隆都属于当前页面内存；不应写成云端保存的 Zine。
+- AI layout 目前只是 Overview/Arrange 流程开关；Recipe、AI 生成、Page Plan、持久化、导出、发布和分享仍未完成。
 
 ## 2026-07-18 历史同步：旧本地优先 Mock 覆盖
 

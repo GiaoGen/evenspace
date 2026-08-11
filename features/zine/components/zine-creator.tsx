@@ -3,8 +3,8 @@
 import { useEffect, useReducer, useRef, useState, type FormEvent } from "react";
 import { createUuid } from "@/core/domain/uuid";
 import {
-  initialZineCreatorState,
-  zineCreatorReducer,
+  initialZineCreatorHistoryState,
+  zineCreatorHistoryReducer,
   type EditableZineStep,
   type ZinePhoto,
 } from "../model/zine-draft";
@@ -17,7 +17,8 @@ import { ZineReader } from "./reader/zine-reader";
 import { ZineShell } from "./zine-shell";
 
 export function ZineCreator() {
-  const [state, dispatch] = useReducer(zineCreatorReducer, initialZineCreatorState);
+  const [history, dispatch] = useReducer(zineCreatorHistoryReducer, initialZineCreatorHistoryState);
+  const state = history.present;
   const [nameAttempted, setNameAttempted] = useState(false);
   const [aiLayoutEnabled, setAiLayoutEnabled] = useState(false);
   const previewUrls = useRef(new Set<string>());
@@ -143,11 +144,17 @@ export function ZineCreator() {
       ) : state.step === "manual" ? (
         <ManualLayoutStep
           draft={state.draft}
-          onPhotoPositionChange={(photoId, positionX, positionY) => dispatch({
-            type: "SET_PHOTO_POSITION",
-            photoId,
-            positionX,
-            positionY,
+          canUndo={history.past.length > 0}
+          canRedo={history.future.length > 0}
+          onUndo={() => dispatch({ type: "UNDO" })}
+          onRedo={() => dispatch({ type: "REDO" })}
+          onPlacementFocusChange={(pageId, placementId, focusX, focusY, scale) => dispatch({
+            type: "SET_PLACEMENT_FOCUS",
+            pageId,
+            placementId,
+            focusX,
+            focusY,
+            scale,
           })}
           onAddPage={(spreadId, side) => dispatch({
             type: "ADD_MANUAL_PAGE",
@@ -160,10 +167,10 @@ export function ZineCreator() {
             photoId,
             replacePhotoId,
           })}
-          onSetSpreadStyle={(spreadId, styleId) => dispatch({
-            type: "SET_MANUAL_SPREAD_STYLE",
-            spreadId,
-            styleId,
+          onApplyRecipe={(pageId, recipeId) => dispatch({
+            type: "APPLY_RECIPE",
+            pageId,
+            recipeId,
           })}
         />
       ) : (
@@ -188,8 +195,8 @@ async function createZinePhoto(file: File): Promise<ZinePhoto> {
       width: dimensions.width,
       height: dimensions.height,
       caption: "",
-      positionX: 50,
-      positionY: 50,
+      defaultFocusX: 50,
+      defaultFocusY: 50,
     };
   } catch (error) {
     URL.revokeObjectURL(previewUrl);

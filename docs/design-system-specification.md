@@ -1,6 +1,6 @@
 # EventSpace 设计系统规范 v1（待视觉稿复核）
 
-> 范围：页面视觉、排版、组件形状与性能边界。2026-08-02 当前实现已经沉淀头像、真实 QR、照片牌堆、路线 loading skeleton 与媒体缓存占位规则。
+> 范围：页面视觉、排版、组件形状与性能边界。2026-08-11 当前实现已经沉淀头像、真实 QR、照片牌堆、路线 loading skeleton、媒体缓存占位，以及独立 Zine 创建器/Reader 的全屏舞台规则。
 
 ## 1. 设计原则
 
@@ -142,7 +142,7 @@
 - Grid/Magazine 切换允许 110-170ms 级别的 opacity 过渡，并保持当前房间视觉锚点；禁止在切换时改变卡片尺寸、重排文本或把搜索/筛选控件推走。
 - Account、Rooms、Room New 和 Room detail loading skeleton 使用同一低对比表面、固定块尺寸和真实页面布局比例；skeleton 不显示假头像、假二维码或看似可点击的假媒体。
 - 媒体缓存命中时可以立即显示本地 Blob；缓存缺失或签名 URL 过期时使用 placeholder/骨架过渡，不能闪现破图图标或把错误状态当作空相册。
-- `page-flip` 已移除依赖；当前设计系统不再维护 Book 翻页控件规则。若未来恢复 Book，应单独建立新的阅读器设计基线和性能预算。
+- `page-flip` 已从 Room/Photos 运行时移除；当前设计系统不维护 Room Book 翻页控件规则。独立 `/zine` 的 Reader 规则见 2026-08-11 同步，不能外推为 Room 产品能力。
 
 ## 8. 已确认的非视觉边界
 
@@ -193,3 +193,11 @@
 - Single 视角接近占满移动端可用宽度，Spread 保留完整双页轮廓。视角平移和翻页使用不同节奏，只有翻页完成后才切换新页侧。
 - Book 控制栏收敛为前一页、Single/Spread 分段、后一页；图标按钮提供可读名称，状态文字保持可辨识，并遵循 `prefers-reduced-motion`。
 - 照片无相框和额外边框，保持原比例；文本透明背景。caption 只存在于照片详情评论层，不覆盖在书页照片上。
+
+## 2026-08-11 当前同步：Zine 创建器与 Reader 模式
+
+- `/zine` 使用全屏、无嵌套卡片的创建器外壳：顶部进度/开关，中部步骤工作区，底部固定导航；不把它伪装成 Room 后台。
+- Style 选择使用横向真实页面比例 Demo；Arrange 的 Photo library / Recipe library 使用全屏舞台上的抽屉，抽屉是任务工具，不再叠加第二层卡片容器。
+- 书页保持直角矩形；Step 2 照片卡用 `contain` 展示完整比例，Reader/Arrange 的书页照片用 `cover` 并以 `positionX` / `positionY` 控制裁切焦点。
+- Reader 的 spread、焦点单页和翻页使用独立相机状态；焦点模式通过 transform/opacity 和受控宽度移动，不使用弹窗替代书页，也不复制第二份可见 Reader DOM。
+- `page-flip` 的书页节点由命令式适配层接管；React 源页隐藏渲染、克隆和销毁必须保持稳定，避免第三方 DOM 所有权与 React 生命周期冲突。

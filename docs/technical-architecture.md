@@ -1,5 +1,7 @@
 # EventSpace 第一版技术架构方案
 
+> 2026-08-11 当前同步：独立 `/zine` 已有 Client-only 创建器、手动排版模型和 `page-flip` Reader，但尚未进入当前 Supabase 生产数据模型或 MVP 后端排期。
+
 > 状态：2026-08-10 Supabase 封闭 MVP 接线校准；详细实施与任务状态以 [`supabase-backend-integration-plan.md`](./supabase-backend-integration-plan.md) 为准。
 > 原则：个人开发者可维护、移动端优先、数十人房间实时协作、严格服务端授权、托管加密而非 E2EE。
 
@@ -45,7 +47,7 @@
 
 ## 4. 数据与授权模型
 
-Postgres 是真相来源。首期核心实体包括：`profiles`、`actors`、`terms_acceptances`、`rooms`、`room_members`、`room_preferences`、`room_invites`、`room_join_requests`、`actor_claim_challenges`、`messages`、`message_reactions`、`message_pins`、`assets`、`photos`、`photo_comments`、`itineraries`、`reports`、`room_bans`、`archive_entries`、`audit_events`、`command_receipts` 和 `outbox_jobs`。`profiles`、`room_members` 与 `room_join_requests` 当前已携带 `avatar_variant` / `avatar_asset_id`，`room_members` 另有当前成员级 `is_favorite` / `hidden_at`；头像 asset 继续复用私有 `assets` + `room-media`。图片类 asset 当前还携带 `thumbnail_object_key`、`thumbnail_byte_size`、`placeholder_data_url`、`image_width`、`image_height` 与 `media_revision`，用于区分 display 与 thumbnail 衍生资源。支付模块包括 `products`、`prices`、`checkout_sessions`、`payment_events`、`room_entitlements` 和 `refund_events`。Book 与投票均不进入首批 schema；旧 `board_items` / `board_comments` 只作为本地兼容来源评估。
+Postgres 是真相来源。首期核心实体包括：`profiles`、`actors`、`terms_acceptances`、`rooms`、`room_members`、`room_preferences`、`room_invites`、`room_join_requests`、`actor_claim_challenges`、`messages`、`message_reactions`、`message_pins`、`assets`、`photos`、`photo_comments`、`itineraries`、`reports`、`room_bans`、`archive_entries`、`audit_events`、`command_receipts` 和 `outbox_jobs`。`profiles`、`room_members` 与 `room_join_requests` 当前已携带 `avatar_variant` / `avatar_asset_id`，`room_members` 另有当前成员级 `is_favorite` / `hidden_at`；头像 asset 继续复用私有 `assets` + `room-media`。图片类 asset 当前还携带 `thumbnail_object_key`、`thumbnail_byte_size`、`placeholder_data_url`、`image_width`、`image_height` 与 `media_revision`，用于区分 display 与 thumbnail 衍生资源。支付模块包括 `products`、`prices`、`checkout_sessions`、`payment_events`、`room_entitlements` 和 `refund_events`。Room 内 Book 与投票均不进入首批 schema；独立 `/zine` 当前也不进入 schema，旧 `board_items` / `board_comments` 只作为本地兼容来源评估。
 
 所有暴露到 Data API 的表均启用 RLS。每项读取和写入策略至少同时验证：
 
@@ -80,9 +82,16 @@ Secret/service role key 只在服务端环境使用，绝不发送到浏览器�
 - Storage bucket 一律私有。读取时由已授权服务端动作生成短期签名 URL；当前 helper 批量签 display 与 thumbnail，默认有效期 30 分钟。签名 URL 在到期前不可按单用户即时撤销，因此到期必须足够短，且不得持久化到本地 snapshot。
 - 不存原图。图片上传当前保存 display 与 thumbnail 两个对象，服务端 RPC 约束 display 不超过 2.25 MB、thumbnail 不超过 180 KB、placeholder data URL 长度、尺寸上限和 revision。
 - `AssetReference` 是 UI/领域层稳定契约，已包含可选 `thumbnail`、`placeholderDataUrl`、`width`、`height` 与 `revision`。legacy asset 缺少 variant 字段时，服务端读取层会降级为单 display URL。
-- 当前 Photos 使用 CSS 网格与照片详情层；`page-flip` 依赖和旧类型声明已删除，Book/StPageFlip 不参与运行时。若未来恢复阅读器，应重新评审其数据模型、包依赖和客户端边界。
+- 当前 Photos 仍使用 CSS 网格与照片详情层；Room 内 Book/StPageFlip 不参与运行时。独立 `/zine` 已重新引入客户端动态 `page-flip@2.0.7`，但它只服务本地 Zine Reader，不改变 Room 后端架构。
 
-### 7.2 PWA
+### 7.2 Zine 当前客户端边界
+
+- `/zine` 是独立 Client Component；`useReducer` 持有 `ZineDraft`，照片使用浏览器 `File` 与 Object URL，刷新/离开路由即丢失。
+- `zine-manual-layout.ts` 和 `zine-pages.ts` 将手动 spread/page 数据与 Reader 页面模型分开；Step 2 的视觉分行不参与阅读顺序。
+- `page-flip@2.0.7` 只在客户端动态加载。Reader 和 Arrange 都先渲染隐藏源页，再克隆到独立命令式根节点；StPageFlip 不直接接管 React 管理的 DOM。
+- 当前没有 Zine Auth、Storage、数据库、Realtime、AI provider 或 server mutation。未来若进入生产，应为 draft/version/page/asset 建立独立 DTO、Repository、私有 Storage 和 RLS 设计，不复用 `MockSession` 作为权威状态。
+
+### 7.3 PWA
 
 - 配置 Web App Manifest、可安装入口、主题色和图标。
 - Service Worker 仅缓存公共应用壳与静态资源；未发送草稿由应用以会话范围的 IndexedDB 数据保存。不永久缓存已认证房间内容或私密媒体。
@@ -224,7 +233,7 @@ Secret/service role key 只在服务端环境使用，绝不发送到浏览器�
 
 ## 2026-07-23 历史同步：回忆录数据与翻页依赖
 
-- 当时 `page-flip@2.0.7` 未被运行时代码引用；截至 2026-08-10 依赖和旧类型声明仍已移除，Book/Zine 没有正式数据模型或运行时阅读器，未来若重启必须重新立项。
+- 当时 `page-flip@2.0.7` 未被运行时代码引用；截至 2026-08-10 Room Book 依赖和旧类型声明仍已移除。2026-08-11 独立 `/zine` 重新引入该包作为 Client-only Reader，但仍没有正式数据模型、持久化或生产后端，未来进入生产必须重新立项。
 - 当前本地 schema 以 `BoardPhoto`/`boardItems`、`boardComments` 和 `AssetReference` 驱动 Photos 网格。生产建议拆分为 photo、comment、asset 等领域 DTO，不应直接复制兼容字段名称。
 - 添加照片与 caption 必须是同一服务端事务：服务端复核成员资格、房间状态、目标页、asset 所有权、照片配额和正文长度，并写入服务器作者/时间。
 - 新增 spread 和修改纸张样式需要 expected revision 或等价乐观并发控制；Realtime 只广播权威页版本，不传播 StPageFlip 动画状态。

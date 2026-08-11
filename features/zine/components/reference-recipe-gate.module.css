@@ -1,0 +1,256 @@
+.page {
+  min-height: 100dvh;
+  padding: 28px clamp(16px, 4vw, 64px) 72px;
+  background:
+    radial-gradient(circle at 12% 0%, rgba(224, 184, 112, .2), transparent 32rem),
+    var(--canvas);
+  color: var(--ink);
+}
+
+.header,
+.recipeSection {
+  width: min(100%, 1480px);
+  margin: 0 auto;
+}
+
+.header {
+  display: grid;
+  gap: 14px;
+  margin-bottom: 28px;
+}
+
+.eyebrow {
+  margin: 0;
+  color: var(--muted);
+  font: 700 10px/1.2 var(--font-geist-mono), monospace;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.header h1 {
+  max-width: 900px;
+  margin: 0;
+  font-size: clamp(30px, 5vw, 62px);
+  line-height: .95;
+  letter-spacing: -.06em;
+}
+
+.header p {
+  max-width: 780px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.gateLegend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.gateLegend span,
+.recipeBadge,
+.scenarioBadge,
+.modeBadge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 0 8px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--surface) 82%, transparent);
+  color: var(--muted);
+  font: 700 9px/1 var(--font-geist-mono), monospace;
+}
+
+.gateLegend span:first-child { border-color: #617c73; color: #3e6459; }
+.gateLegend span:nth-child(2) { border-color: #b26b55; color: #99543e; }
+.gateLegend span:nth-child(3) { border-color: #6678b6; color: #4d619f; }
+
+.sectionStack { display: grid; gap: 24px; }
+
+.recipeSection {
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  box-shadow: 0 18px 46px rgba(49, 43, 35, .08);
+}
+
+.recipeHeader {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 18px;
+  padding: 20px 22px 18px;
+  border-bottom: 1px solid var(--line);
+}
+
+.recipeHeader h2 {
+  margin: 0;
+  font-size: clamp(20px, 3vw, 31px);
+  line-height: 1;
+  letter-spacing: -.045em;
+}
+
+.recipeHeader p {
+  max-width: 680px;
+  margin: 7px 0 0;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.recipeMeta {
+  display: grid;
+  align-content: start;
+  justify-items: end;
+  gap: 7px;
+  color: var(--muted);
+  font: 700 9px/1.35 var(--font-geist-mono), monospace;
+  text-align: right;
+}
+
+.recipeBadge { color: var(--ink); }
+
+.scenarioGroup {
+  padding: 16px 22px 22px;
+}
+
+.scenarioGroup + .scenarioGroup { border-top: 1px solid var(--line); }
+
+.scenarioHeader {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 11px;
+}
+
+.scenarioHeader h3 {
+  margin: 0;
+  font-size: 12px;
+  letter-spacing: -.01em;
+}
+
+.scenarioHeader small {
+  color: var(--muted);
+  font: 700 9px/1 var(--font-geist-mono), monospace;
+}
+
+.cellGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 12px;
+}
+
+.cell {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+}
+
+.cell[data-mode="editor"] { border-top: 3px solid #b26b55; }
+.cell[data-mode="reader"] { border-top: 3px solid #617c73; }
+
+.cellMeta {
+  display: grid;
+  gap: 5px;
+  padding: 10px 11px 9px;
+}
+
+.cellMetaTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.modeBadge { color: var(--ink); }
+.cell[data-mode="editor"] .modeBadge { border-color: #c88870; color: #99543e; }
+.cell[data-mode="reader"] .modeBadge { border-color: #82a59a; color: #3e6459; }
+
+.cellCode {
+  overflow: hidden;
+  color: var(--muted);
+  font: 700 8px/1.3 var(--font-geist-mono), monospace;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cellCode strong { color: var(--ink); font-weight: 800; }
+
+.cellCanvasRow {
+  display: flex;
+  gap: 4px;
+  padding: 0 10px 10px;
+  background: var(--surface-2);
+}
+
+.canvasFrame {
+  position: relative;
+  min-width: 0;
+  flex: 1 1 0;
+  aspect-ratio: 3 / 4;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--ink) 15%, transparent);
+  background: var(--surface-2);
+}
+
+.canvasFrame :global(.recipeCanvas) { width: 100%; height: 100%; }
+
+.cellFooter {
+  display: grid;
+  gap: 5px;
+  padding: 9px 11px 11px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font: 700 8px/1.35 var(--font-geist-mono), monospace;
+}
+
+.slotList {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.slotList strong { color: var(--ink); }
+
+.assignmentState { display: flex; flex-wrap: wrap; gap: 5px 10px; }
+
+.errorList {
+  display: grid;
+  gap: 4px;
+  color: #9a443c;
+}
+
+.errorList strong { color: #77302b; }
+
+.validState { display: none; }
+
+.compatibilityValid,
+.compatibilityInvalid {
+  overflow-wrap: anywhere;
+}
+
+.compatibilityValid { color: #3e6459; }
+.compatibilityInvalid { color: #9a443c; }
+.compatibilityInvalid strong { color: #77302b; }
+
+@media (max-width: 700px) {
+  .page { padding-top: 20px; }
+  .recipeHeader { grid-template-columns: 1fr; }
+  .recipeMeta { justify-items: start; text-align: left; }
+  .scenarioGroup { padding-inline: 13px; }
+  .recipeHeader { padding-inline: 14px; }
+  .cellGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .cellMeta { padding-inline: 8px; }
+  .cellCanvasRow { padding-inline: 7px; }
+  .cellFooter { padding-inline: 8px; }
+}
+
+@media (max-width: 430px) {
+  .cellGrid { grid-template-columns: 1fr; }
+}

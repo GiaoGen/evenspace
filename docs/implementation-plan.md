@@ -1,6 +1,6 @@
 # EventSpace 实施任务顺序
 
-> 本文是执行顺序与验收门槛，不替代产品规格。2026-08-10 当前封闭 MVP 已收敛为 Host-led + Chat + Photos + Itinerary + Supabase；旧投票、自由画板和 Book 阶段不再作为当前实施主线。
+> 本文是执行顺序与验收门槛，不替代产品规格。2026-08-11 当前封闭 MVP 已收敛为 Host-led + Chat + Photos + Itinerary + Supabase；旧投票、自由画板和 Room Book 阶段不再作为当前实施主线。独立 `/zine` 目前只是未接后端的本地实验切片，不进入本计划的生产排期。
 
 ## Phase 0 — 视觉与交互定稿
 

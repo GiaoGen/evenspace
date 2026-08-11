@@ -2,6 +2,7 @@ import Image from "next/image";
 import { Icon } from "@/components/ui/icon";
 import type { EditableZineStep, ZineDraft } from "../../model/zine-draft";
 import { getZineStyle } from "../../model/zine-styles";
+import { getRecipeForStyle } from "../../model/recipe-contract";
 import { StylePagePreview } from "../style-page-preview";
 import styles from "../zine-creator.module.css";
 
@@ -13,6 +14,7 @@ export function OverviewStep({
   readonly onEdit: (step: EditableZineStep) => void;
 }) {
   const style = getZineStyle(draft.styleId);
+  const recipe = draft.styleId ? getRecipeForStyle(draft.styleId) : null;
   const captionedPhotos = draft.photos.filter((photo) => photo.caption.trim()).length;
 
   return (
@@ -42,9 +44,9 @@ export function OverviewStep({
             <span>Page style</span>
             <EditButton label="Edit style" onClick={() => onEdit("style")} />
           </div>
-          {style && draft.styleId ? (
+          {style && recipe ? (
             <div className={styles.overviewStyleBody}>
-              <StylePagePreview styleId={draft.styleId} photos={draft.photos} compact />
+              <StylePagePreview recipe={recipe} photos={draft.photos} compact />
               <span><strong>{style.name}</strong><small>{style.description}</small></span>
             </div>
           ) : null}

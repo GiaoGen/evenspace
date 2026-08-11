@@ -1,6 +1,6 @@
 # EventSpace Supabase 后端接入方案
 
-> 状态：2026-08-10 同步；首批后端基础任务已完成 8/8，BE-010 至 BE-022、
+> 状态：2026-08-11 同步；首批后端基础任务已完成 8/8，BE-010 至 BE-022、
 > DW-001 至 DW-010、2026-07-28 五项线上接入修复，以及头像/访客加入/真实 QR
 > 工作区改动均已记录；BE-009 支付规划按产品决策延期。
 > 建立日期：2026-07-27。  
@@ -62,7 +62,8 @@
 | 事项 | 当前运行时代码 | 历史规格/兼容状态 | 推荐首期决定 |
 | --- | --- | --- | --- |
 | 投票 | UI 已移除 | reducer 和旧文档仍保留 | 延后，优先级低于 Book |
-| Book/回忆录 | 已删除 | 历史任务和旧技术方案仍提及 | 后端首批不建设；作为 MVP 候选，优先于投票重新设计 |
+| Room Book/回忆录 | 已删除 | 历史任务和旧技术方案仍提及 | 后端首批不建设；作为 MVP 候选，优先于投票重新设计 |
+| 独立 Zine | 当前为 Client-only 本地切片 | 无生产表、RPC、Storage、AI 或权限路径 | 不纳入当前后端；先完成产品/Recipe/Page Plan 设计后重新立项 |
 | 自由 Board | 无正式入口 | 保留兼容类型和旧字段 | 不建立生产 Board API |
 | Photos | 当前为图片网格 | 复用 `BoardPhoto`/`boardItems` 名称 | 生产使用 `photos`/`photo_comments` |
 | Chat 图片/位置 | 新 UI 不创建 | 兼容读取旧 session | 首期仅文字和语音 |
@@ -708,9 +709,9 @@ Stripe Checkout 使用 Stripe 托管的支付页，应用不直接接触卡号�
 
 ### Phase 7 — 延后能力边界
 
-- Book/Zine、投票和自由 Board 不属于当前 MVP 实施路径，也没有当前生产表、RPC、迁移或验收任务。
-- 若未来重新启动 Book，必须重新提交产品、数据模型、权限、媒体快照和阅读器方案；不能恢复已撤回的历史实现或把菜单占位当作后端需求。
-- 当前阶段只维护 Photos 网格、照片详情/评论和 Rooms 照片预览；Book 相关内容不进入本阶段开发排期。
+- Room Book、独立 Zine、投票和自由 Board 不属于当前 MVP 后端实施路径，也没有当前生产表、RPC、迁移或验收任务。独立 Zine 虽已有 `/zine` 本地切片，但不构成后端需求已启动。
+- 若未来启动 Zine 后端，必须先提交产品范围、Recipe/AI/Page Plan、draft/version/page/asset 数据模型、媒体快照、权限、删除、分享和 Reader 读取方案；不能直接把客户端 `ZineDraft` 或 `manualSpreads` 写入表。
+- 当前阶段只维护 Photos 网格、照片详情/评论和 Rooms 照片预览；Room Book 与 Zine 内容不进入本阶段开发排期。
 
 ### Phase 8 — 生产化
 
@@ -1628,3 +1629,10 @@ Photos/语音 Storage、支付、Book 和投票仍按既定范围延后。
 - [ ] 重新生成并比对 `data/supabase/database.types.ts`，确认 `room_members` 字段、`viewer_is_favorite` 和两个 preference RPC 参数一致。
 - [ ] 运行 `npm run supabase:test:db`，确认 026 与既有成员、头像、媒体 RLS 测试通过。
 - [ ] 补真机/浏览器验证：双账号偏好隔离、隐藏后直接访问、恢复可见性、Server Action 失败回滚、Cache Storage 不可用、IndexedDB 配额失败和签名 URL 过期回源。
+
+## 21. 2026-08-11 Zine 本地切片与后端边界
+
+- `/zine` 当前完全绕过 Supabase：没有 Auth 读写、Storage 上传、数据库 migration、RLS policy、RPC、Realtime、AI provider 或发布权限。
+- `ZineDraft` 直接持有浏览器 `File` / Object URL；`manualSpreads`、页面样式、照片放置和裁切焦点只存在当前组件内存。不能把它们视为可恢复的云端草稿，也不能复用 Room 的 `MockSession` 业务存储。
+- 若未来进入后端，至少需要先明确独立的 draft/version/page/asset ownership 边界，以及 Photo Note 敏感性、私有 Storage、RLS、短期 signed URL、服务端媒体处理、版本并发、删除和分享撤销策略。
+- 在 Recipe/AI/Page Plan 的产品决策完成前，不新增 Zine 生产表，不把当前 `page-flip` Reader 的 DOM 或动画状态设计成数据库字段，也不把客户端 AI layout 开关当作已接入生成服务。

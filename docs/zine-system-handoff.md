@@ -4,19 +4,19 @@
 
 本文档记录 EventSpace 当前 Zine 系统已经完成的范围、实现结构、交互约束和已知边界，供新的开发模型继续开发 Recipe 模板时快速了解现有项目。
 
-Zine 当前是一个完整的前端优先创作流程。Recipe 模板尚未在本文档中定义，后续开发应先确认 Recipe 的内容模型和步骤，再决定复用 Zine 的哪些基础能力。
+当前 Zine 是独立的、仅浏览器内存的前端创作与预览 vertical slice，不是 Room 内的 Book 功能，也不是已经接入 Supabase 的生产模块。Recipe 模板仍应先确认内容模型和步骤，再决定复用 Zine 的哪些基础能力。
 
 ## 当前完成的用户流程
 
-Zine 页面入口为 `/zine`，共包含五个步骤：
+Zine 页面入口为 `/zine`，创建器包含五个进度节点：
 
 1. Name：命名 Zine。
-2. Photos：添加照片并为每张照片添加文字。
-3. Style：选择书页排版风格。
-4. Overview：总览所有 Zine 信息并返回对应步骤修改。
-5. Reader：使用真实翻页效果阅读最终 Zine。
+2. Photos：添加图片、删除图片，并为每张图片编辑最多 120 个字符的 Photo Note。
+3. Style：选择 5 种当前可用的页面样式。
+4. Overview 或 Arrange：顶部 `AI layout` 开关关闭时进入 Arrange 手动排版；打开时进入 Overview。当前开关只改变流程分支，不调用 AI 服务或自动生成布局。
+5. Reader：使用真实翻页效果阅读当前草稿。
 
-前四步使用统一的创建器外壳和进度导航。Overview 中的 `Open reader` 会进入沉浸式 Reader；关闭 Reader 会回到 Overview，草稿内容不会丢失。
+创建器前四步使用统一外壳和进度导航。关闭 Reader 会回到进入 Reader 前的 Overview 或 Arrange，草稿内容在当前页面生命周期内保留。
 
 ## 已完成的界面设计
 
@@ -53,12 +53,21 @@ Zine 页面入口为 `/zine`，共包含五个步骤：
   - `night`：深色、电影感页面。
 - 风格定义集中在 `features/zine/model/zine-styles.ts`，新增或修改选项不需要改动步骤框架。
 
-### Step 4：Overview
+### Step 4A：Overview（AI layout 分支）
 
-- 使用卡片式布局展示名称、照片数量、文字数量、所选风格和照片摘要。
-- 每个信息区都可直接返回对应步骤修改。
-- 明确提示 Overview 的照片位置不定义 Reader 顺序。
-- 草稿完整时可通过 `Open reader` 进入 Reader。
+- 展示名称、照片数量、带 Note 的照片数量、样式和照片摘要。
+- 每个信息区都可以返回对应步骤修改。
+- 当前只提供创建结果总览，不提供 AI 生成、重新生成、布局解释或生成任务状态。
+
+### Step 4B：Arrange（手动排版分支）
+
+- 首次进入时根据所选样式和照片集合生成初始 `manualSpreads`；照片从集合两端向中间交替分配，Step 2 的视觉卡片行不决定 Reader 顺序。
+- 中央书页使用真实 `page-flip@2.0.7` Reader 适配层预览，支持打开页面、双击/双触进入单页焦点模式、拖动或滑动浏览。
+- 空白页提供 `Add page`，可以在 spread 的左侧或右侧新增页面；最后始终保留一个可继续添加的 trailing spread。
+- 焦点模式下可以打开 Photo library，将照片放入当前页面或替换当前选中的照片；页面容量由样式决定：Editorial/Margin/Night 为 1 张，Split 为 2 张，Contact sheet 为 4 张。
+- 焦点模式下可以打开 Recipe library，为当前 spread 的左右页面一起切换样式；样式改变时会按新样式容量截断该页照片。这里的 Recipe library 是当前 5 个样式的选择器，不是未来的 Recipe registry。
+- 选中照片后可以直接拖动照片调整 `positionX` / `positionY`，Reader 使用 `object-fit: cover` 和该焦点位置渲染；这只改变裁切焦点，不改变照片顺序。
+- 当前没有页面删除、页面拖拽重排、自由图层、文字页或空白停顿页编辑能力。
 
 ## Reader 已完成的能力
 
@@ -75,8 +84,8 @@ Reader 基于 Nodlik/StPageFlip 的 npm 包 `page-flip@2.0.7`，不是自制的 
 
 ### 移动端翻页
 
-- StPageFlip 的 `swipeDistance` 当前为 12px，以提高滑动灵敏度。
-- 翻页动画时间为 520ms。
+- StPageFlip 的 `swipeDistance` 当前为 20px。
+- 翻页动画时间为 560ms。
 - `touch-action: pan-y` 保留页面纵向手势，同时允许横向翻页。
 - 内页禁用整页单击翻页，避免和双击放大冲突；滑动和拖动仍可翻页。
 
@@ -113,16 +122,21 @@ type ZineDraft = {
   readonly name: string;
   readonly photos: readonly ZinePhoto[];
   readonly styleId: ZineStyleId | null;
+  readonly manualSpreads: readonly ZineManualSpread[] | null;
 };
 ```
 
-照片包含文件、Object URL、文件名、原始尺寸和说明文字。创建流程使用 `useReducer` 与 `zineCreatorReducer` 管理，支持以下操作：
+照片包含 `File`、Object URL、文件名、原始尺寸、说明文字和焦点坐标。`manualSpreads` 包含左右页面、页面样式和照片 ID。创建流程使用 `useReducer` 与 `zineCreatorReducer` 管理，支持以下操作：
 
 - `SET_NAME`
 - `ADD_PHOTOS`
 - `REMOVE_PHOTO`
 - `SET_CAPTION`
+- `SET_PHOTO_POSITION`
 - `SET_STYLE`
+- `ADD_MANUAL_PAGE`
+- `PLACE_MANUAL_PHOTO`
+- `SET_MANUAL_SPREAD_STYLE`
 - `GO_TO`
 
 目前草稿只存在于当前客户端组件内存中，尚未保存到数据库、Local Storage 或服务端。刷新 `/zine` 页面会清空草稿。
@@ -141,13 +155,15 @@ features/zine/
 │  │  ├─ name-step.tsx
 │  │  ├─ photos-step.tsx
 │  │  ├─ style-step.tsx
-│  │  └─ overview-step.tsx
+│  │  ├─ overview-step.tsx
+│  │  └─ manual-layout-step.tsx      手动 spread/page 编辑和焦点相机
 │  └─ reader/
 │     ├─ zine-reader.tsx            StPageFlip 生命周期、翻页与镜头手势
 │     ├─ zine-reader-page.tsx       封面、内容页、Colophon、封底排版
 │     └─ zine-reader.module.css     Reader 与页面样式
 └─ model/
    ├─ zine-draft.ts                 草稿、步骤、Reducer、瀑布流分行
+   ├─ zine-manual-layout.ts         手动 spread/page 模型和初始分配
    ├─ zine-draft.test.ts
    ├─ zine-styles.ts                风格配置
    ├─ zine-pages.ts                 Reader 排序与分页
@@ -175,7 +191,7 @@ StPageFlip 会直接修改传入的 DOM。当前实现专门隔离了 React 与�
 - 卡片设计、边框、间距、背景和按钮应复用项目现有设计语言。
 - 禁止引入衬线体大标题；主标题统一使用 Geist Sans 或现有无衬线字体变量。
 - 书页本体保持直角矩形。
-- 图片需要展示完整比例，除非未来需求明确要求裁切。
+- Step 2 的照片卡保持完整比例；Reader 和 Arrange 的书页照片允许按页面容器裁切，并通过 `positionX` / `positionY` 保留焦点。
 - 业务数据顺序不能通过瀑布流位置、CSS Grid 位置或 DOM 顺序隐式表达。
 - 数据模型、分页规则、展示组件和第三方 Reader 适配层保持分离。
 - 不修改无关功能和现有用户改动。
@@ -186,7 +202,8 @@ StPageFlip 会直接修改传入的 DOM。当前实现专门隔离了 React 与�
 
 - 草稿持久化。
 - 上传照片到远程存储。
-- 用户手动编排 Reader 页面顺序。
+- 页面删除、页面拖拽重排、自由图层和文字页编辑。
+- AI 自动排版、Recipe registry、Recipe 选择与生成任务。
 - 导出 PDF、图片或印刷文件。
 - 发布、分享和权限控制。
 - 从已发布数据重新打开 Reader。
@@ -208,10 +225,10 @@ Recipe 的详细需求尚未给出，因此不应预先假设它与 Zine 使用�
 
 ## 验证状态
 
-最近一次 Zine 修改已通过：
+2026-08-11 对 `42d0519`、`45b460d` 的同步验证：
 
 - `npm run check`
-- Zine model 测试，共 7 项
+- Zine model 测试已覆盖 reducer、手动 spread、照片放置/替换和 Reader 页面生成；完整测试数量以命令输出为准。
 - `npm run build`
 - `git diff --check`
 

@@ -9,6 +9,7 @@
 | 公开 | 首页、邀请进入、认证、法律页 | 解释产品、创建/加入、登录。 |
 | 用户首页 | 进行中、已归档、搜索/筛选、账户菜单 | 回到自己的活动空间。 |
 | 创建 | 分步创建向导、成功/分享 | 快速建立私密临时房间。 |
+| 独立实验 | `/zine` 创建器、手动排版、Reader | 在不改变 Room MVP 的前提下探索照片到 Zine 的创作流程。 |
 | 房间 | Chat、Photos、Itinerary、成员、分享、管理面板 | 活动进行中的核心协作。 |
 | 归档 | 回忆册入口、只读 Chat/Photos/Itinerary、个人移除确认 | 浏览自己的只读活动记忆。 |
 | 状态 | 审核等待、冻结、处理归档、访问终止、断线 | 清晰说明当前可否操作。 |
@@ -332,3 +333,18 @@
 - Room 顶部不新增第四个 tab；Photos/Book 共用第二个主导航位置并通过再次点击直接切换。
 - Photos 承担浏览和 spread 级轻编辑，Book 承担沉浸式只读翻阅；二者职责不混合。
 - 当前编辑层只解决来源选择、目标页、移除和纸张样式。复杂排版引擎后续独立设计，不继续堆入 `memoir-panel.tsx`。
+
+## 2026-08-11 当前同步：Zine 页面结构
+
+`/zine` 是独立的全屏创建器，不嵌入 Room 外壳：
+
+- 顶部：关闭入口、`Create zine` 标题和 `AI layout` 二态开关。
+- 进度导航：Name、Photos、Style、Overview/Arrange、Reader；底部固定 Back / Continue 或 Open reader 操作。
+- Name：标题输入和书脊预览。
+- Photos：拖放/选择图片区、双行照片瀑布流、Add more、删除和 Photo Note 输入；照片卡的视觉分行不表达阅读顺序。
+- Style：横向滚动的真实页面比例 Demo，当前 5 个样式。
+- Overview：名称、照片数、Note 数、样式和照片摘要的可编辑总览。
+- Arrange：全屏书页舞台；空白页上的 Add page、焦点模式工具、Photo library 和 Recipe library 抽屉。抽屉关闭后恢复书页舞台，不新增页面级导航。
+- Reader：独立全屏阅读器、封面/双页/封底状态、前后 spread 控制和单页焦点镜头；关闭回到进入 Reader 前的 Overview 或 Arrange。
+
+该路由当前只保存组件内存，刷新或离开页面即丢失；不应在 Room 线框、归档入口或正式产品导航中画成已发布 Zine。

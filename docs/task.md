@@ -1,25 +1,46 @@
 # EventSpace 当前任务记录
 
-> 最后更新：2026-08-10
+> 最后更新：2026-08-11
 > 用途：记录最近任务做了什么、当前真实进度、验证结果、遗留事项和下一步。  
 > 规则：本文件保持为当前阶段活文档；更早阶段摘要迁移到 [`history_taks.md`](./history_taks.md)。  
-> 本次同步范围：基于 `main` 的最新提交 `7981e16` 及其父提交校准；只同步文档，不修改业务代码。
+> 本次同步范围：基于 `main` 的最新提交 `45b460d` 及其父提交校准；只同步文档，不修改业务代码。
 
 ## 项目当前状态
 
 - 当前阶段：Supabase-backed 封闭 MVP 接线推进中；正式房间、账号、邀请、成员治理、Chat 文本/语音、Photos、Itinerary 与 Realtime 已从纯本地 Mock 迁到真实 Supabase 读写路径。
 - `MockSession` 仍存在，但在云端房间内主要作为 `RoomExperience` 的兼容前端状态外壳；`BackendSessionProvider.executeCommand` 会把支持的命令转成 Server Action / RPC / Storage 操作，失败后回滚到服务器快照。
 - 结构化本地会话 `eventspace:local-session:v1` 与 IndexedDB `eventspace-local-assets` 继续服务本地 mock、录音/图片采集的上传前临时 Blob，以及旧数据兼容；它不是云端业务真相。
-- 当前已经支持创建真实 Host-led 房间、真实邀请 token/code、可扫描 QR、匿名访客加入、待审核轮询、Host 审批、账号资料和头像上传、房间列表/详情、文字/语音 Chat、Photos 上传/评论/删除、行程和成员治理。Room 内联投票、Book 与回忆录编辑器仍不在当前正式范围。
+- 当前已经支持创建真实 Host-led 房间、真实邀请 token/code、可扫描 QR、匿名访客加入、待审核轮询、Host 审批、账号资料和头像上传、房间列表/详情、文字/语音 Chat、Photos 上传/评论/删除、行程和成员治理。另有独立 `/zine` 本地创建器和翻页 Reader vertical slice；它不属于 Room 内 Book，也未接入生产后端。
 - 图片、语音与头像均走 `assets` + 私有 `room-media` Storage + 短期签名 URL；图片上传当前生成 display / thumbnail / placeholder / dimensions / revision 元数据，客户端仍需先持有本地 Blob 才能上传，服务端负责成员资格、状态、配额、对象归属和 variant 字段约束校验。
 - `/rooms`、`/rooms/[roomId]`、`/account` 和 viewer avatar 已增加浏览器快照/头像缓存与 Cache Storage + IndexedDB 云端图片 read-through cache。它们只保存去签名 URL 的展示快照或媒体 Blob 加速读取，不是跨设备业务真相；权限、签名和最终内容仍以 Supabase 为准。
 - `/rooms` 的收藏和“从个人列表移除”已经写入当前成员的 Supabase `room_members` 偏好；前端先乐观更新，Server Action 失败时回滚并显示错误。隐藏只影响当前成员的 Rooms 列表，不撤销该成员进入房间的权限。
-- 后端范围已冻结：仅 Host-led；Chat 文本/语音；Photos 与 Itinerary 进入首期；Stripe 一次性房间支付进入 MVP 但当前免费/封闭测试不阻塞；Book 延后设计，投票继续延后。
+- 后端范围已冻结：仅 Host-led；Chat 文本/语音；Photos 与 Itinerary 进入首期；Stripe 一次性房间支付进入 MVP 但当前免费/封闭测试不阻塞；Room 内 Book 延后设计，投票继续延后；Zine 当前只保留本地实验切片，不创建生产表。
 - 后端实施、验收和任务 Mark 统一以 [`supabase-backend-integration-plan.md`](./supabase-backend-integration-plan.md) 为主计划书。
 - 生产构建不再依赖远程 Google Fonts / `next/font` 拉取；字体资源已通过 `public/fonts` 的本地 `@font-face` 加载，保留 Bodoni 衬线标题风格。
 - `/prototype` 系列路由只作为视觉历史参考，不再代表当前功能完成度。
 
 ## 最近完成任务
+
+### TASK-029 - Zine 创建器重写、手动排版与 Reader 同步
+
+- 日期：2026-08-11
+- 状态：代码已进入 `main`；当前是独立 `/zine` 的浏览器内存切片，不是 Room/Book 生产功能。
+- 完成内容：
+  - 重写 Zine 创建流程为 Name → Photos → Style → Overview/Arrange → Reader，保留统一进度外壳和 AI layout 分支开关。
+  - Photos 支持 Photo Note、删除/追加图片和浏览器 Object URL 预览；`ZinePhoto` 记录原始尺寸、说明文字和 `positionX` / `positionY` 焦点坐标。
+  - 新增 `ZineManualSpread` / `ZineManualPage` 模型和 reducer：按所选样式生成初始 spread，支持左右加页、照片放置/替换、按 spread 切换样式，并按页面容量截断照片。
+  - Arrange 使用真实 `page-flip@2.0.7` 预览；焦点模式支持照片库、样式库、单页镜头、拖动调整照片裁切焦点和页面手势。
+  - Reader 使用纯数据 `createZineReaderPages` 生成封面、内容页、加页/空白页和封底，再把源页面克隆到命令式 DOM 交给 StPageFlip；支持封面打开、spread 翻页、双击/双触焦点模式、焦点内滑动、Esc 退出和照片 `object-fit: cover` 焦点渲染。
+- 真实能力边界：
+  - 草稿只存在 `useReducer` 和组件内 `File` / Object URL；刷新 `/zine`、关闭页面或离开路由不会恢复草稿，也没有 localStorage、IndexedDB、Supabase Storage 或数据库写入。
+  - AI layout 开关只选择 Overview 或 Arrange 分支；没有 AI provider、生成任务、Recipe registry、Page Plan 持久化或自动排版。
+  - 手动排版当前支持加页、放置/替换照片、样式与焦点位置，不支持页面删除、拖拽重排、文字页、自由图层、导出、发布、分享或重新打开。
+- 已知问题/风险：
+  - `page-flip` 仅在客户端动态加载；Reader 和 Arrange 都依赖第三方 DOM 生命周期，修改时必须保持 source DOM → clone → imperative root 的隔离。
+  - 浏览器 `File` 和 Object URL 只适合当前会话预览，不是持久化或隐私承诺；后续上传前要补文件类型、大小、EXIF、恶意文件和 Storage/RLS 设计。
+  - 当前尚未进行浏览器自动化和真机触控验收；双击/双触、焦点镜头、翻页生命周期和不同视口仍需设备验证。
+- 验证：`npm run check` 通过；`npm test` 通过（44 个测试文件、161 个测试）；`npm run build` 通过（Next.js 16.2.10，生成 `/zine` 静态路由）；`git diff --check` 通过。Git 仅提示 Windows 工作区的 LF/CRLF 转换，不是 whitespace error。
+- 下一步：先确认 Recipe/AI/Page Plan 的产品边界，再决定 Zine 是否进入 Room/生产 MVP；之后分别设计持久化 DTO、私有 Storage、RLS、媒体处理和发布/分享权限。
 
 ### TASK-028 - 房间成员偏好与图片缓存解析同步
 
@@ -556,6 +577,7 @@
 - Host-led 成员审核、禁言、移除、拉黑等 mock 治理状态仍存在于本地 fallback；云端房间已通过 RPC 持久化对应核心路径。
 - 房间 active / freezing / archiving / archived 生命周期 mock。
 - 旧 Poll/Votes、Book 和自由 Board 类型/命令仍可能存在于兼容层，但不是当前正式 UI 能力。
+- 独立 `/zine` 创建器、手动排版和 Reader 是本地浏览器内存实验切片；其 `File`、Object URL、草稿和页面模型不进入当前 Room session 或 Supabase。
 
 ### 尚未具备或仍待环境验收的生产能力
 
