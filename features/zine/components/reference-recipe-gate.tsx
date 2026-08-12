@@ -1,4 +1,5 @@
 import { createReferencePreviewMatrix, referencePreviewScenarios, type ReferencePreviewCell } from "../model/reference-recipe-matrix";
+import { getDevelopmentRecipeCatalogEntry, resolveDevelopmentRecipe } from "../model/recipe-catalog";
 import { RecipeRenderer } from "./recipe-renderer";
 import styles from "./reference-recipe-gate.module.css";
 
@@ -37,6 +38,10 @@ function ReferenceRecipeSection({ recipeId }: { readonly recipeId: string }) {
   const cells = referencePreviewMatrix.filter((cell) => cell.recipeId === recipeId);
   const recipe = cells[0]?.recipe;
   if (!recipe) return null;
+  const recipeRef = { id: recipe.id, version: recipe.version };
+  const developmentResolution = resolveDevelopmentRecipe(recipeRef);
+  const catalogEntry = developmentResolution.entry;
+  const catalogValidation = developmentResolution.validation;
 
   return (
     <section
@@ -51,6 +56,8 @@ function ReferenceRecipeSection({ recipeId }: { readonly recipeId: string }) {
         </div>
         <div className={styles.recipeMeta}>
           <span className={styles.recipeBadge}>{recipe.id}</span>
+          <span>catalog: {catalogEntry?.status ?? "missing"}</span>
+          <span>catalog validator: {catalogValidation?.valid ? "valid" : "invalid"}</span>
           <span>{recipe.scope} · {recipe.capabilities.photos.min}–{recipe.capabilities.photos.max} photos</span>
           <span>notes: {recipe.capabilities.notes.mode}</span>
         </div>
@@ -73,6 +80,10 @@ function ReferenceRecipeSection({ recipeId }: { readonly recipeId: string }) {
 }
 
 function ReferencePreviewCellView({ cell }: { readonly cell: ReferencePreviewCell }) {
+  const catalogEntry = getDevelopmentRecipeCatalogEntry({ id: cell.recipe.id, version: cell.recipe.version });
+  const catalogValidation = catalogEntry
+    ? resolveDevelopmentRecipe(catalogEntry.recipe).validation
+    : null;
   return (
     <article
       className={styles.cell}
@@ -135,6 +146,9 @@ function ReferencePreviewCellView({ cell }: { readonly cell: ReferencePreviewCel
           {cell.compatibility.valid ? " · allowed" : ` · blocked · slotId=${cell.compatibilitySlotId}`}
           {cell.compatibility.reason ? ` · ${cell.compatibility.reason}` : ""}
         </div>
+        <span className={styles.slotList} data-catalog-status={catalogEntry?.status ?? "missing"}>
+          <strong>catalog</strong>={catalogEntry?.status ?? "missing"} · validator={catalogValidation?.valid ? "valid" : "invalid"}
+        </span>
         <span className={styles.slotList} title={cell.slotIds.join(", ")}>
           <strong>slotIds</strong>={cell.slotIds.join(", ") || "none"}
         </span>

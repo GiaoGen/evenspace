@@ -91,6 +91,15 @@ Secret/service role key 只在服务端环境使用，绝不发送到浏览器�
 - `page-flip@2.0.7` 只在客户端动态加载。Reader 和 Arrange 都先渲染隐藏源页，再克隆到独立命令式根节点；StPageFlip 不直接接管 React 管理的 DOM。
 - 当前没有 Zine Auth、Storage、数据库、Realtime、AI provider 或 server mutation。未来若进入生产，应为 draft/version/page/asset 建立独立 DTO、Repository、私有 Storage 和 RLS 设计，不复用 `MockSession` 作为权威状态。
 
+- 当前客户端另有 `recipe-contract.ts`、`recipe-placement.ts`、`recipe-renderer.tsx` 和 `recipe-renderer-plan.ts`：它们分别负责 Recipe schema/校验/应用、照片实例焦点、统一渲染计划和 Editor/Reader 输出。`reference-recipe-gate.tsx` 与 `/zine/preview-matrix` 仅用于 development 验证，不进入生产路由。
+- `ZineDraft` 的 Recipe Application、`unplacedPhotoIds`、隐藏 Note 和 undo/redo 都是内存状态；单页应用不改变配对页，spread 应用整体替换左右页。客户端状态不应直接映射成 SQL 表或被当作后端授权结果。
+
+## 2026-08-12 当前同步：Recipe Contract 已实现但仍是前端本地切片
+
+- 最新提交已完成 Recipe Contract v1 的纯逻辑实现、共享 Renderer、Reference fixtures/矩阵和自动化测试；正式执行目录为 5 个 legacy style 加 1 个 spread Recipe，Reference fixtures 仍是 draft。
+- 这一层解决的是手动排版和未来 AI 排版共用的确定性规则，不代表 AI provider、远程 Recipe 发布、数据库持久化、多人协作或生产 Reader 数据流已经启动。
+- 进入生产前必须把 Recipe ID/version、Application、页面版本、资产所有权和照片实例焦点纳入服务端 schema/command 校验，并为私有媒体建立 Storage/RLS；不能信任浏览器提交的 `recipeId`、坐标或可见性状态。
+
 ### 7.3 PWA
 
 - 配置 Web App Manifest、可安装入口、主题色和图标。

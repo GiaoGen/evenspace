@@ -10,8 +10,12 @@ import {
   createNotesByPhotoId,
   createRecipeApplication,
   evaluateRecipeCompatibility,
-  getRecipeDefinition,
-} from "./recipe-contract";
+  getRecipeDefinitionByRef,
+  getRecipeForStyle,
+  getLegacyStyleId,
+  type RecipeRef,
+  } from "./recipe-contract";
+import { getActiveRecipeDefinition } from "./recipe-catalog";
 import {
   createContentItemId,
   createPhotoFocusDefaults,
@@ -84,7 +88,7 @@ export type ZineCreatorAction =
       readonly photoId: string;
       readonly replacePhotoId?: string;
     }
-  | { readonly type: "APPLY_RECIPE"; readonly recipeId: string; readonly pageId: string }
+  | { readonly type: "APPLY_RECIPE"; readonly recipeRef: RecipeRef; readonly pageId: string }
   | { readonly type: "GO_TO"; readonly step: ZineStep };
 
 export type ZineCreatorHistoryState = {
@@ -107,6 +111,7 @@ export const initialZineCreatorHistoryState: ZineCreatorHistoryState = {
 export function zineCreatorReducer(
   state: ZineCreatorState,
   action: ZineCreatorAction,
+  resolveRecipe: (ref: RecipeRef) => ReturnType<typeof getActiveRecipeDefinition> = getActiveRecipeDefinition,
 ): ZineCreatorState {
   if (action.type === "SET_NAME") {
     return {
@@ -214,7 +219,7 @@ export function zineCreatorReducer(
 
   if (action.type === "APPLY_RECIPE") {
     if (!state.draft.manualSpreads) return state;
-    const recipe = getRecipeDefinition(action.recipeId);
+    const recipe = resolveRecipe(action.recipeRef);
     if (!recipe) return state;
     const containingSpread = state.draft.manualSpreads.find((spread) => (
       spread.left?.id === action.pageId || spread.right?.id === action.pageId
@@ -255,7 +260,7 @@ export function zineCreatorReducer(
       draft: {
         ...state.draft,
         manualSpreads: state.draft.manualSpreads.map((spread) => spread.id === containingSpread.id
-          ? applyRecipeToSpreadPages(spread, recipe.legacyStyleId, application, recipe.scope === "spread")
+          ? applyRecipeToSpreadPages(spread, getLegacyStyleId(recipe) ?? spread.left?.styleId ?? spread.right?.styleId ?? "editorial", application, recipe.scope === "spread")
           : spread),
       },
     };
@@ -397,7 +402,10 @@ function refreshPagePhotoIds(
   if (!page.recipeApplication || page.recipeApplication.scope === "spread") {
     return { ...page, photoIds, contentItemIds };
   }
-  const recipe = getRecipeDefinition(page.recipeApplication.recipeId);
+  const recipe = getRecipeDefinitionByRef({
+    id: page.recipeApplication.recipeId,
+    version: page.recipeApplication.recipeVersion,
+  });
   if (!recipe) return { ...page, photoIds };
   return {
     ...page,
@@ -430,12 +438,17 @@ function refreshSpreadApplications(
         ? spread.right.recipeApplication
         : null;
     if (!application) return spread;
-    const recipe = getRecipeDefinition(application.recipeId);
+    const recipe = getRecipeDefinitionByRef({
+      id: application.recipeId,
+      version: application.recipeVersion,
+    });
     if (!recipe) return spread;
     const targetPages = [spread.left, spread.right].filter((page): page is ZineManualPage => (
-      page !== null && application.targetPageIds.includes(page.id)
+      page !== null
+      && application.targetPageIds.includes(page.id)
+      && hasSameRecipeApplicationIdentity(page.recipeApplication, application)
     ));
-    if (targetPages.length === 0) return spread;
+    if (targetPages.length !== application.targetPageIds.length) return spread;
     const nextApplication = createRecipeApplication({
       recipe,
       content: {
@@ -450,10 +463,10 @@ function refreshSpreadApplications(
     });
     return {
       ...spread,
-      left: spread.left && application.targetPageIds.includes(spread.left.id)
+      left: spread.left && application.targetPageIds.includes(spread.left.id) && hasSameRecipeApplicationIdentity(spread.left.recipeApplication, application)
         ? { ...spread.left, recipeApplication: nextApplication }
         : spread.left,
-      right: spread.right && application.targetPageIds.includes(spread.right.id)
+      right: spread.right && application.targetPageIds.includes(spread.right.id) && hasSameRecipeApplicationIdentity(spread.right.recipeApplication, application)
         ? { ...spread.right, recipeApplication: nextApplication }
         : spread.right,
     };
@@ -461,7 +474,7 @@ function refreshSpreadApplications(
 }
 
 function createEmptyRecipeApplication(styleId: ZineStyleId, pageId: string) {
-  const recipe = getRecipeDefinition(`recipe-${styleId}-v1`);
+  const recipe = getRecipeForStyle(styleId);
   return recipe
     ? createRecipeApplication({ recipe, content: { photoIds: [], notesByPhotoId: {} }, anchorPageId: pageId })
     : null;
@@ -485,13 +498,21 @@ function updatePlacementOnSpread(
   };
   return {
     ...spread,
-    left: spread.left && targetPageIds.includes(spread.left.id) && spread.left.recipeApplication?.recipeId === application.recipeId
+    left: spread.left && targetPageIds.includes(spread.left.id) && hasSameRecipeApplicationIdentity(spread.left.recipeApplication, application)
       ? { ...spread.left, recipeApplication: nextApplication }
       : spread.left,
-    right: spread.right && targetPageIds.includes(spread.right.id) && spread.right.recipeApplication?.recipeId === application.recipeId
+    right: spread.right && targetPageIds.includes(spread.right.id) && hasSameRecipeApplicationIdentity(spread.right.recipeApplication, application)
       ? { ...spread.right, recipeApplication: nextApplication }
       : spread.right,
   };
+}
+
+function hasSameRecipeApplicationIdentity(
+  candidate: ZineManualPage["recipeApplication"],
+  expected: NonNullable<ZineManualPage["recipeApplication"]>,
+) {
+  return candidate?.recipeId === expected.recipeId
+    && candidate.recipeVersion === expected.recipeVersion;
 }
 
 function applyRecipeToSpreadPages(

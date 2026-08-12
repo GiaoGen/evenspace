@@ -159,6 +159,12 @@ Host 只能转让给房间内已登录成员，接收者确认后生效；原 Ho
 - 当前没有保存、发布、分享、导出、权限、AI 自动排版或重新打开；AI layout 开关只是 Overview/Arrange 流程选择。
 - 在产品决策确认前，不把 Zine 写入封闭 MVP 的正式功能承诺，也不为它创建 Supabase 生产 schema。
 
+## 2026-08-12 当前同步：Zine Recipe 实验边界
+
+- Zine Arrange 现在以 Recipe Contract 驱动：用户可应用兼容的单页或跨页 Recipe，查看内容容量/Note 兼容性，并调整照片实例的裁切焦点；未放置照片和被无文字 Recipe 隐藏的 Note 不能被静默删除。
+- 当前正式执行目录仍只有 5 个 legacy style Recipe 和 1 个跨页 `Gutter bridge` Recipe。6 个 Reference Recipe 仅用于开发态 Preview Matrix 和 Gate，不构成产品承诺，也不改变 Room MVP 的产品范围。
+- Recipe 应用、焦点调整和手动排版撤销/重做都只存在浏览器内存；AI layout 开关仍不是 AI 服务接入，Zine 也没有发布、分享、多人协作、登录或云端保存能力。
+
 ## 2026-07-18 当前同步：产品规格与现状差异
 
 本节为历史同步，保留用于理解旧本地优先阶段；当前判断以 2026-08-02 同步为准。

@@ -1,6 +1,6 @@
 # EventSpace 交互式 Mock 覆盖与边界
 
-> 状态：2026-08-11。正式产品路由已经进入 Supabase-backed 封闭 MVP 接线阶段；另有独立 `/zine` 本地创建/阅读切片。本文继续用于区分“本地 mock/fallback”“真实云端能力”“浏览器加速缓存”和“尚未达到生产安全承诺”的边界。
+> 状态：2026-08-12。正式产品路由已经进入 Supabase-backed 封闭 MVP 接线阶段；另有独立 `/zine` 本地创建/阅读切片和 development-only Recipe Preview Matrix。本文继续用于区分“本地 mock/fallback”“真实云端能力”“浏览器加速缓存”和“尚未达到生产安全承诺”的边界。
 
 ## 1. Mock 会话模型
 
@@ -23,6 +23,7 @@
 | `/join/[roomId]` | 真实私密邀请预览、昵称、账号头像带入、匿名访客 session、免审核直入或 Host 审核 pending；pending 页面轮询审批结果 |
 | `/account` | 真实 Supabase profile、昵称/主题更新、账号头像上传、房间/照片统计、退出登录、法律入口 |
 | `/zine` | 浏览器内存中的 Name、Photos/Photo Note、Style、Overview 或 Arrange、真实翻页 Reader；不接入 Room、MockSession 或 Supabase |
+| `/zine/preview-matrix` | 仅 development 可访问的 Reference Recipe Editor/Reader 预览矩阵；生产环境返回 Not Found，不是用户功能 |
 | `/legal/[document]` | Terms、Privacy、Community Rules、Cookie Notice 的结构草案与法律审阅警告 |
 
 ## 3. 房间交互覆盖
@@ -48,6 +49,8 @@
 - `/zine` 是独立的客户端创建器，使用 `useReducer` 管理 `ZineDraft`；照片以浏览器 `File` 和 Object URL 保存在当前组件生命周期内。
 - 关闭 `AI layout` 进入 Arrange：支持初始 spread、左右加页、照片放置/替换、每个 spread 的样式切换、双击/双触焦点模式和照片裁切焦点调整。
 - 打开 `AI layout` 进入 Overview，但当前没有 AI provider 或自动布局；开关只是流程分支选择。
+- Arrange 的 Recipe library 已由 Contract 驱动：显示 5 个 legacy style Recipe 和 1 个跨页 Recipe 的兼容状态；支持单页/跨页应用、未放置照片、Photo Note 显示/隐藏和 placement 级裁切焦点。
+- Recipe 应用、照片放置和 placement 焦点支持一次 Undo/Redo；编辑器与 Reader 共用 `RecipeRenderer`，不应把 Preview Matrix 或控制 UI 当作生产内容。
 - Reader 使用客户端动态加载的 `page-flip@2.0.7`，支持封面打开、spread 翻页、焦点单页、焦点内滑动、Esc 退出和照片 `object-fit: cover`。
 - 刷新、关闭 `/zine` 或离开路由会丢失草稿；没有 localStorage、IndexedDB、远程 Storage、数据库、发布、分享、导出或重新打开路径。
 
@@ -124,6 +127,13 @@
 - Arrange 的手动模型是 `manualSpreads`，支持加页、放置/替换照片、spread 样式和照片焦点位置；这与 Step 2 的照片视觉分行独立。
 - `page-flip@2.0.7` 仅在客户端动态加载，Reader/Arrange 的翻页状态和源页面克隆都属于当前页面内存；不应写成云端保存的 Zine。
 - AI layout 目前只是 Overview/Arrange 流程开关；Recipe、AI 生成、Page Plan、持久化、导出、发布和分享仍未完成。
+
+## 2026-08-12 当前同步：Recipe Contract 与 Preview Matrix
+
+- 新增 Recipe Definition/Validator/Compatibility/Application，约束 Recipe 的 scope、照片容量、Photo Note 关系、Slot 坐标、cover 填充和 placement 焦点迁移。
+- `/zine` 的手动排版现在以 `recipeApplication` 生成页面内容；单页 Recipe 不修改对侧页，跨页 Recipe 以完整 spread 原子应用，并支持一次 Undo/Redo。
+- `RecipeRenderer` 同时服务 Style preview、Arrange/Editor、Reader 和 Preview Matrix；Reader 不再维护独立的旧 style JSX 版面。
+- `/zine/preview-matrix` 覆盖 6 个 Reference Recipe、Editor/Reader、空/最小/最大/超额照片、横竖方/超宽图、短长 Note 和 Note overflow；当前只完成静态/自动化检查，人工视觉 Gate 仍待确认。
 
 ## 2026-07-18 历史同步：旧本地优先 Mock 覆盖
 

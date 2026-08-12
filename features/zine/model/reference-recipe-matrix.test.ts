@@ -4,13 +4,14 @@ import { createReferencePreviewMatrix, referencePreviewScenarios } from "./refer
 import { referenceRecipeDefinitions } from "./reference-recipe-definitions";
 
 describe("Reference Recipe Gate", () => {
-  it("defines six semantic reference recipes independently of the runtime style catalog", () => {
+  it("defines semantic reference recipes independently of the runtime style catalog", () => {
     expect(referenceRecipeDefinitions.map((recipe) => recipe.id)).toEqual([
       "reference-single-photo-no-note-v1",
       "reference-single-photo-note-v1",
       "reference-multi-photo-no-note-v1",
       "reference-multi-photo-indexed-note-v1",
       "reference-cross-gutter-v1",
+      "reference-cross-page-pairs-v1",
       "reference-multi-color-system-v1",
     ]);
     expect(referenceRecipeDefinitions.every((recipe) => validateRecipeDefinition(recipe).valid)).toBe(true);
@@ -20,6 +21,10 @@ describe("Reference Recipe Gate", () => {
     expect(referenceRecipeDefinitions.find((recipe) => recipe.id === "reference-cross-gutter-v1")?.scope).toBe("spread");
     expect(referenceRecipeDefinitions.find((recipe) => recipe.id === "reference-multi-color-system-v1")?.theme?.background).toBe("#17384a");
     expect(referenceRecipeDefinitions.every((recipe) => recipe.status === "draft")).toBe(true);
+    expect(new Set(referenceRecipeDefinitions.flatMap((recipe) => recipe.slots
+      .filter((slot) => slot.kind === "note" || slot.kind === "static-text")
+      .flatMap((slot) => slot.role ? [slot.role] : []))))
+      .toEqual(new Set(["title", "deck", "label", "folio", "caption", "note", "index"]));
 
     const noteRecipe = referenceRecipeDefinitions.find((recipe) => recipe.id === "reference-single-photo-note-v1");
     const notePhoto = noteRecipe?.slots.find((slot) => slot.id === "hero-photo");
@@ -31,6 +36,19 @@ describe("Reference Recipe Gate", () => {
       noteSlotId: "note-1",
       kind: "aligned",
     });
+  });
+
+  it("renders both directions of cross-page Photo Note pairing", () => {
+    const matrix = createReferencePreviewMatrix();
+    const cell = matrix.find((candidate) => (
+      candidate.recipeId === "reference-cross-page-pairs-v1"
+      && candidate.scenario === "minimum"
+      && candidate.mode === "reader"
+    ));
+    expect(cell?.plans[0]?.slots.find((slot) => slot.id === "pair-note-left")?.notes?.[0])
+      .toMatchObject({ photoSlotId: "pair-photo-right", relation: "cross-page-pair" });
+    expect(cell?.plans[1]?.slots.find((slot) => slot.id === "pair-note-right")?.notes?.[0])
+      .toMatchObject({ photoSlotId: "pair-photo-left", relation: "cross-page-pair" });
   });
 
   it("covers minimum, maximum, over-capacity, ratios, Notes, and both render modes", () => {

@@ -85,6 +85,12 @@
 - 因此 Zine 当前只是 local-only prototype，不满足本文“刷新、关闭浏览器、重新打开仍可恢复”的本地优先验收。未来若要持久化，应先把 File/Object URL 转成独立 asset/blob repository，再设计版本化 draft/page model。
 - 后端替换点应独立于 `MockSession`：生产需要私有 Storage、asset ownership、页面版本/并发控制、RLS 和发布权限，不能把浏览器 reducer 直接当成服务端 mutation。
 
+## 2026-08-12 当前同步：Recipe 状态仍未进入本地优先持久化
+
+- 最新 Zine 重写已把 Recipe Contract、兼容性判断、单页/跨页应用、照片实例级裁切焦点和撤销重做落在 `features/zine` 内部，但这些状态仍随 `ZineDraft` 生命周期存在。
+- `/zine/preview-matrix` 仅在 development 环境可访问，使用 Reference Recipe fixtures 验证空内容、容量边界、图片比例和 Note 长度；它不代表刷新恢复、IndexedDB、PWA 离线或跨标签同步已经完成。
+- 若未来把 Zine 纳入本地优先，应先定义 asset/blob repository、版本化 `draft/page/recipeApplication` schema、迁移与配额失败策略，再决定如何序列化 `File`、Object URL 和照片实例焦点。
+
 ### Phase E — Itinerary、Poll 与治理
 
 目标：

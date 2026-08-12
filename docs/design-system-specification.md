@@ -198,6 +198,12 @@
 
 - `/zine` 使用全屏、无嵌套卡片的创建器外壳：顶部进度/开关，中部步骤工作区，底部固定导航；不把它伪装成 Room 后台。
 - Style 选择使用横向真实页面比例 Demo；Arrange 的 Photo library / Recipe library 使用全屏舞台上的抽屉，抽屉是任务工具，不再叠加第二层卡片容器。
-- 书页保持直角矩形；Step 2 照片卡用 `contain` 展示完整比例，Reader/Arrange 的书页照片用 `cover` 并以 `positionX` / `positionY` 控制裁切焦点。
+- 书页保持直角矩形；Step 2 照片卡用 `contain` 展示完整比例，Reader/Arrange 的书页照片用 `cover` 并以 placement 级 `focusX` / `focusY` / `scale` 控制裁切焦点。
 - Reader 的 spread、焦点单页和翻页使用独立相机状态；焦点模式通过 transform/opacity 和受控宽度移动，不使用弹窗替代书页，也不复制第二份可见 Reader DOM。
 - `page-flip` 的书页节点由命令式适配层接管；React 源页隐藏渲染、克隆和销毁必须保持稳定，避免第三方 DOM 所有权与 React 生命周期冲突。
+
+## 2026-08-12 当前同步：Recipe Renderer 的可复用视觉边界
+
+- Recipe Renderer 是 Arrange、Reader 和 development-only Preview Matrix 共用的视觉边界；Recipe 卡片应展示作用域、容量、Note 支持和兼容性状态，不把不可用 Recipe 伪装成普通可选样式。
+- Photo slot 使用稳定尺寸和明确的 focus/scale 状态，拖动裁切焦点时不能引发 slot 或工具栏尺寸跳动；未放置照片、隐藏 Note 和超长 Note 必须有可辨识的非破坏性状态。
+- 这次同步只确定组件与状态表达规则，不引入新的品牌色、字体或 Room 通用组件，也不把 Preview Matrix 当成正式用户页面。

@@ -348,3 +348,9 @@
 - Reader：独立全屏阅读器、封面/双页/封底状态、前后 spread 控制和单页焦点镜头；关闭回到进入 Reader 前的 Overview 或 Arrange。
 
 该路由当前只保存组件内存，刷新或离开页面即丢失；不应在 Room 线框、归档入口或正式产品导航中画成已发布 Zine。
+
+## 2026-08-12 当前同步：Recipe Arrange 与 Preview Matrix
+
+- Arrange 的 Recipe library 需要同时表达作用域（单页/跨页）、兼容性、Note 模式、容量和应用结果；Recipe 应用后若有照片未放置，必须在工作台显示明确状态，不能让用户误以为内容已排完。
+- 单页 Recipe 的操作目标是当前聚焦页，配对页保持不变；跨页 Recipe 从任一侧进入都作为一次原子操作。照片焦点属于具体放置实例，拖动调整需要有可撤销的反馈。
+- `/zine/preview-matrix` 是 development-only 的内部线框/验证入口，不属于用户导航；它以 Editor / Reader 两种模式并列检查 Reference Recipe、图片比例和 Note 超限，不替代正式 Reader 的翻页体验。

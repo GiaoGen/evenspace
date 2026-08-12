@@ -21,14 +21,18 @@ import {
   type ZineDraft,
 } from "../../model/zine-draft";
 import type { ZinePageSide } from "../../model/zine-manual-layout";
+import type { RecipeRef } from "../../model/recipe-contract";
 import { createManualEditorPages } from "../../model/zine-pages";
 import { getPhotoUseCounts } from "../../model/photo-usage";
 import {
   createNotesByPhotoId,
   evaluateRecipeCompatibility,
   getRecipeCompatibilityLabel,
-  recipeDefinitions,
 } from "../../model/recipe-contract";
+import {
+  getActiveRecipeCatalogEntries,
+  getActiveRecipeDefinition,
+} from "../../model/recipe-catalog";
 import { normalizePlacement } from "../../model/recipe-placement";
 import { syncVisiblePlacementFocus } from "../placement-focus-dom";
 import { StylePagePreview } from "../style-page-preview";
@@ -97,10 +101,21 @@ const defaultCameraGeometry: CameraGeometry = {
   shift: 205,
 };
 
+const activeRecipeChoices = getActiveRecipeCatalogEntries()
+  .map((entry) => ({
+    entry,
+    recipe: getActiveRecipeDefinition(entry.recipe),
+  }))
+  .filter((choice): choice is typeof choice & { recipe: NonNullable<typeof choice.recipe> } => choice.recipe !== null);
+
 const recipeWaterfallRows = [
-  recipeDefinitions.filter((_, index) => index % 2 === 0),
-  recipeDefinitions.filter((_, index) => index % 2 === 1),
+  activeRecipeChoices
+    .filter((_, index) => index % 2 === 0),
+  activeRecipeChoices
+    .filter((_, index) => index % 2 === 1),
 ] as const;
+
+const activeRecipeCount = recipeWaterfallRows.flat().length;
 
 export function ManualLayoutStep({
   draft,
@@ -127,7 +142,7 @@ export function ManualLayoutStep({
     photoId: string,
     replacePhotoId?: string,
   ) => void;
-  readonly onApplyRecipe: (pageId: string, recipeId: string) => void;
+  readonly onApplyRecipe: (pageId: string, recipeRef: RecipeRef) => void;
   readonly canUndo: boolean;
   readonly canRedo: boolean;
   readonly onUndo: () => void;
@@ -808,7 +823,7 @@ export function ManualLayoutStep({
                     <span>{drawerKind === "photos" ? "Photo library" : "Recipe library"}</span>
                     <strong>{drawerKind === "photos" ? "Add a photograph" : "Choose a page recipe"}</strong>
                   </div>
-                  <small>{drawerKind === "photos" ? `${draft.photos.length} photos` : `${recipeDefinitions.length} available recipes`}</small>
+                  <small>{drawerKind === "photos" ? `${draft.photos.length} photos` : `${activeRecipeCount} available recipes`}</small>
                 </header>
 
                 {drawerKind === "layout" && focusedContentPage?.recipeApplication?.unplacedPhotoIds.length ? (
@@ -863,8 +878,9 @@ export function ManualLayoutStep({
                   <div className={`${styles.horizontalWaterfall} ${styles.recipeWaterfall}`}>
                     {recipeWaterfallRows.map((row, rowIndex) => (
                       <div className={styles.waterfallRow} key={rowIndex}>
-                        {row.map((recipe) => {
-                          const selected = focusedContentPage?.recipeApplication?.recipeId === recipe.id;
+                        {row.map(({ entry, recipe }) => {
+                          const selected = focusedContentPage?.recipeApplication?.recipeId === recipe.id
+                            && focusedContentPage.recipeApplication.recipeVersion === entry.recipe.version;
                           const recipePhotoIds = recipe.scope === "spread"
                             ? [focusedSpread?.left, focusedSpread?.right].flatMap((page) => page?.photoIds ?? [])
                             : focusedContentPage?.photos.map((photo) => photo.id) ?? [];
@@ -902,10 +918,10 @@ export function ManualLayoutStep({
                               data-selected={selected}
                               disabled={!compatibility?.valid}
                               title={compatibility?.reason ?? recipe.description}
-                              key={recipe.id}
+                              key={`${entry.recipe.id}@${entry.recipe.version}`}
                               onClick={() => {
                                 if (!focusedContentPage || !compatibility?.valid) return;
-                                onApplyRecipe(focusedContentPage.id, recipe.id);
+                                onApplyRecipe(focusedContentPage.id, entry.recipe);
                                 closeDrawer();
                               }}
                             >

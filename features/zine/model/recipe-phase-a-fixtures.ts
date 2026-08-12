@@ -1,4 +1,4 @@
-import { RECIPE_SCHEMA_VERSION, type RecipeDefinition } from "./recipe-contract";
+import { DEFAULT_RECIPE_TYPOGRAPHY, RECIPE_SCHEMA_VERSION, type RecipeDefinition } from "./recipe-contract";
 
 /**
  * Phase A fixtures are intentionally not added to the active catalog. They
@@ -15,7 +15,6 @@ export const phaseARecipeFixtures: readonly RecipeDefinition[] = [
     description: "A data-only single page with a title, photo and note.",
     status: "draft",
     scope: "page",
-    legacyStyleId: "editorial",
     capabilities: {
       photos: { min: 1, max: 1 },
       notes: { mode: "optional", maxCharacters: 240, maxLines: 6 },
@@ -30,16 +29,20 @@ export const phaseARecipeFixtures: readonly RecipeDefinition[] = [
       foreground: "#22201c",
       muted: "#756c61",
       photoBackground: "#d8cec0",
+      typography: DEFAULT_RECIPE_TYPOGRAPHY,
     },
     slots: [
       {
-        id: "title",
+      id: "title",
         kind: "static-text",
         rect: { x: .1, y: .08, width: .8, height: .08 },
         pageSide: "left",
         required: true,
-        zIndex: 3,
+        zIndex: 29,
+        foregroundToken: "ink",
         textSource: "title",
+        role: "title",
+        align: "start",
       },
       {
         id: "photo",
@@ -47,7 +50,7 @@ export const phaseARecipeFixtures: readonly RecipeDefinition[] = [
         rect: { x: .22, y: .24, width: .64, height: .5 },
         pageSide: "left",
         required: true,
-        zIndex: 1,
+        zIndex: 10,
         fit: "cover",
       },
       {
@@ -56,8 +59,11 @@ export const phaseARecipeFixtures: readonly RecipeDefinition[] = [
         rect: { x: .22, y: .78, width: .64, height: .12 },
         pageSide: "left",
         required: false,
-        zIndex: 2,
+        zIndex: 20,
+        foregroundToken: "ink",
         maxLines: 6,
+        role: "note",
+        align: "start",
       },
     ],
     noteRelations: [{ photoSlotId: "photo", noteSlotId: "note", kind: "adjacent" }],
@@ -71,7 +77,6 @@ export const phaseARecipeFixtures: readonly RecipeDefinition[] = [
     description: "A data-only spread with one photo crossing the gutter.",
     status: "draft",
     scope: "spread",
-    legacyStyleId: "editorial",
     capabilities: {
       photos: { min: 1, max: 1 },
       notes: { mode: "none" },
@@ -87,6 +92,7 @@ export const phaseARecipeFixtures: readonly RecipeDefinition[] = [
       foreground: "#f4f0e7",
       muted: "#b6b0a4",
       photoBackground: "#343532",
+      typography: DEFAULT_RECIPE_TYPOGRAPHY,
     },
     slots: [{
       id: "bridge-photo",
@@ -94,7 +100,7 @@ export const phaseARecipeFixtures: readonly RecipeDefinition[] = [
       rect: { x: .72, y: .16, width: .56, height: .68 },
       pageSide: "cross-spread",
       required: true,
-      zIndex: 1,
+      zIndex: 10,
       fit: "cover",
       allowBleed: true,
       allowGutterCrossing: true,
@@ -102,4 +108,3 @@ export const phaseARecipeFixtures: readonly RecipeDefinition[] = [
     noteRelations: [],
   },
 ];
-

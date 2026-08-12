@@ -1,7 +1,7 @@
 # Zine Engine 需求规格
 
-> 状态：未来排版引擎需求；当前代码已实现本地创建器、手动排版切片和 Reader，本文其余 Recipe/AI/Page Plan 目标尚未实现。
-> 更新日期：2026-08-11
+> 状态：Recipe Contract v1、共享 Renderer 和手动应用基础路径已进入 `main`；正式 Recipe 大规模目录、AI、Page Plan 持久化和生产后端仍未实现。
+> 更新日期：2026-08-12
 > 适用范围：`/zine` 创建流程、自动排版、手动排版、页面 Recipe、封面、封底与 Reader 页面计划  
 > 关联文档：`docs/zine-system-handoff.md`
 
@@ -11,7 +11,7 @@
 
 Recipe 用于描述：一组照片和 Photo Note 如何被选择、排序、分组、放入页面模板，并最终生成可由 Reader 消费的页面计划。
 
-本文档记录的是后续开发目标，不代表当前代码已经具备以下能力。当前 Zine 的真实完成范围仍以 `docs/zine-system-handoff.md` 和代码现状为准。
+本文档同时记录当前实现与后续开发目标，不代表候选目录、AI 或生产持久化已经完成。当前 Zine 的真实完成范围仍以 `docs/zine-system-handoff.md` 和代码现状为准。
 
 ## 1.1 当前代码对照
 
@@ -21,12 +21,17 @@ Recipe 用于描述：一组照片和 Photo Note 如何被选择、排序、分�
 - 浏览器内存中的 `ZineDraft`、`ZinePhoto`、`ZineManualSpread` 和 reducer；照片使用 `File` 与 Object URL。
 - Arrange 的初始 spread 生成、左右加页、照片放置/替换、按 spread 切换现有样式，以及照片裁切焦点位置调整。
 - `createZineReaderPages` 将草稿转换为封面、内容页、空白/加页页和封底；Reader 使用 `page-flip@2.0.7`，支持 spread、单页焦点镜头和手势翻页。
+- Recipe Contract v1 已进入前端：`recipe-contract.ts` 提供 Definition、Validator、Compatibility、Application 和迁移；`recipe-placement.ts` 提供 placement 级 `focusX` / `focusY` / `scale`。
+- `recipe-renderer.tsx` / `recipe-renderer-plan.ts` 统一 Editor、Reader 和 development-only `/zine/preview-matrix` 的 Slot、Photo Note、主题和跨页坐标渲染；单页与跨页应用、未放置照片、隐藏 Note 和 undo/redo 已接入手动排版。
+- 当前有 5 个 legacy style Recipe 和 1 个 `Gutter bridge` spread Recipe 可执行；6 个 Reference Recipe 仍是 Gate fixtures，状态为 `draft`。
 
-当前仍未实现：
+当前仍未实现或未完成：
 
-- 真正的 AI 排版、Recipe registry、72 个 Recipe、Page Plan 持久化和生成任务。
+- 真正的 AI 排版、正式 Recipe registry 的大规模目录、72 个候选 Recipe、Page Plan 持久化和生成任务。
 - 页面删除/拖拽重排、文字页、自由图层、导出、发布、分享和重新打开。
 - localStorage、IndexedDB、Supabase Auth、Storage、RLS、Realtime 或任何 Zine 后端写入。
+
+Reference Recipe 的自动化 Validator/Compatibility/Application 测试已完成，但 `/zine/preview-matrix` 的浏览器人工视觉 Gate 尚未完成；不能仅凭代码测试把 Reference fixtures 升级为正式 `active` 目录。
 
 因此，“AI Layout”在当前实现中只是流程分支开关；不得把 Overview 或现有样式选择器写成自动排版已完成。
 

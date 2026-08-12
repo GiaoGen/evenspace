@@ -9,8 +9,10 @@ import {
   zineCreatorReducer,
   type ZinePhoto,
 } from "./zine-draft";
-import { createRecipeApplication } from "./recipe-contract";
+import { adaptRecipeSlot, baseRecipeDefinitions, createRecipeApplication, DEFAULT_RECIPE_TYPOGRAPHY, type RecipeDefinition } from "./recipe-contract";
+import { recipeCatalogEntries, resolveActiveRecipe } from "./recipe-catalog";
 import { phaseARecipeFixtures } from "./recipe-phase-a-fixtures";
+import { phaseDRecipeDefinitions } from "./recipe-contract";
 import type { ZineManualSpread } from "./zine-manual-layout";
 
 function photo(id: string, width: number, height: number): ZinePhoto {
@@ -197,6 +199,65 @@ describe("zineCreatorReducer", () => {
       .toEqual(nextSpread?.right?.recipeApplication?.assignments);
   });
 
+  it("does not update placement across same-ID RecipeApplications with different versions", () => {
+    const sourceRecipe = phaseDRecipeDefinitions[0];
+    expect(sourceRecipe).toBeDefined();
+    if (!sourceRecipe) return;
+    const recipeV1 = { ...sourceRecipe, version: 1 };
+    const recipeV2 = { ...sourceRecipe, version: 2 };
+    const applicationV1 = createRecipeApplication({
+      recipe: recipeV1,
+      content: { photoIds: ["bridge"], contentItemIds: ["left-content"], notesByPhotoId: {} },
+      anchorPageId: "left-page",
+      targetPageIds: ["left-page", "right-page"],
+    });
+    const applicationV2 = createRecipeApplication({
+      recipe: recipeV2,
+      content: { photoIds: ["bridge"], contentItemIds: ["right-content"], notesByPhotoId: {} },
+      anchorPageId: "right-page",
+      targetPageIds: ["left-page", "right-page"],
+    });
+    const state = {
+      ...initialZineCreatorState,
+      step: "manual" as const,
+      draft: {
+        name: "Versioned spread",
+        photos: [photo("bridge", 16, 9)],
+        styleId: "editorial" as const,
+        manualSpreads: [{
+          id: "spread-one",
+          left: {
+            id: "left-page",
+            styleId: "editorial" as const,
+            photoIds: ["bridge"],
+            contentItemIds: ["left-content"],
+            recipeApplication: applicationV1,
+          },
+          right: {
+            id: "right-page",
+            styleId: "editorial" as const,
+            photoIds: ["bridge"],
+            contentItemIds: ["right-content"],
+            recipeApplication: applicationV2,
+          },
+        }],
+      },
+    };
+    const placementId = applicationV1.assignments[0]?.placementId ?? "";
+    const updated = zineCreatorReducer(state, {
+      type: "SET_PLACEMENT_FOCUS",
+      pageId: "left-page",
+      placementId,
+      focusX: 11,
+      focusY: 89,
+      scale: 1.4,
+    });
+
+    expect(updated.draft.manualSpreads?.[0]?.left?.recipeApplication?.assignments[0])
+      .toMatchObject({ focusX: 11, focusY: 89, scale: 1.4 });
+    expect(updated.draft.manualSpreads?.[0]?.right?.recipeApplication).toEqual(applicationV2);
+  });
+
   it("keeps at least one add-page slot at the end of manual spreads", () => {
     const withPhotos = zineCreatorReducer(initialZineCreatorState, {
       type: "ADD_PHOTOS",
@@ -229,7 +290,7 @@ describe("zineCreatorReducer", () => {
     const recipeApplied = zineCreatorReducer(manual, {
       type: "APPLY_RECIPE",
       pageId: firstPage?.id ?? "",
-      recipeId: "recipe-split-v1",
+      recipeRef: { id: "recipe-split-v1", version: 1 },
     });
     const appliedPage = recipeApplied.draft.manualSpreads?.[0]?.left;
     const placed = zineCreatorReducer(recipeApplied, {
@@ -244,6 +305,74 @@ describe("zineCreatorReducer", () => {
     expect(placed.draft.manualSpreads?.[0]?.left?.photoIds).toContain("two");
   });
 
+  it("applies the exact version carried by a RecipeRef", () => {
+    const withPhotos = zineCreatorReducer(initialZineCreatorState, {
+      type: "ADD_PHOTOS",
+      photos: [photo("one", 4, 3)],
+    });
+    const styled = zineCreatorReducer(withPhotos, { type: "SET_STYLE", styleId: "editorial" });
+    const manual = zineCreatorReducer(styled, { type: "GO_TO", step: "manual" });
+    const sourceEntry = recipeCatalogEntries[0];
+    const sourceDefinition = baseRecipeDefinitions[0];
+    expect(sourceEntry).toBeDefined();
+    expect(sourceDefinition).toBeDefined();
+    if (!sourceEntry || !sourceDefinition) return;
+    const modernize = (version: number) => ({
+      ...sourceDefinition,
+      id: "recipe-ref-test",
+      version,
+      theme: { ...sourceDefinition.theme!, typography: DEFAULT_RECIPE_TYPOGRAPHY },
+      slots: sourceDefinition.slots.map((slot) => slot.kind === "photo"
+        ? { ...slot, zIndex: 10 }
+        : { ...adaptRecipeSlot(slot), zIndex: 20, foregroundToken: "ink" as const }),
+    }) as unknown as RecipeDefinition;
+    const definitionV1 = modernize(1);
+    const definitionV2 = modernize(2);
+    const entryV1 = { ...sourceEntry, recipe: { id: "recipe-ref-test", version: 1 } };
+    const entryV2 = { ...sourceEntry, recipe: { id: "recipe-ref-test", version: 2 } };
+    const resolve = (ref: { readonly id: string; readonly version: number }) => (
+      resolveActiveRecipe(ref, [entryV1, entryV2], [definitionV1, definitionV2])?.definition ?? null
+    );
+    const pageId = manual.draft.manualSpreads?.[0]?.left?.id ?? "";
+    const applied = zineCreatorReducer(manual, {
+      type: "APPLY_RECIPE",
+      pageId,
+      recipeRef: entryV2.recipe,
+    }, resolve);
+
+    expect(applied.draft.manualSpreads?.[0]?.left?.recipeApplication).toMatchObject({
+      recipeId: "recipe-ref-test",
+      recipeVersion: 2,
+    });
+  });
+
+  it("keeps state unchanged when direct APPLY_RECIPE dispatch targets draft, deprecated, or wrong version", () => {
+    const withPhotos = zineCreatorReducer(initialZineCreatorState, {
+      type: "ADD_PHOTOS",
+      photos: [photo("one", 4, 3)],
+    });
+    const styled = zineCreatorReducer(withPhotos, { type: "SET_STYLE", styleId: "editorial" });
+    const manual = zineCreatorReducer(styled, { type: "GO_TO", step: "manual" });
+    const sourceEntry = recipeCatalogEntries[0];
+    const sourceDefinition = baseRecipeDefinitions[0];
+    expect(sourceEntry).toBeDefined();
+    expect(sourceDefinition).toBeDefined();
+    if (!sourceEntry || !sourceDefinition) return;
+    const targets = [
+      { ...sourceEntry, status: "draft" as const },
+      { ...sourceEntry, status: "deprecated" as const },
+      { ...sourceEntry, recipe: { ...sourceEntry.recipe, version: 99 } },
+    ];
+    for (const target of targets) {
+      const rejected = zineCreatorReducer(manual, {
+        type: "APPLY_RECIPE",
+        pageId: manual.draft.manualSpreads?.[0]?.left?.id ?? "",
+        recipeRef: target.recipe,
+      }, (ref) => resolveActiveRecipe(ref, [target], [sourceDefinition])?.definition ?? null);
+      expect(rejected).toBe(manual);
+    }
+  });
+
   it("applies a spread Recipe atomically and keeps overflow photos unplaced", () => {
     const withPhotos = zineCreatorReducer(initialZineCreatorState, {
       type: "ADD_PHOTOS",
@@ -256,7 +385,7 @@ describe("zineCreatorReducer", () => {
     const applied = zineCreatorReducer(manual, {
       type: "APPLY_RECIPE",
       pageId: first.left.id,
-      recipeId: "recipe-reference-cross-gutter-v1",
+      recipeRef: { id: "recipe-reference-cross-gutter-v1", version: 1 },
     });
     const nextSpread = applied.draft.manualSpreads?.[0];
     const leftApplication = nextSpread?.left?.recipeApplication;
@@ -264,6 +393,7 @@ describe("zineCreatorReducer", () => {
 
     expect(leftApplication).toMatchObject({
       recipeId: "recipe-reference-cross-gutter-v1",
+      recipeVersion: 1,
       scope: "spread",
       targetPageIds: [first.left.id, first.right.id],
       unplacedPhotoIds: [first.right.photoIds[0]],
@@ -302,7 +432,7 @@ describe("zineCreatorReducer", () => {
     const applied = zineCreatorHistoryReducer(history, {
       type: "APPLY_RECIPE",
       pageId,
-      recipeId: "recipe-split-v1",
+      recipeRef: { id: "recipe-split-v1", version: 1 },
     });
     const undone = zineCreatorHistoryReducer(applied, { type: "UNDO" });
     const redone = zineCreatorHistoryReducer(undone, { type: "REDO" });
@@ -350,7 +480,7 @@ describe("zineCreatorReducer", () => {
     const applied = zineCreatorHistoryReducer(history, {
       type: "APPLY_RECIPE",
       pageId: first.left.id,
-      recipeId: "recipe-reference-cross-gutter-v1",
+      recipeRef: { id: "recipe-reference-cross-gutter-v1", version: 1 },
     });
     const undone = zineCreatorHistoryReducer(applied, { type: "UNDO" });
     const redone = zineCreatorHistoryReducer(undone, { type: "REDO" });
@@ -393,7 +523,7 @@ describe("zineCreatorReducer", () => {
     const rejected = zineCreatorReducer(overfull, {
       type: "APPLY_RECIPE",
       pageId: first.left.id,
-      recipeId: "recipe-editorial-v1",
+      recipeRef: { id: "recipe-editorial-v1", version: 1 },
     });
 
     expect(rejected).toBe(overfull);

@@ -1,9 +1,13 @@
 import {
+  DEFAULT_RECIPE_TYPOGRAPHY,
   RECIPE_SCHEMA_VERSION,
   type RecipeDefinition,
+  type RecipeNoteSlot,
+  type RecipePhotoSlot,
   type RecipeRect,
-  type RecipeSlot,
+  type RecipeStaticTextSlot,
   type RecipeTheme,
+  type RecipeTypographyRole,
 } from "./recipe-contract";
 
 const pageCanvas = {
@@ -23,6 +27,7 @@ const paperTheme: RecipeTheme = {
   foreground: "#20201b",
   muted: "#736c61",
   photoBackground: "#d9d0c2",
+  typography: DEFAULT_RECIPE_TYPOGRAPHY,
 };
 
 const noteTheme: RecipeTheme = {
@@ -30,6 +35,7 @@ const noteTheme: RecipeTheme = {
   foreground: "#252019",
   muted: "#806d58",
   photoBackground: "#dfc8a6",
+  typography: DEFAULT_RECIPE_TYPOGRAPHY,
 };
 
 const contactTheme: RecipeTheme = {
@@ -37,6 +43,7 @@ const contactTheme: RecipeTheme = {
   foreground: "#22221f",
   muted: "#726f67",
   photoBackground: "#d3d0c9",
+  typography: DEFAULT_RECIPE_TYPOGRAPHY,
 };
 
 const indexTheme: RecipeTheme = {
@@ -44,6 +51,7 @@ const indexTheme: RecipeTheme = {
   foreground: "#18333a",
   muted: "#52727a",
   photoBackground: "#c1d5d6",
+  typography: DEFAULT_RECIPE_TYPOGRAPHY,
 };
 
 const spreadTheme: RecipeTheme = {
@@ -51,6 +59,7 @@ const spreadTheme: RecipeTheme = {
   foreground: "#f7f0df",
   muted: "#b8b5a8",
   photoBackground: "#394648",
+  typography: DEFAULT_RECIPE_TYPOGRAPHY,
 };
 
 const colorTheme: RecipeTheme = {
@@ -58,18 +67,32 @@ const colorTheme: RecipeTheme = {
   foreground: "#fff2ce",
   muted: "#b9e2d7",
   photoBackground: "#cc795a",
+  colorTokens: {
+    paper: "#f7ead0",
+    ink: "#17384a",
+    "muted-ink": "#52727a",
+    "photo-mat": "#cc795a",
+    "accent-1": "#17384a",
+    "accent-2": "#b84a3a",
+    "accent-3": "#e0a33a",
+    "inverse-ink": "#fff2ce",
+  },
+  typography: DEFAULT_RECIPE_TYPOGRAPHY,
 };
 
-const staticHeaderSlots: readonly RecipeSlot[] = [
+const staticHeaderSlots = (kickerRole: RecipeTypographyRole): readonly RecipeStaticTextSlot[] => [
   {
     id: "reference-kicker",
     kind: "static-text",
     rect: { x: .08, y: .06, width: .42, height: .04 },
     pageSide: "left",
     required: false,
-    zIndex: 3,
+    zIndex: 20,
+    foregroundToken: "ink",
     text: "REFERENCE RECIPE",
     textSource: "literal",
+    role: kickerRole,
+    align: "start",
   },
   {
     id: "reference-page-number",
@@ -77,8 +100,11 @@ const staticHeaderSlots: readonly RecipeSlot[] = [
     rect: { x: .84, y: .06, width: .08, height: .04 },
     pageSide: "left",
     required: false,
-    zIndex: 3,
+    zIndex: 20,
+    foregroundToken: "ink",
     textSource: "page-number",
+    role: "folio",
+    align: "end",
   },
 ];
 
@@ -86,25 +112,28 @@ const photoSlot = (
   id: string,
   rect: RecipeRect,
   required: boolean,
-): RecipeSlot => ({
+): RecipePhotoSlot => ({
   id,
   kind: "photo",
   rect,
   pageSide: "left",
   required,
-  zIndex: 1,
+  zIndex: 10,
   fit: "cover",
 });
 
-const noteSlot = (rect: RecipeRect): RecipeSlot => ({
+const noteSlot = (rect: RecipeRect, role: "caption" | "note" | "index"): RecipeNoteSlot => ({
   id: "note-1",
   kind: "note",
   rect,
   pageSide: "left",
   required: false,
-  zIndex: 2,
+  zIndex: 20,
+  foregroundToken: "ink",
   maxLines: 3,
   repeatable: true,
+  role,
+  align: "start",
 });
 
 const pageRecipe = ({
@@ -119,18 +148,22 @@ const pageRecipe = ({
   theme,
   noteRect,
   relation,
+  kickerRole = "label",
+  noteRole = "note",
 }: {
   readonly id: string;
   readonly familyId: string;
   readonly name: string;
   readonly description: string;
-  readonly photos: readonly RecipeSlot[];
+  readonly photos: readonly RecipePhotoSlot[];
   readonly photoMin: number;
   readonly photoMax: number;
   readonly notes: "none" | "optional";
   readonly theme: RecipeTheme;
   readonly noteRect?: RecipeRect;
   readonly relation?: "adjacent" | "aligned" | "indexed";
+  readonly kickerRole?: RecipeTypographyRole;
+  readonly noteRole?: "caption" | "note" | "index";
 }): RecipeDefinition => ({
   schemaVersion: RECIPE_SCHEMA_VERSION,
   id,
@@ -140,9 +173,6 @@ const pageRecipe = ({
   description,
   status: "draft",
   scope: "page",
-  // Kept only for old persistence compatibility. Preview rendering never looks
-  // up this field, which is why these definitions live outside the runtime catalog.
-  legacyStyleId: "editorial",
   capabilities: {
     photos: { min: photoMin, max: photoMax },
     notes: notes === "none"
@@ -153,13 +183,30 @@ const pageRecipe = ({
   canvas: pageCanvas,
   theme,
   slots: [
-    ...staticHeaderSlots,
+    ...staticHeaderSlots(kickerRole),
     ...photos,
-    ...(notes === "none" || !noteRect ? [] : [noteSlot(noteRect)]),
+    ...(notes === "none" || !noteRect ? [] : [noteSlot(noteRect, noteRole)]),
   ],
   noteRelations: notes === "none" || !relation
     ? []
     : photos.map((slot) => ({ photoSlotId: slot.id, noteSlotId: "note-1", kind: relation })),
+});
+
+const multiColorBase = pageRecipe({
+  id: "reference-multi-color-system-v1",
+  familyId: "reference-multi-color-system",
+  name: "Multi-color system",
+  description: "A two-image color system with a deliberately contrasting paper field.",
+  photos: [
+    photoSlot("color-photo-1", { x: .08, y: .19, width: .47, height: .54 }, true),
+    photoSlot("color-photo-2", { x: .59, y: .19, width: .33, height: .3 }, false),
+  ],
+  photoMin: 1,
+  photoMax: 2,
+  notes: "optional",
+  noteRect: { x: .59, y: .56, width: .33, height: .18 },
+  relation: "aligned",
+  theme: colorTheme,
 });
 
 export const referenceRecipeDefinitions: readonly RecipeDefinition[] = [
@@ -185,6 +232,8 @@ export const referenceRecipeDefinitions: readonly RecipeDefinition[] = [
     notes: "optional",
     noteRect: { x: .58, y: .24, width: .34, height: .48 },
     relation: "aligned",
+    kickerRole: "deck",
+    noteRole: "caption",
     theme: noteTheme,
   }),
   pageRecipe({
@@ -218,6 +267,8 @@ export const referenceRecipeDefinitions: readonly RecipeDefinition[] = [
     notes: "optional",
     noteRect: { x: .08, y: .8, width: .84, height: .12 },
     relation: "indexed",
+    kickerRole: "title",
+    noteRole: "index",
     theme: indexTheme,
   }),
   {
@@ -229,7 +280,6 @@ export const referenceRecipeDefinitions: readonly RecipeDefinition[] = [
     description: "One placement owns both halves of a photograph across the book spine.",
     status: "draft",
     scope: "spread",
-    legacyStyleId: "editorial",
     capabilities: {
       photos: { min: 1, max: 1 },
       notes: { mode: "none" },
@@ -244,7 +294,7 @@ export const referenceRecipeDefinitions: readonly RecipeDefinition[] = [
         rect: { x: .68, y: .14, width: .64, height: .72 },
         pageSide: "cross-spread",
         required: true,
-        zIndex: 1,
+        zIndex: 10,
         fit: "cover",
         allowBleed: true,
         allowGutterCrossing: true,
@@ -255,9 +305,12 @@ export const referenceRecipeDefinitions: readonly RecipeDefinition[] = [
         rect: { x: .08, y: .06, width: .3, height: .04 },
         pageSide: "left",
         required: false,
-        zIndex: 2,
+        zIndex: 20,
+        foregroundToken: "ink",
         text: "LEFT PAGE",
         textSource: "literal",
+        role: "label",
+        align: "outward",
       },
       {
         id: "cross-gutter-right-label",
@@ -265,29 +318,108 @@ export const referenceRecipeDefinitions: readonly RecipeDefinition[] = [
         rect: { x: 1.62, y: .06, width: .3, height: .04 },
         pageSide: "right",
         required: false,
-        zIndex: 2,
+        zIndex: 20,
+        foregroundToken: "ink",
         text: "RIGHT PAGE",
         textSource: "literal",
+        role: "label",
+        align: "outward",
       },
     ],
     noteRelations: [],
   },
-  pageRecipe({
-    id: "reference-multi-color-system-v1",
-    familyId: "reference-multi-color-system",
-    name: "Multi-color system",
-    description: "A two-image color system with a deliberately contrasting paper field.",
-    photos: [
-      photoSlot("color-photo-1", { x: .08, y: .19, width: .47, height: .54 }, true),
-      photoSlot("color-photo-2", { x: .59, y: .19, width: .33, height: .3 }, false),
+  {
+    schemaVersion: RECIPE_SCHEMA_VERSION,
+    id: "reference-cross-page-pairs-v1",
+    version: 1,
+    familyId: "reference-cross-page-pairs",
+    name: "Bidirectional cross-page pairs",
+    description: "Two Photo Notes prove both left-to-right and right-to-left content relationships.",
+    status: "draft",
+    scope: "spread",
+    capabilities: {
+      photos: { min: 2, max: 2 },
+      notes: { mode: "optional", maxCharacters: 140, maxLines: 3 },
+      allowsEmptyDraft: true,
+    },
+    canvas: spreadCanvas,
+    theme: spreadTheme,
+    slots: [
+      photoSlot("pair-photo-left", { x: .08, y: .18, width: .4, height: .32 }, true),
+      { ...photoSlot("pair-photo-right", { x: 1.52, y: .56, width: .4, height: .32 }, true), pageSide: "right" },
+      {
+        ...noteSlot({ x: 1.52, y: .18, width: .4, height: .22 }, "caption"),
+        id: "pair-note-right",
+        pageSide: "right",
+        align: "inward",
+      },
+      {
+        ...noteSlot({ x: .08, y: .66, width: .4, height: .22 }, "note"),
+        id: "pair-note-left",
+        align: "inward",
+      },
+      {
+        id: "pair-label-left",
+        kind: "static-text",
+        rect: { x: .08, y: .06, width: .4, height: .04 },
+        pageSide: "left",
+        required: false,
+        zIndex: 20,
+        foregroundToken: "ink",
+        text: "LEFT PHOTO / RIGHT NOTE",
+        textSource: "literal",
+        role: "label",
+        align: "outward",
+      },
+      {
+        id: "pair-label-right",
+        kind: "static-text",
+        rect: { x: 1.52, y: .06, width: .4, height: .04 },
+        pageSide: "right",
+        required: false,
+        zIndex: 20,
+        foregroundToken: "ink",
+        text: "RIGHT PHOTO / LEFT NOTE",
+        textSource: "literal",
+        role: "label",
+        align: "outward",
+      },
     ],
-    photoMin: 1,
-    photoMax: 2,
-    notes: "optional",
-    noteRect: { x: .59, y: .56, width: .33, height: .18 },
-    relation: "aligned",
-    theme: colorTheme,
-  }),
+    noteRelations: [
+      { photoSlotId: "pair-photo-left", noteSlotId: "pair-note-right", kind: "cross-page-pair" },
+      { photoSlotId: "pair-photo-right", noteSlotId: "pair-note-left", kind: "cross-page-pair" },
+    ],
+  },
+  {
+    ...multiColorBase,
+    slots: [
+      {
+        id: "color-paper-field",
+        kind: "color-field",
+        rect: { x: .05, y: .05, width: .48, height: .9 },
+        pageSide: "left",
+        required: true,
+        zIndex: 0,
+        fillToken: "paper",
+      },
+      {
+        id: "color-accent-field",
+        kind: "color-field",
+        rect: { x: .53, y: .05, width: .42, height: .9 },
+        pageSide: "left",
+        required: true,
+        zIndex: 1,
+        fillToken: "accent-1",
+      },
+      ...multiColorBase.slots
+        .filter((slot) => slot.kind !== "color-field")
+        .map((slot) => slot.kind === "photo"
+          ? { ...slot, zIndex: 10 }
+          : slot.kind === "note"
+            ? { ...slot, zIndex: 20, foregroundToken: "inverse-ink" as const }
+            : { ...slot, zIndex: 20, foregroundToken: slot.id === "reference-page-number" ? "inverse-ink" as const : "ink" as const }),
+    ],
+  },
 ];
 
 export const referenceRecipeIds = referenceRecipeDefinitions.map((recipe) => recipe.id);

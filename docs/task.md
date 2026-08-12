@@ -1,25 +1,48 @@
 # EventSpace 当前任务记录
 
-> 最后更新：2026-08-11
+> 最后更新：2026-08-12
 > 用途：记录最近任务做了什么、当前真实进度、验证结果、遗留事项和下一步。  
 > 规则：本文件保持为当前阶段活文档；更早阶段摘要迁移到 [`history_taks.md`](./history_taks.md)。  
-> 本次同步范围：基于 `main` 的最新提交 `45b460d` 及其父提交校准；只同步文档，不修改业务代码。
+> 本次同步范围：对比 `main` 的 `16320a1` 与父提交 `45b460d`；只同步文档，不修改业务代码。
 
 ## 项目当前状态
 
-- 当前阶段：Supabase-backed 封闭 MVP 接线推进中；正式房间、账号、邀请、成员治理、Chat 文本/语音、Photos、Itinerary 与 Realtime 已从纯本地 Mock 迁到真实 Supabase 读写路径。
+- 当前阶段：Supabase-backed 封闭 MVP 接线推进中；正式房间、账号、邀请、成员治理、Chat 文本/语音、Photos、Itinerary 与 Realtime 已从纯本地 Mock 迁到真实 Supabase 读写路径；Zine Recipe 引擎在独立本地切片中推进，尚未进入后端。
 - `MockSession` 仍存在，但在云端房间内主要作为 `RoomExperience` 的兼容前端状态外壳；`BackendSessionProvider.executeCommand` 会把支持的命令转成 Server Action / RPC / Storage 操作，失败后回滚到服务器快照。
 - 结构化本地会话 `eventspace:local-session:v1` 与 IndexedDB `eventspace-local-assets` 继续服务本地 mock、录音/图片采集的上传前临时 Blob，以及旧数据兼容；它不是云端业务真相。
 - 当前已经支持创建真实 Host-led 房间、真实邀请 token/code、可扫描 QR、匿名访客加入、待审核轮询、Host 审批、账号资料和头像上传、房间列表/详情、文字/语音 Chat、Photos 上传/评论/删除、行程和成员治理。另有独立 `/zine` 本地创建器和翻页 Reader vertical slice；它不属于 Room 内 Book，也未接入生产后端。
 - 图片、语音与头像均走 `assets` + 私有 `room-media` Storage + 短期签名 URL；图片上传当前生成 display / thumbnail / placeholder / dimensions / revision 元数据，客户端仍需先持有本地 Blob 才能上传，服务端负责成员资格、状态、配额、对象归属和 variant 字段约束校验。
 - `/rooms`、`/rooms/[roomId]`、`/account` 和 viewer avatar 已增加浏览器快照/头像缓存与 Cache Storage + IndexedDB 云端图片 read-through cache。它们只保存去签名 URL 的展示快照或媒体 Blob 加速读取，不是跨设备业务真相；权限、签名和最终内容仍以 Supabase 为准。
 - `/rooms` 的收藏和“从个人列表移除”已经写入当前成员的 Supabase `room_members` 偏好；前端先乐观更新，Server Action 失败时回滚并显示错误。隐藏只影响当前成员的 Rooms 列表，不撤销该成员进入房间的权限。
-- 后端范围已冻结：仅 Host-led；Chat 文本/语音；Photos 与 Itinerary 进入首期；Stripe 一次性房间支付进入 MVP 但当前免费/封闭测试不阻塞；Room 内 Book 延后设计，投票继续延后；Zine 当前只保留本地实验切片，不创建生产表。
+- 后端范围已冻结：仅 Host-led；Chat 文本/语音；Photos 与 Itinerary 进入首期；Stripe 一次性房间支付进入 MVP 但当前免费/封闭测试不阻塞；Room 内 Book 延后设计，投票继续延后；Zine Recipe 引擎当前只保留本地实验切片，不创建生产表。
 - 后端实施、验收和任务 Mark 统一以 [`supabase-backend-integration-plan.md`](./supabase-backend-integration-plan.md) 为主计划书。
 - 生产构建不再依赖远程 Google Fonts / `next/font` 拉取；字体资源已通过 `public/fonts` 的本地 `@font-face` 加载，保留 Bodoni 衬线标题风格。
 - `/prototype` 系列路由只作为视觉历史参考，不再代表当前功能完成度。
 
 ## 最近完成任务
+
+### TASK-030 - Recipe Contract、Renderer 与 Reference Gate
+
+- 日期：2026-08-12
+- 对比范围：`16320a1` 相对 `45b460d`。
+- 状态：代码已进入 `main`；Recipe Contract、Renderer、手动应用和开发 Preview Matrix 已落地，但 Reference Recipe Gate 的浏览器人工视觉复核尚未完成。
+- 完成内容：
+  - 新增 `RecipeDefinition`、`RecipeApplication`、`RecipeAssignment`、Slot、Scope、Note relation、Theme 和兼容性状态模型，并实现静态 Definition Validator。
+  - 新增确定性的 Recipe Application：支持内容容量、Note 长度/行数、无文字隐藏 Note、未放置照片、旧 Application 的 placement/focus 迁移和失败时不提交部分状态。
+  - 新增通用 `RecipeRenderer` 与 `createRecipeRenderPlan`；编辑器预览、Reader 和 Preview Matrix 共用同一套 Slot、Photo Note、cover 裁切、主题和跨页坐标渲染。
+  - 将照片焦点从资产级下沉到 placement：支持 `focusX` / `focusY` / `scale`，同一照片的不同 placement 可独立裁切；编辑器拖动时使用 DOM 即时同步，提交后写入 reducer。
+  - 手动排版支持单页 Recipe、跨页 `Gutter bridge`、Recipe 兼容状态、超额照片提示，以及 Recipe/照片放置/placement 焦点的一次 Undo/Redo。
+  - 新增 6 个 Reference Recipe、照片比例/容量/Note 边界 fixtures、Editor/Reader 对照 Preview Matrix 和 development-only `/zine/preview-matrix` Gate 页面；生产环境访问该页面会 `notFound()`。
+- 真实能力边界：
+  - 当前正式执行目录只有 5 个 legacy style Recipe 和 1 个跨页 Recipe；6 个 Reference Recipe 是 Gate fixtures，仍为 `draft`，不是最终产品目录。
+  - AI layout 仍只是 Overview/Arrange 流程分支，没有 AI provider、生成任务或任意 CSS/坐标输出；AI 未来必须先经过同一 Contract Validator/Application。
+  - Zine 仍是浏览器内存切片：没有 localStorage、IndexedDB、Supabase Auth、Storage、数据库持久化、发布、分享、导出或多人协作。
+- 已知问题/风险：
+  - Preview Matrix 已有纯逻辑测试和开发路由，但本轮没有启动 dev server 做浏览器人工视觉检查；图片比例、Note 溢出、跨书脊和 Editor/Reader 像素一致性仍是 Gate 项。
+  - `page-flip` 只应继续接管克隆后的命令式 DOM；Recipe Renderer 的 React 源页、Preview Matrix 和 Reader 仍需保持生命周期隔离。
+  - 正式 Recipe 从 `draft` 升级为 `active` 前，需要完成 Gate 记录和产品视觉评审；不要直接批量扩展 72 个 Recipe。
+- 验证：`npm run check` 通过；`npm test` 通过（50 个测试文件、205 个测试）；`npm run build` 通过（Next.js 16.2.10，包含 `/zine/preview-matrix` 静态产物）；`git diff --check` 通过。构建输出与代码边界一致：Preview Matrix 仍由运行时环境保护，非 development 访问返回 Not Found。
+- 下一步：在 development 环境人工复核 `/zine/preview-matrix`，按 `recipeId` / `fixtureId` / `slotId` 记录问题；Gate 通过后再开展正式 Recipe 家族和 AI 选择设计。
 
 ### TASK-029 - Zine 创建器重写、手动排版与 Reader 同步
 

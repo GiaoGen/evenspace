@@ -1,5 +1,5 @@
 import { Icon } from "@/components/ui/icon";
-import { getRecipeDefinition } from "../../model/recipe-contract";
+import { getActiveRecipeDefinition } from "../../model/recipe-catalog";
 import type { ZineReaderPage } from "../../model/zine-pages";
 import { RecipeRenderer } from "../recipe-renderer";
 import styles from "./zine-reader.module.css";
@@ -103,7 +103,9 @@ function ContentPage({
   readonly mode: "editor" | "reader";
 }) {
   const application = page.recipeApplication;
-  const recipe = application ? getRecipeDefinition(application.recipeId) : null;
+  const recipe = application
+    ? getActiveRecipeDefinition({ id: application.recipeId, version: application.recipeVersion })
+    : null;
   if (!recipe || !application) {
     return <span className={styles.missingRecipe}>Recipe unavailable</span>;
   }

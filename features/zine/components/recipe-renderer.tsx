@@ -1,6 +1,13 @@
 import Image from "next/image";
 import type { CSSProperties } from "react";
-import type { RecipeDefinition, RecipeApplication, RecipeRelationKind } from "../model/recipe-contract";
+import {
+  adaptRecipeTheme,
+  type RecipeColorToken,
+  type RecipeDefinition,
+  type RecipeApplication,
+  type RecipeRelationKind,
+  type RecipeTypographyToken,
+} from "../model/recipe-contract";
 import type { ZinePhoto } from "../model/zine-draft";
 import {
   createRecipeRenderPlan,
@@ -34,11 +41,20 @@ export function RecipeRenderer({
     muted: "#817c73",
     photoBackground: "#ded8cd",
   };
+  const colorTokens = adaptRecipeTheme(theme);
   const canvasStyle = {
-    "--recipe-background": theme.background,
-    "--recipe-foreground": theme.foreground,
-    "--recipe-muted": theme.muted,
-    "--recipe-photo-background": theme.photoBackground,
+    "--recipe-background": colorTokens.paper,
+    "--recipe-foreground": colorTokens.ink,
+    "--recipe-muted": colorTokens["muted-ink"],
+    "--recipe-photo-background": colorTokens["photo-mat"],
+    "--recipe-color-paper": colorTokens.paper,
+    "--recipe-color-ink": colorTokens.ink,
+    "--recipe-color-muted-ink": colorTokens["muted-ink"],
+    "--recipe-color-photo-mat": colorTokens["photo-mat"],
+    "--recipe-color-accent-1": colorTokens["accent-1"],
+    "--recipe-color-accent-2": colorTokens["accent-2"],
+    "--recipe-color-accent-3": colorTokens["accent-3"],
+    "--recipe-color-inverse-ink": colorTokens["inverse-ink"],
   } as CSSProperties;
 
   return (
@@ -81,6 +97,9 @@ function RecipeSlotView({
   if (slot.kind === "photo") {
     return <PhotoSlot slot={slot} style={slotStyle} />;
   }
+  if (slot.kind === "color-field") {
+    return <ColorFieldSlot slot={slot} style={slotStyle} />;
+  }
   if (slot.kind === "note") {
     return <NoteSlot slot={slot} style={slotStyle} />;
   }
@@ -89,7 +108,8 @@ function RecipeSlotView({
       className={styles.recipeStaticText}
       data-zine-slot-id={slot.id}
       data-slot-kind={slot.kind}
-      style={slotStyle}
+      data-typography-role={slot.typographyRole}
+      style={{ ...slotStyle, ...foregroundStyle(slot.foregroundToken), ...typographyStyle(slot.typographyToken, slot.textAlign) }}
     >
       {slot.text}
     </span>
@@ -171,7 +191,8 @@ function NoteSlot({
       data-slot-kind="note"
       data-note-relation={relation}
       data-note-relations={relationKinds.join(" ") || undefined}
-      style={{ ...style, "--recipe-note-count": notes.length } as CSSProperties}
+      data-typography-role={slot.typographyRole}
+      style={{ ...style, ...foregroundStyle(slot.foregroundToken), ...typographyStyle(slot.typographyToken, slot.textAlign), "--recipe-note-count": notes.length } as CSSProperties}
     >
       {notes.map((note) => (
         <span
@@ -187,6 +208,58 @@ function NoteSlot({
       ))}
     </div>
   );
+}
+
+function ColorFieldSlot({
+  slot,
+  style,
+}: {
+  readonly slot: RecipeRenderPlanSlot;
+  readonly style: CSSProperties;
+}) {
+  return (
+    <div
+      className={styles.recipeColorField}
+      data-zine-slot-id={slot.id}
+      data-slot-kind="color-field"
+      data-fill-token={slot.fillToken}
+      style={{ ...style, background: colorTokenValue(slot.fillToken) }}
+    />
+  );
+}
+
+function foregroundStyle(token: RecipeColorToken | undefined): CSSProperties {
+  return token ? { color: colorTokenValue(token) } : {};
+}
+
+function colorTokenValue(token: RecipeColorToken | undefined) {
+  if (!token) return "transparent";
+  return `var(--recipe-color-${token})`;
+}
+
+const typographySizes = {
+  xs: "clamp(5px, .9vw, 7px)",
+  sm: "clamp(5px, 1.05vw, 8px)",
+  md: "clamp(6px, 1.35vw, 10px)",
+  lg: "clamp(8px, 1.8vw, 14px)",
+  xl: "clamp(10px, 2.5vw, 20px)",
+} as const;
+const typographyLineHeights = { tight: 1.1, normal: 1.25, open: 1.45 } as const;
+const typographyTracking = { tight: "-.015em", normal: "0", wide: ".08em" } as const;
+
+function typographyStyle(
+  token: RecipeTypographyToken | undefined,
+  align: RecipeRenderPlanSlot["textAlign"],
+): CSSProperties {
+  if (!token) return {};
+  return {
+    fontSize: typographySizes[token.size],
+    lineHeight: typographyLineHeights[token.lineHeight],
+    fontWeight: token.weight,
+    letterSpacing: typographyTracking[token.tracking],
+    textTransform: token.transform,
+    textAlign: align,
+  };
 }
 
 export function getRecipeRelationLabel(relation: RecipeRelationKind | null) {

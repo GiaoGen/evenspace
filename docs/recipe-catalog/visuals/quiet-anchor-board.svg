@@ -1,0 +1,165 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="2200" height="1540" viewBox="0 0 2200 1540" role="img" aria-labelledby="title desc">
+  <title id="title">Quiet family final three Anchor state board</title>
+  <desc id="desc">Held Field, Scale Echo, and Horizon Bridge are each shown in six states: ideal, landscape, portrait or square, no note, longest legal note, and left-right or spread focus.</desc>
+  <defs>
+    <pattern id="horizon" patternUnits="objectBoundingBox" width="1" height="1" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid slice">
+      <rect width="100" height="100" fill="#d0d0d0"/><rect y="52" width="100" height="48" fill="#9b9b9b"/>
+      <path d="M0 61L18 50L37 58L55 43L74 59L100 48V72H0Z" fill="#666"/><circle cx="78" cy="26" r="7" fill="#f3f3f3"/><circle cx="33" cy="55" r="3.5" fill="#222"/>
+    </pattern>
+    <pattern id="figure" patternUnits="objectBoundingBox" width="1" height="1" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid slice">
+      <rect width="100" height="100" fill="#c7c7c7"/><rect x="9" y="9" width="82" height="82" fill="#dedede"/>
+      <circle cx="61" cy="34" r="13" fill="#555"/><path d="M34 91C38 59 48 50 62 50C78 50 86 67 88 91Z" fill="#707070"/><rect x="10" width="16" height="100" fill="#999"/>
+    </pattern>
+    <pattern id="square" patternUnits="objectBoundingBox" width="1" height="1" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid slice">
+      <rect width="100" height="100" fill="#d5d5d5"/><ellipse cx="58" cy="48" rx="30" ry="21" fill="#737373"/><ellipse cx="55" cy="45" rx="15" ry="10" fill="#aaa"/><circle cx="61" cy="46" r="3" fill="#222"/><path d="M0 82C27 61 50 89 100 63V100H0Z" fill="#969696"/>
+    </pattern>
+    <marker id="arrow" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0 0L7 3.5L0 7Z" fill="#222"/></marker>
+    <style>
+      .bg{fill:#f2f2f0}.row{fill:#fafafa;stroke:#bbb;stroke-width:1}.page{fill:#fff;stroke:#222;stroke-width:1.5}.safe{fill:none;stroke:#b0b0b0;stroke-width:.8;stroke-dasharray:4 4}.gutter{fill:#dedede}.photo{stroke:#202020;stroke-width:1.2}.h1{font:700 27px Arial,sans-serif;fill:#111}.h2{font:700 20px Arial,sans-serif;fill:#111}.meta{font:14px Arial,sans-serif;fill:#333}.state{font:700 12px Arial,sans-serif;fill:#222}.small{font:11px Arial,sans-serif;fill:#555}.tiny{font:9px Arial,sans-serif;fill:#333}.noteLine{stroke:#333;stroke-width:1.2}.path{fill:none;stroke:#222;stroke-width:1.5;marker-end:url(#arrow)}.crop{fill:none;stroke:#fff;stroke-width:1.2}.divider{stroke:#c4c4c4;stroke-width:1}.risk{fill:#eee;stroke:#777;stroke-width:.8;stroke-dasharray:3 3}
+    </style>
+  </defs>
+  <rect class="bg" width="2200" height="1540"/>
+  <text x="70" y="58" class="h1">QUIET / FINAL ANCHOR STATE BOARD</text>
+  <text x="70" y="86" class="meta">Grayscale only · self-made neutral photography · every image cover-fills its frame · fixed geometry across Note states</text>
+  <line x1="70" y1="108" x2="2130" y2="108" class="divider"/>
+
+  <!-- HELD FIELD -->
+  <g transform="translate(50 135)">
+    <rect class="row" width="2100" height="390"/>
+    <text x="25" y="38" class="h2">HELD FIELD · quiet-held-field-v1</text>
+    <text x="25" y="62" class="small">Role 03 · page · one required photo · no visible Note · centered vertical hold</text>
+    <g transform="translate(25 88)">
+      <text x="125" y="0" text-anchor="middle" class="state">1 · IDEAL</text>
+      <rect class="page" x="65" y="15" width="120" height="160"/><rect class="safe" x="77" y="31" width="96" height="128"/>
+      <rect class="photo" x="82" y="40.6" width="86.4" height="96" fill="url(#figure)"/><circle class="crop" cx="135" cy="74" r="4"/>
+      <path class="path" d="M125 61V118"/><text x="125" y="196" text-anchor="middle" class="tiny">portrait subject, 43.2% image</text>
+    </g>
+    <g transform="translate(355 88)">
+      <text x="125" y="0" text-anchor="middle" class="state">2 · LANDSCAPE</text>
+      <rect class="page" x="65" y="15" width="120" height="160"/><rect class="safe" x="77" y="31" width="96" height="128"/>
+      <rect class="photo" x="82" y="40.6" width="86.4" height="96" fill="url(#horizon)"/><circle class="crop" cx="111" cy="94" r="4"/>
+      <text x="125" y="196" text-anchor="middle" class="tiny">cover crops sides; focus follows subject</text>
+    </g>
+    <g transform="translate(685 88)">
+      <text x="125" y="0" text-anchor="middle" class="state">3 · SQUARE</text>
+      <rect class="page" x="65" y="15" width="120" height="160"/><rect class="safe" x="77" y="31" width="96" height="128"/>
+      <rect class="photo" x="82" y="40.6" width="86.4" height="96" fill="url(#square)"/><circle class="crop" cx="134" cy="85" r="4"/>
+      <text x="125" y="196" text-anchor="middle" class="tiny">top/bottom crop; subject remains legible</text>
+    </g>
+    <g transform="translate(1015 88)">
+      <text x="125" y="0" text-anchor="middle" class="state">4 · NO NOTE</text>
+      <rect class="page" x="65" y="15" width="120" height="160"/><rect class="safe" x="77" y="31" width="96" height="128"/>
+      <rect class="photo" x="82" y="40.6" width="86.4" height="96" fill="url(#figure)"/>
+      <text x="125" y="153" text-anchor="middle" class="tiny">paper remains intentional</text><text x="125" y="196" text-anchor="middle" class="tiny">source Note retained, hidden; no reflow</text>
+    </g>
+    <g transform="translate(1345 88)">
+      <text x="125" y="0" text-anchor="middle" class="state">5 · LONGEST NOTE</text>
+      <rect class="page" x="65" y="15" width="120" height="160"/><rect class="safe" x="77" y="31" width="96" height="128"/>
+      <rect class="photo" x="82" y="40.6" width="86.4" height="96" fill="url(#figure)"/>
+      <rect class="risk" x="80" y="146" width="90" height="15"/><text x="125" y="156" text-anchor="middle" class="tiny">NOTE HIDDEN · CONTENT KEPT</text>
+      <text x="125" y="196" text-anchor="middle" class="tiny">not a text-capable layout</text>
+    </g>
+    <g transform="translate(1675 88)">
+      <text x="170" y="0" text-anchor="middle" class="state">6 · LEFT / RIGHT FOCUS</text>
+      <rect class="page" x="35" y="35" width="90" height="120"/><rect class="gutter" x="120" y="35" width="5" height="120"/><rect class="photo" x="48" y="54" width="65" height="72" fill="url(#figure)"/>
+      <rect class="page" x="215" y="35" width="90" height="120"/><rect class="gutter" x="215" y="35" width="5" height="120"/><rect class="photo" x="227" y="54" width="65" height="72" fill="url(#figure)"/>
+      <text x="170" y="178" text-anchor="middle" class="tiny">same normalized rect; inner safe space preserved</text>
+    </g>
+    <text x="25" y="355" class="small">Strength: the family baseline—one image, a firm scale, and continuous paper. Risk: ultra-wide scenes need aggressive side crop; weak photos feel exposed.</text>
+  </g>
+
+  <!-- SCALE ECHO -->
+  <g transform="translate(50 555)">
+    <rect class="row" width="2100" height="390"/>
+    <text x="25" y="38" class="h2">SCALE ECHO · quiet-scale-echo-v1</text>
+    <text x="25" y="62" class="small">Role 09 · page · two required photos · optional aligned Note bound to photo 2 · diagonal echo</text>
+    <g transform="translate(25 88)">
+      <text x="125" y="0" text-anchor="middle" class="state">1 · IDEAL</text>
+      <rect class="page" x="65" y="15" width="120" height="160"/><rect class="safe" x="77" y="31" width="96" height="128"/>
+      <rect class="photo" x="77" y="35.8" width="72" height="64" fill="url(#horizon)"/><rect class="photo" x="127.4" y="111" width="45.6" height="51.2" fill="url(#square)"/>
+      <path class="path" d="M97 63C125 84 137 112 148 135"/><line class="noteLine" x1="78" y1="140" x2="111" y2="140"/><text x="78" y="151" class="tiny">2  NOTE</text>
+      <text x="125" y="196" text-anchor="middle" class="tiny">large scene → detail → note</text>
+    </g>
+    <g transform="translate(355 88)">
+      <text x="125" y="0" text-anchor="middle" class="state">2 · LANDSCAPE PAIR</text>
+      <rect class="page" x="65" y="15" width="120" height="160"/><rect class="safe" x="77" y="31" width="96" height="128"/>
+      <rect class="photo" x="77" y="35.8" width="72" height="64" fill="url(#horizon)"/><rect class="photo" x="127.4" y="111" width="45.6" height="51.2" fill="url(#horizon)"/>
+      <circle class="crop" cx="143" cy="137" r="4"/><text x="125" y="196" text-anchor="middle" class="tiny">secondary frame crops sides most</text>
+    </g>
+    <g transform="translate(685 88)">
+      <text x="125" y="0" text-anchor="middle" class="state">3 · PORTRAIT + SQUARE</text>
+      <rect class="page" x="65" y="15" width="120" height="160"/><rect class="safe" x="77" y="31" width="96" height="128"/>
+      <rect class="photo" x="77" y="35.8" width="72" height="64" fill="url(#figure)"/><rect class="photo" x="127.4" y="111" width="45.6" height="51.2" fill="url(#square)"/>
+      <text x="125" y="196" text-anchor="middle" class="tiny">portrait main risks head/feet; square is robust</text>
+    </g>
+    <g transform="translate(1015 88)">
+      <text x="125" y="0" text-anchor="middle" class="state">4 · NO NOTE</text>
+      <rect class="page" x="65" y="15" width="120" height="160"/><rect class="safe" x="77" y="31" width="96" height="128"/>
+      <rect class="photo" x="77" y="35.8" width="72" height="64" fill="url(#horizon)"/><rect class="photo" x="127.4" y="111" width="45.6" height="51.2" fill="url(#square)"/>
+      <line class="divider" x1="78" y1="140" x2="111" y2="140" stroke-dasharray="3 3"/><text x="125" y="196" text-anchor="middle" class="tiny">fixed lower-left pause remains; no slot moves</text>
+    </g>
+    <g transform="translate(1345 88)">
+      <text x="125" y="0" text-anchor="middle" class="state">5 · 60 CH / 3 LINES</text>
+      <rect class="page" x="65" y="15" width="120" height="160"/><rect class="safe" x="77" y="31" width="96" height="128"/>
+      <rect class="photo" x="77" y="35.8" width="72" height="64" fill="url(#horizon)"/><rect class="photo" x="127.4" y="111" width="45.6" height="51.2" fill="url(#square)"/>
+      <line class="noteLine" x1="78" y1="132" x2="116" y2="132"/><text x="78" y="142" class="tiny">2  Detail returns</text><text x="78" y="151" class="tiny">after the scene,</text><text x="78" y="160" class="tiny">held in paper.</text>
+      <text x="125" y="196" text-anchor="middle" class="tiny">overflow is incompatible, never clipped</text>
+    </g>
+    <g transform="translate(1675 88)">
+      <text x="170" y="0" text-anchor="middle" class="state">6 · LEFT / RIGHT FOCUS</text>
+      <rect class="page" x="35" y="35" width="90" height="120"/><rect class="gutter" x="120" y="35" width="5" height="120"/><rect class="photo" x="44" y="51" width="54" height="48" fill="url(#horizon)"/><rect class="photo" x="82" y="106" width="34" height="38" fill="url(#square)"/>
+      <rect class="page" x="215" y="35" width="90" height="120"/><rect class="gutter" x="215" y="35" width="5" height="120"/><rect class="photo" x="224" y="51" width="54" height="48" fill="url(#horizon)"/><rect class="photo" x="262" y="106" width="34" height="38" fill="url(#square)"/>
+      <text x="170" y="178" text-anchor="middle" class="tiny">page scope; paired page never changes</text>
+    </g>
+    <text x="25" y="355" class="small">Strength: two images converse through a 2:1 scale change, not equal-module comparison. Risk: unrelated images break the echo; photo 2 needs a reliable focus.</text>
+  </g>
+
+  <!-- HORIZON BRIDGE -->
+  <g transform="translate(50 975)">
+    <rect class="row" width="2100" height="470"/>
+    <text x="25" y="38" class="h2">HORIZON BRIDGE · quiet-horizon-bridge-v1</text>
+    <text x="25" y="62" class="small">Role 11 · spread · one required cross-gutter photo · no visible Note · horizontal immersion</text>
+    <g transform="translate(20 88)">
+      <text x="155" y="0" text-anchor="middle" class="state">1 · IDEAL</text>
+      <rect class="page" x="35" y="35" width="240" height="160"/><rect class="gutter" x="152" y="35" width="6" height="160"/>
+      <rect class="safe" x="47" y="51" width="216" height="128"/><rect class="photo" x="68.6" y="62.2" width="172.8" height="105.6" fill="url(#horizon)"/>
+      <path class="path" d="M91 112H218"/><text x="155" y="218" text-anchor="middle" class="tiny">cross-gutter landscape, subject off spine</text>
+    </g>
+    <g transform="translate(355 88)">
+      <text x="155" y="0" text-anchor="middle" class="state">2 · LANDSCAPE</text>
+      <rect class="page" x="35" y="35" width="240" height="160"/><rect class="gutter" x="152" y="35" width="6" height="160"/>
+      <rect class="photo" x="68.6" y="62.2" width="172.8" height="105.6" fill="url(#horizon)"/><circle class="crop" cx="120" cy="121" r="4"/>
+      <text x="155" y="218" text-anchor="middle" class="tiny">preferred; modest vertical crop</text>
+    </g>
+    <g transform="translate(690 88)">
+      <text x="155" y="0" text-anchor="middle" class="state">3 · PORTRAIT / SQUARE</text>
+      <rect class="page" x="35" y="35" width="240" height="160"/><rect class="gutter" x="152" y="35" width="6" height="160"/>
+      <rect class="photo" x="68.6" y="62.2" width="172.8" height="105.6" fill="url(#figure)"/><rect class="risk" x="145" y="62.2" width="20" height="105.6"/>
+      <text x="155" y="218" text-anchor="middle" class="tiny">high side crop + gutter risk; subject must move off center</text>
+    </g>
+    <g transform="translate(1025 88)">
+      <text x="155" y="0" text-anchor="middle" class="state">4 · NO NOTE</text>
+      <rect class="page" x="35" y="35" width="240" height="160"/><rect class="gutter" x="152" y="35" width="6" height="160"/>
+      <rect class="photo" x="68.6" y="62.2" width="172.8" height="105.6" fill="url(#horizon)"/>
+      <text x="155" y="218" text-anchor="middle" class="tiny">native state; any source Note stays hidden</text>
+    </g>
+    <g transform="translate(1360 88)">
+      <text x="155" y="0" text-anchor="middle" class="state">5 · LONGEST NOTE</text>
+      <rect class="page" x="35" y="35" width="240" height="160"/><rect class="gutter" x="152" y="35" width="6" height="160"/>
+      <rect class="photo" x="68.6" y="62.2" width="172.8" height="105.6" fill="url(#horizon)"/>
+      <rect class="risk" x="105" y="173" width="100" height="15"/><text x="155" y="184" text-anchor="middle" class="tiny">NOTE HIDDEN · CONTENT KEPT</text>
+      <text x="155" y="218" text-anchor="middle" class="tiny">no text surface is introduced</text>
+    </g>
+    <g transform="translate(1695 88)">
+      <text x="190" y="0" text-anchor="middle" class="state">6 · FULL SPREAD + PAGE FOCUS</text>
+      <rect class="page" x="55" y="25" width="240" height="160"/><rect class="gutter" x="172" y="25" width="6" height="160"/><rect class="photo" x="88.6" y="52.2" width="172.8" height="105.6" fill="url(#horizon)"/>
+      <rect class="page" x="10" y="208" width="90" height="120"/><rect class="photo" x="35" y="228" width="65" height="80" fill="url(#horizon)"/>
+      <rect class="page" x="280" y="208" width="90" height="120"/><rect class="photo" x="280" y="228" width="65" height="80" fill="url(#horizon)"/>
+      <text x="190" y="347" text-anchor="middle" class="tiny">single-page focus crops the shared image, but preserves placement identity</text>
+    </g>
+    <text x="25" y="435" class="small">Strength: the family’s rare immersive stop, legally inseparable through one cross-gutter placement. Risk: gutter swallows central subjects; portrait inputs are often incompatible in practice.</text>
+  </g>
+  <text x="70" y="1492" class="small">Guides and risk zones are annotations only. Gray gutter bands visualize binding loss. Note labels use lines/numbers and are never rendered as cards.</text>
+  <text x="70" y="1518" class="small">Visual decision needed: confirm Held Field scale, Scale Echo’s 2:1 relationship, and Horizon Bridge’s framed—not full-bleed—immersive stance.</text>
+</svg>

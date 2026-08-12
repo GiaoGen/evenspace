@@ -1,17 +1,31 @@
 import {
   validateRecipeDefinition,
+  adaptRecipeSlot,
+  adaptRecipeTheme,
+  adaptRecipeTypography,
+  resolveRecipeTextSurface,
   type RecipeApplication,
   type RecipeDefinition,
   type RecipeNoteRelation,
   type RecipeRect,
   type RecipeSlot,
   type RecipeSlotKind,
+  type RecipeColorToken,
+  type RecipeTheme,
+  type RecipeTextAlign,
+  type RecipeTypographyRole,
+  type RecipeTypographyToken,
 } from "../model/recipe-contract";
 import { normalizePlacement } from "../model/recipe-placement";
 import type { ZinePhoto } from "../model/zine-draft";
 
 export type RecipeRenderPageSide = "left" | "right";
 export type RecipeRenderMode = "editor" | "reader" | "preview";
+
+/** Renderer-facing semantic palette; legacy four-color themes are adapted here. */
+export function getRecipeRendererColorTokens(theme?: RecipeTheme) {
+  return adaptRecipeTheme(theme);
+}
 
 export type RecipeRenderEnvironment = {
   readonly pageId: string;
@@ -41,6 +55,12 @@ export type RecipeRenderPlanSlot = {
   readonly imageWidthPercent?: number;
   readonly notes?: readonly RecipeRenderNote[];
   readonly text?: string;
+  readonly fillToken?: RecipeColorToken;
+  readonly foregroundToken?: RecipeColorToken;
+  readonly surfaceToken?: RecipeColorToken;
+  readonly typographyRole?: RecipeTypographyRole;
+  readonly typographyToken?: RecipeTypographyToken;
+  readonly textAlign?: "start" | "center" | "end";
 };
 
 export type RecipeRenderNote = {
@@ -72,6 +92,7 @@ export function createRecipeRenderPlan({
   readonly environment: RecipeRenderEnvironment;
 }): RecipeRenderPlan {
   const validation = validateRecipeDefinition(recipe);
+  const typography = adaptRecipeTypography(recipe.theme);
   const photoById = new Map(photos.map((photo) => [photo.id, photo]));
   const assignmentByPhotoSlotId = new Map(
     application.assignments.map((assignment) => [assignment.photoSlotId, assignment]),
@@ -100,22 +121,37 @@ export function createRecipeRenderPlan({
 
   const slots: RecipeRenderPlanSlot[] = [];
   for (const slot of recipe.slots) {
-    const localRect = getLocalSlotRect(recipe, slot, environment.pageSide);
+    const adaptedSlot = adaptRecipeSlot(slot);
+    const localRect = getLocalSlotRect(recipe, adaptedSlot, environment.pageSide);
     if (!localRect) continue;
 
-    if (slot.kind === "photo") {
-      const assignment = assignmentByPhotoSlotId.get(slot.id);
+    if (adaptedSlot.kind === "color-field") {
+      slots.push({
+        id: adaptedSlot.id,
+        pageId: environment.pageId,
+        kind: adaptedSlot.kind,
+        rect: localRect.rect,
+        zIndex: adaptedSlot.zIndex,
+        showPhotoPlaceholder: false,
+        crossSpread: localRect.crossSpread,
+        fillToken: adaptedSlot.fillToken,
+      });
+      continue;
+    }
+
+    if (adaptedSlot.kind === "photo") {
+      const assignment = assignmentByPhotoSlotId.get(adaptedSlot.id);
       const photo = assignment ? photoById.get(assignment.photoId) : undefined;
       const placement = normalizePlacement(
         assignment,
         photo ? { focusX: photo.defaultFocusX, focusY: photo.defaultFocusY } : undefined,
       );
       slots.push({
-        id: slot.id,
+        id: adaptedSlot.id,
         pageId: environment.pageId,
-        kind: slot.kind,
+        kind: adaptedSlot.kind,
         rect: localRect.rect,
-        zIndex: slot.zIndex,
+        zIndex: adaptedSlot.zIndex,
         photoId: photo?.id,
         photo,
         placementId: assignment?.placementId,
@@ -129,33 +165,45 @@ export function createRecipeRenderPlan({
       continue;
     }
 
-    if (slot.kind === "note") {
-      const notes = assignmentsByNoteSlotId.get(slot.id) ?? [];
+    if (adaptedSlot.kind === "note") {
+      const notes = assignmentsByNoteSlotId.get(adaptedSlot.id) ?? [];
       if (notes.length === 0) continue;
+      const surface = resolveRecipeTextSurface(recipe, adaptedSlot);
       slots.push({
-        id: slot.id,
+        id: adaptedSlot.id,
         pageId: environment.pageId,
-        kind: slot.kind,
+        kind: adaptedSlot.kind,
         rect: localRect.rect,
-        zIndex: slot.zIndex,
+        zIndex: adaptedSlot.zIndex,
         showPhotoPlaceholder: false,
         crossSpread: localRect.crossSpread,
         notes,
+        foregroundToken: adaptedSlot.foregroundToken,
+        surfaceToken: surface.surfaceToken,
+        typographyRole: adaptedSlot.role,
+        typographyToken: typography[adaptedSlot.role!],
+        textAlign: resolveRecipeTextAlign(adaptedSlot.align, environment.pageSide),
       });
       continue;
     }
 
-    const text = resolveStaticText(slot, environment);
+    const text = resolveStaticText(adaptedSlot, environment);
     if (!text) continue;
+    const surface = resolveRecipeTextSurface(recipe, adaptedSlot);
     slots.push({
-      id: slot.id,
+      id: adaptedSlot.id,
       pageId: environment.pageId,
-      kind: slot.kind,
+      kind: adaptedSlot.kind,
       rect: localRect.rect,
-      zIndex: slot.zIndex,
+      zIndex: adaptedSlot.zIndex,
       showPhotoPlaceholder: false,
       crossSpread: localRect.crossSpread,
       text,
+      foregroundToken: adaptedSlot.foregroundToken,
+      surfaceToken: surface.surfaceToken,
+      typographyRole: adaptedSlot.role,
+      typographyToken: typography[adaptedSlot.role!],
+      textAlign: resolveRecipeTextAlign(adaptedSlot.align, environment.pageSide),
     });
   }
 
@@ -168,8 +216,18 @@ export function createRecipeRenderPlan({
   };
 }
 
+export function resolveRecipeTextAlign(
+  align: RecipeTextAlign | undefined,
+  pageSide: RecipeRenderPageSide,
+): "start" | "center" | "end" {
+  if (align === "center" || align === "end") return align;
+  if (align === "inward") return pageSide === "left" ? "end" : "start";
+  if (align === "outward") return pageSide === "left" ? "start" : "end";
+  return "start";
+}
+
 function resolveStaticText(
-  slot: RecipeSlot,
+  slot: Extract<RecipeSlot, { kind: "static-text" }>,
   environment: RecipeRenderEnvironment,
 ) {
   const override = environment.textBySlotId?.[slot.id];

@@ -2,9 +2,20 @@
 
 ## Recipe Contract v1
 
-状态：设计锁定，等待前端实现  
+状态：Contract v1 已在前端实现；正式 Recipe 大规模目录和 AI 管道仍未实现
 版本：`1.0`  
 适用范围：手动排版优先，预留 AI 排版管道；当前不要求后端持久化。
+
+当前实现位置：`features/zine/model/recipe-contract.ts`、`features/zine/model/recipe-placement.ts`、`features/zine/components/recipe-renderer.tsx`、`features/zine/components/recipe-renderer-plan.ts`。
+
+当前实现状态：
+
+- 已实现 Recipe Definition 静态校验、内容兼容性判断、确定性 Application、照片/Note 绑定、未放置照片和隐藏 Note 状态。
+- 已实现 placement 级 `focusX` / `focusY` / `scale`，同一照片在不同 placement 中可以独立裁切。
+- 已实现单页与跨页 Recipe 应用；手动编辑器支持 Recipe 应用的一次 Undo/Redo。
+- 编辑器预览、Reader 和开发用 Preview Matrix 共用 `RecipeRenderer`；开发入口为 `/zine/preview-matrix`，仅 development 环境可访问。
+- 当前正式执行目录包含 5 个 legacy style Recipe 和 1 个跨页 `Gutter bridge` Recipe；6 个 Reference Recipe 只用于 Gate，不是正式产品目录，当前仍为 `draft`。
+- 当前没有后端持久化、Recipe 远程发布、AI 生成或大规模 active Recipe 目录。完整视觉 Gate 仍需用户在开发环境手动检查。
 
 本文档使用以下约束词：
 
@@ -472,35 +483,35 @@ AI 结果必须经过与手动排版完全相同的 Contract Validator 和应用
 
 ## 14. 推荐实现顺序
 
-### P0：Contract 与纯逻辑
+### P0：Contract 与纯逻辑（已完成）
 
 1. 建立 Recipe Definition、Application、Assignment 和兼容性类型。
 2. 建立静态 Validator。
 3. 建立动态兼容性计算器。
 4. 为本文验收场景建立纯逻辑测试。
 
-### P1：草稿模型
+### P1：草稿模型（已完成基础路径）
 
 1. 将页面内容与 Recipe Application 分离。
 2. 将 Crop 改为照片放置实例状态。
 3. 增加未放置照片和隐藏 Note 状态。
 4. 增加单页与跨页原子撤销快照。
 
-### P2：手动排版接入
+### P2：手动排版接入（已完成基础路径）
 
 1. Recipe 菜单读取 Definition 数据。
 2. 显示作用域、文字能力和兼容状态。
 3. 按确定性流程应用当前单页或跨页。
 4. 保持现有 StPageFlip 翻页和镜头逻辑不变。
 
-### P3：Renderer
+### P3：Renderer（已完成基础路径）
 
 1. 根据 Application 渲染 Slot。
 2. 渲染 Photo Note 的 Recipe 关系。
 3. 保证 Reader 与编辑器使用同一个 Recipe Renderer。
 4. 编辑器专用占位和控制元素不得进入 Reader 或导出。
 
-### P4：扩展
+### P4：扩展（未开始，Gate 后再做）
 
 1. 完成每类十个以上 Recipe。
 2. 添加封面和书背 Contract。
@@ -527,4 +538,11 @@ AI 结果必须经过与手动排版完全相同的 Contract Validator 和应用
 12. 同一 Recipe 输入相同内容时得到相同 Assignment。
 13. AI 提交无效 Assignment 时被 Validator 拒绝。
 
-满足以上约束后，Recipe Contract v1 才可视为完成。
+纯逻辑 Contract v1 已在代码和测试中实现；满足以上行为约束后，才可将 Reference Recipe Gate 视为完成并开始批量 Recipe 视觉设计。当前仍需开发环境 Preview Matrix 的人工视觉复核，不能仅凭静态测试宣称视觉 Gate 已完成。
+
+## 16. 当前验证与下一步
+
+- 纯逻辑与组件计划测试覆盖 Contract 校验、兼容性、Application 迁移、Photo Note、placement 焦点、单页/跨页应用和 Preview Matrix。
+- `/zine/preview-matrix` 使用 Reference Recipe fixtures 一次渲染 Editor / Reader、空内容、容量边界、不同图片比例和 Note 长度；不依赖 StPageFlip。
+- 生产构建不暴露 Preview Matrix：路由在非 development 环境调用 `notFound()`。
+- 下一步是完成浏览器中的 Reference Recipe Gate 视觉检查，再决定哪些 Recipe 从 `draft` 升级为正式 `active`；不要直接扩展到大批量目录或 AI 接入。

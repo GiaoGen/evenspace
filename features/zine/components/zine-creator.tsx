@@ -167,10 +167,10 @@ export function ZineCreator() {
             photoId,
             replacePhotoId,
           })}
-          onApplyRecipe={(pageId, recipeId) => dispatch({
+          onApplyRecipe={(pageId, recipeRef) => dispatch({
             type: "APPLY_RECIPE",
             pageId,
-            recipeId,
+            recipeRef,
           })}
         />
       ) : (

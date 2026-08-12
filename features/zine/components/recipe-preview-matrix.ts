@@ -1,6 +1,8 @@
 import {
   baseRecipeDefinitions,
+  adaptRecipeSlot,
   createRecipeApplication,
+  DEFAULT_RECIPE_TYPOGRAPHY,
   getRecipeForStyle,
   phaseDRecipeDefinitions,
   type RecipeApplication,
@@ -150,8 +152,12 @@ export function createRecipePreviewMatrix(): readonly RecipePreviewMatrixCase[] 
       foreground: "#fff7dc",
       muted: "#c8d4ff",
       photoBackground: "#3856a0",
+      typography: DEFAULT_RECIPE_TYPOGRAPHY,
     },
-  } satisfies RecipeDefinition;
+    slots: offsetRecipe.slots.map((slot) => slot.kind === "photo"
+      ? { ...slot, zIndex: 10 }
+      : { ...adaptRecipeSlot(slot), zIndex: 20, foregroundToken: "ink" as const }),
+  } as unknown as RecipeDefinition;
 
   return [
     createMatrixCase("empty-editor", "Empty page editor", offsetRecipe, "empty", ["left-editor"], ["empty", "left-page"]),

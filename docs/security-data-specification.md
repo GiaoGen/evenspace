@@ -113,6 +113,12 @@
 - 刷新、关闭页面或离开路由会丢失草稿；当前没有账号隔离、发布权限、导出权限或重新打开机制。
 - 如果未来将 Zine 接入后端，照片、Photo Note 和页面结构都应按私密内容处理：使用私有 Storage、asset ownership、RLS、短期 signed URL、服务端 MIME/大小/解码/EXIF/恶意文件校验，并单独定义删除、版本、分享和审计策略。
 
+## 2026-08-12 当前同步：Recipe 状态与未来后端信任边界
+
+- Recipe Application、照片实例的 `focusX` / `focusY` / `scale`、未放置照片和隐藏 Note 目前都只在浏览器内存中存在；它们不是权限、发布状态、所有权或删除结果。
+- development-only `/zine/preview-matrix` 使用固定 Reference fixtures，不应接收真实用户私有资产或被部署为生产公开入口；生产环境必须继续阻断该路径。
+- 若未来持久化，服务端必须校验 Recipe ID/version 是否可用、Application 是否属于当前 draft/page、照片 asset 是否属于当前用户/房间、坐标与 Note 长度是否在 schema 范围内，并通过 RLS/Storage policy 保护原图和衍生资源。客户端 Compatibility 只用于 UX，不是授权。
+
 ### 仍待补齐的生产安全要求
 
 1. Cloudflare Turnstile 或等价机制、服务端速率限制和匿名用户清理任务。

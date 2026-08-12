@@ -65,8 +65,10 @@ Zine 页面入口为 `/zine`，创建器包含五个进度节点：
 - 中央书页使用真实 `page-flip@2.0.7` Reader 适配层预览，支持打开页面、双击/双触进入单页焦点模式、拖动或滑动浏览。
 - 空白页提供 `Add page`，可以在 spread 的左侧或右侧新增页面；最后始终保留一个可继续添加的 trailing spread。
 - 焦点模式下可以打开 Photo library，将照片放入当前页面或替换当前选中的照片；页面容量由样式决定：Editorial/Margin/Night 为 1 张，Split 为 2 张，Contact sheet 为 4 张。
-- 焦点模式下可以打开 Recipe library，为当前 spread 的左右页面一起切换样式；样式改变时会按新样式容量截断该页照片。这里的 Recipe library 是当前 5 个样式的选择器，不是未来的 Recipe registry。
-- 选中照片后可以直接拖动照片调整 `positionX` / `positionY`，Reader 使用 `object-fit: cover` 和该焦点位置渲染；这只改变裁切焦点，不改变照片顺序。
+- 焦点模式下可以打开 Recipe library，为当前单页或当前完整 spread 应用 Recipe；菜单显示作用域、照片容量、Note 能力和兼容状态。不兼容 Recipe 会禁用并说明原因，超出容量的照片进入 `unplacedPhotoIds`，不会被删除。
+- 当前执行目录包含 5 个 legacy style Recipe 和 1 个可应用的跨页 `Gutter bridge` Recipe；6 个 Reference Recipe 只在 development-only Preview Matrix 中作为 Gate fixtures，不是正式产品目录。
+- 选中照片后可以直接拖动当前 placement 调整 `focusX` / `focusY` / `scale`，Reader 和编辑器使用同一个 `RecipeRenderer`；同一照片的不同 placement 可以拥有独立裁切。
+- Recipe 应用、照片放置和 placement 焦点调整支持一次 Undo/Redo；单页 Recipe 不修改对侧页，跨页 Recipe 以 spread 为原子单位。
 - 当前没有页面删除、页面拖拽重排、自由图层、文字页或空白停顿页编辑能力。
 
 ## Reader 已完成的能力
@@ -126,17 +128,18 @@ type ZineDraft = {
 };
 ```
 
-照片包含 `File`、Object URL、文件名、原始尺寸、说明文字和焦点坐标。`manualSpreads` 包含左右页面、页面样式和照片 ID。创建流程使用 `useReducer` 与 `zineCreatorReducer` 管理，支持以下操作：
+照片包含 `File`、Object URL、文件名、原始尺寸、Photo Note 和默认焦点。`manualSpreads` 包含左右页面、页面样式、照片 ID、content item ID 和 `recipeApplication`；裁切焦点属于 Recipe placement，不属于照片资产。创建流程使用带历史栈的 reducer 管理，支持以下操作：
 
 - `SET_NAME`
 - `ADD_PHOTOS`
 - `REMOVE_PHOTO`
 - `SET_CAPTION`
-- `SET_PHOTO_POSITION`
+- `SET_PLACEMENT_FOCUS`
 - `SET_STYLE`
 - `ADD_MANUAL_PAGE`
 - `PLACE_MANUAL_PHOTO`
-- `SET_MANUAL_SPREAD_STYLE`
+- `APPLY_RECIPE`
+- `UNDO` / `REDO`
 - `GO_TO`
 
 目前草稿只存在于当前客户端组件内存中，尚未保存到数据库、Local Storage 或服务端。刷新 `/zine` 页面会清空草稿。
@@ -151,6 +154,11 @@ features/zine/
 │  ├─ zine-shell.tsx                顶部进度、表单外壳和底部操作
 │  ├─ zine-creator.module.css       Step 1–4 统一设计
 │  ├─ style-page-preview.tsx        风格书页 Demo
+│  ├─ recipe-renderer.tsx           Editor/Reader 共用的 Slot Renderer
+│  ├─ recipe-renderer-plan.ts       纯数据渲染计划
+│  ├─ reference-recipe-gate.tsx     development-only Reference Gate
+│  ├─ recipe-preview-matrix.ts      参考 Recipe 场景矩阵
+│  ├─ placement-focus-dom.ts        placement 焦点即时同步
 │  ├─ steps/
 │  │  ├─ name-step.tsx
 │  │  ├─ photos-step.tsx
@@ -167,8 +175,13 @@ features/zine/
    ├─ zine-draft.test.ts
    ├─ zine-styles.ts                风格配置
    ├─ zine-pages.ts                 Reader 排序与分页
+   ├─ recipe-contract.ts            Definition、Validator、Compatibility、Application
+   ├─ recipe-placement.ts           placement 焦点和 content item ID
+   ├─ reference-recipe-definitions.ts  六个 Gate 基准 Recipe
+   ├─ reference-recipe-matrix.ts    预览 fixture 与校验结果
    └─ zine-pages.test.ts
 types/page-flip.d.ts                第三方包的本地类型声明
+app/zine/preview-matrix/page.tsx    development-only 参考 Recipe 预览入口
 ```
 
 ## StPageFlip 集成边界
@@ -191,7 +204,7 @@ StPageFlip 会直接修改传入的 DOM。当前实现专门隔离了 React 与�
 - 卡片设计、边框、间距、背景和按钮应复用项目现有设计语言。
 - 禁止引入衬线体大标题；主标题统一使用 Geist Sans 或现有无衬线字体变量。
 - 书页本体保持直角矩形。
-- Step 2 的照片卡保持完整比例；Reader 和 Arrange 的书页照片允许按页面容器裁切，并通过 `positionX` / `positionY` 保留焦点。
+- Step 2 的照片卡保持完整比例；Reader 和 Arrange 的书页照片允许按页面容器裁切，并通过 placement 级 `focusX` / `focusY` / `scale` 保留焦点。
 - 业务数据顺序不能通过瀑布流位置、CSS Grid 位置或 DOM 顺序隐式表达。
 - 数据模型、分页规则、展示组件和第三方 Reader 适配层保持分离。
 - 不修改无关功能和现有用户改动。
@@ -203,33 +216,32 @@ StPageFlip 会直接修改传入的 DOM。当前实现专门隔离了 React 与�
 - 草稿持久化。
 - 上传照片到远程存储。
 - 页面删除、页面拖拽重排、自由图层和文字页编辑。
-- AI 自动排版、Recipe registry、Recipe 选择与生成任务。
+- AI 自动排版、Recipe 生成任务和大规模正式 Recipe registry。
 - 导出 PDF、图片或印刷文件。
 - 发布、分享和权限控制。
 - 从已发布数据重新打开 Reader。
-- Recipe 模板及其内容模型。
+- Reference Recipe Gate 的浏览器人工视觉复核，以及将 reference fixtures 升级为正式 `active` 目录。
 
 如果后续需求涉及以上能力，应先扩展领域模型和数据边界，不要把持久化、排序或 Recipe 字段直接塞进现有 UI 组件。
 
 ## Recipe 模板开发建议
 
-Recipe 的详细需求尚未给出，因此不应预先假设它与 Zine 使用同一字段结构。建议新的开发模型按以下顺序推进：
+Recipe Contract v1 已锁定并有前端实现；后续新的 Recipe 应先遵守根目录 [`zine-engine.md`](../zine-engine.md) 和 [`recipe-design-readiness-plan.md`](../recipe-design-readiness-plan.md)，不要绕过 Contract 直接增加专用 JSX 分支。建议按以下顺序推进：
 
-1. 先确认 Recipe 的核心内容：名称、封面、材料、步骤、照片、备注、份量等字段是否需要。
-2. 确认 Recipe 是独立创建流程、Zine 的一种 Style，还是可以被 Zine Reader 消费的内容模板。
-3. 如果同样是多步骤创建器，可复用 Zine 的移动端优先布局原则和 Shell 交互，但应建立独立的 Recipe Draft 与 Reducer。
-4. 如果 Recipe 最终进入翻页 Reader，应把 Recipe 数据转换为通用页面模型，不要让 Reader 直接读取 Recipe 表单 DOM。
-5. 先开发数据模型和前端预览，再决定持久化与发布方案。
+1. 先在 `RecipeDefinition` 中声明 scope、slots、Note relation、容量、主题和安全区。
+2. 通过静态 Validator、Compatibility 和 Application 测试，确保单页/跨页、Note、超额照片和 placement 迁移正确。
+3. 在 `/zine/preview-matrix` 中完成 Editor/Reader、比例、Note 和跨书脊的人工视觉检查。
+4. 只有 Gate 通过后，才将 Recipe 从 `draft` 变成正式 `active`，再讨论 AI 选择和后端发布。
 
 不建议直接复制整个 `zine-creator.tsx` 后修改字段。更合理的方向是在 Recipe 需求稳定后，识别真正通用的创建器外壳、步骤导航、媒体卡片和页面渲染接口，再进行小范围抽取。
 
 ## 验证状态
 
-2026-08-11 对 `42d0519`、`45b460d` 的同步验证：
+2026-08-12 对 `16320a1`、`45b460d` 的同步验证：
 
 - `npm run check`
-- Zine model 测试已覆盖 reducer、手动 spread、照片放置/替换和 Reader 页面生成；完整测试数量以命令输出为准。
+- Zine model/component 测试已覆盖 Contract、Validator、Compatibility、Recipe Application、placement 焦点、手动 spread、照片放置/替换、Undo/Redo、Renderer plan 和 Preview Matrix；完整测试数量以命令输出为准。
 - `npm run build`
 - `git diff --check`
 
-按项目协作约定，最近的 Reader 手势修改没有进行浏览器自动验证，由用户自行进行真实移动端交互检验。因此新的开发模型在修改双触、滑动、StPageFlip 生命周期或镜头动画时，应优先保留现有状态机和事件抑制逻辑，并等待用户的设备验证反馈。
+当前仍未完成 `/zine/preview-matrix` 的浏览器人工视觉 Gate，也未进行真实移动端触控验收。新的开发模型在修改 Recipe Renderer、双触、滑动、StPageFlip 生命周期或镜头动画时，应优先保留现有状态机和事件抑制逻辑，并记录 `recipeId`、`fixtureId`、`slotId` 的问题定位信息。

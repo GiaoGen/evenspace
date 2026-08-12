@@ -1,6 +1,6 @@
 # Recipe 设计前置实施计划
 
-状态：Recipe Contract v1 已完成，基础可视化验证已完成  
+状态：Recipe Contract v1、Phase A–E 的前端基础实现已进入 `main`；Reference Recipe Gate 的浏览器人工视觉复核待完成
 目标：完成可扩展的 Recipe 执行基础，使后续每个 Recipe 主要是数据和视觉设计，而不是新增一套组件逻辑。
 
 ---
@@ -9,11 +9,11 @@
 
 现在可以开始做 Recipe 的视觉研究、情绪板和纸面草图，但还不应该批量制作正式 Recipe 数据。
 
-正式 Recipe 设计开始前，系统必须先通过“Reference Recipe Gate”：使用少量基准 Recipe 证明 Renderer、内容迁移、Photo Note、裁切、单页/跨页和 Reader 输出都能由 Contract 驱动。
+正式 Recipe 设计开始前，系统必须先通过“Reference Recipe Gate”：使用少量基准 Recipe 证明 Renderer、内容迁移、Photo Note、裁切、单页/跨页和 Reader 输出都能由 Contract 驱动。当前已经具备静态 Validator、动态测试和 development-only Preview Matrix，但还不能把未完成人工视觉检查的 Gate 写成完全通过。
 
 下一项最首要工作是：
 
-> 建立通用、数据驱动的 Recipe Renderer，移除 Recipe 对旧 `styleId` 和专用 JSX 分支的依赖。
+> 在开发环境打开 `/zine/preview-matrix`，完成六个 Reference Recipe 的 Editor/Reader、容量、比例、Note 和跨页人工视觉检查，并记录 Gate 结果。
 
 ---
 
@@ -42,26 +42,26 @@
 
 ## 3. 实施阶段
 
-## Phase A：通用 Recipe Renderer
+## Phase A：通用 Recipe Renderer（代码已完成）
 
-### 任务
+### 已完成
 
-1. 建立 `RecipeRenderer`，输入只能是：
+1. 已建立 `RecipeRenderer`，输入为：
    - Recipe Definition；
    - Recipe Application；
    - Photo Assets；
    - Page/Spread 渲染环境。
-2. 使用标准化坐标渲染：
+2. 已使用标准化坐标渲染：
    - Photo Slot；
    - Note Slot；
    - Static Text Slot；
    - z-index；
    - 出血与安全区；
    - 左页、右页和跨页坐标。
-3. Photo Slot 必须使用 cover 满框。
-4. Editor 和 Reader 必须调用同一个内容 Renderer。
-5. 编辑器控制层独立存在，不能进入 Reader。
-6. 逐步移除 `legacyStyleId` 对实际布局的控制。
+3. Photo Slot 使用 cover 满框。
+4. Editor 和 Reader 调用同一个内容 Renderer。
+5. 编辑器控制层独立存在，不进入 Reader。
+6. `legacyStyleId` 仅作为兼容映射，Recipe Definition/Application 决定实际布局。
 
 ### 交付物
 
@@ -70,15 +70,15 @@
 - Editor/Reader 共用的渲染入口。
 - Renderer 的纯数据 fixtures。
 
-### 验收
+### 当前验收状态
 
-- 修改 Recipe 坐标即可改变版面，无需修改 TSX。
-- 新增一个只包含现有 Slot 类型的 Recipe 时，不修改组件代码。
-- Editor 和 Reader 的照片位置、Note、层级和裁切结果一致。
+- 修改 Recipe 坐标即可改变版面，无需修改 TSX；已有纯逻辑测试覆盖。
+- 新增一个只包含现有 Slot 类型的 Recipe 时，不修改组件代码；Reference fixtures 已覆盖。
+- Editor 和 Reader 的照片位置、Note、层级和裁切结果由同一 Renderer 计划生成；仍需 Preview Matrix 人工复核。
 
 ---
 
-## Phase B：Placement 级裁切模型
+## Phase B：Placement 级裁切模型（代码已完成）
 
 ### 问题
 
@@ -104,7 +104,7 @@
 
 ---
 
-## Phase C：Photo Note 关系 Renderer
+## Phase C：Photo Note 关系 Renderer（代码已完成）
 
 ### 任务
 
@@ -136,7 +136,7 @@
 
 ---
 
-## Phase D：内容迁移、兼容性和撤销
+## Phase D：内容迁移、兼容性和撤销（代码已完成基础路径）
 
 ### 任务
 
@@ -162,7 +162,7 @@
 
 ---
 
-## Phase E：Recipe Preview Matrix
+## Phase E：Recipe Preview Matrix（代码已完成，人工 Gate 待复核）
 
 建立开发用预览矩阵，不要求做正式用户界面。
 
@@ -302,18 +302,16 @@ Gate 未通过时，可以继续进行视觉草图，但不能将大量 Recipe �
 
 ---
 
-## 7. 交给执行模型的首个任务
+## 7. 交给执行模型的下一个任务
 
-执行模型首先只处理 Phase A：通用 Recipe Renderer。
+执行模型下一步只处理 Reference Recipe Gate 的人工复核与问题记录，不再重复建设 Renderer。
 
 任务完成定义：
 
-1. 使用现有 Recipe Contract 输入。
-2. 用标准化 Slot 坐标渲染单页。
-3. 用跨页坐标渲染 Spread。
-4. Editor 与 Reader 共用同一个内容 Renderer。
-5. 用两个临时 Recipe 证明新增 Recipe 不需要修改 TSX。
-6. 保持现有 StPageFlip、镜头和手势逻辑不变。
-7. 只进行静态测试与构建；浏览器验证由用户手动完成。
+1. 启动 development server 并打开 `/zine/preview-matrix`。
+2. 检查六个 Reference Recipe 的空内容、最小/最大/超额照片、图片比例、Note 长度、Editor/Reader 对照和跨书脊画面。
+3. 记录每个 `recipeId`、`fixtureId`、`slotId` 的视觉问题。
+4. 保持现有 StPageFlip、镜头和手势逻辑不变。
+5. 只有 Gate 通过后，才开始制作正式 Recipe 目录。
 
-Phase A 验收后，再依次交付 Phase B、C、D、E。不要并行重写整个 Zine 系统。
+Gate 通过后，再进入正式 Recipe 目录设计；不要在 Gate 未通过时批量注册 `active` Recipe 或接入 AI。

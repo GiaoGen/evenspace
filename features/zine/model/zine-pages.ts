@@ -9,7 +9,6 @@ import {
 import {
   createNotesByPhotoId,
   createRecipeApplication,
-  getRecipeDefinition,
   getRecipeForStyle,
   type RecipeApplication,
 } from "./recipe-contract";
@@ -231,7 +230,7 @@ function createReaderRecipeApplication(
   pageId: string,
 ): RecipeApplication | null {
   if (!draft.styleId) return null;
-  const recipe = getRecipeForStyle(draft.styleId) ?? getRecipeDefinition(`recipe-${draft.styleId}-v1`);
+  const recipe = getRecipeForStyle(draft.styleId);
   if (!recipe) return null;
   return createRecipeApplication({
     recipe,

@@ -11,9 +11,14 @@
 
 .recipePhoto,
 .recipeNoteSlot,
-.recipeStaticText {
+.recipeStaticText,
+.recipeColorField {
   position: absolute;
   margin: 0;
+}
+
+.recipeColorField {
+  pointer-events: none;
 }
 
 .recipePhoto {
@@ -98,7 +103,7 @@
 
 .recipeNoteSlot[data-note-relations~="edge-related"] {
   justify-content: flex-end;
-  color: var(--recipe-muted);
+  color: inherit;
 }
 
 .recipeNoteItem[data-note-relation="indexed"] {
@@ -107,13 +112,13 @@
 
 .recipeNoteItem[data-note-relation="indexed"]::before {
   margin-right: 4px;
-  color: var(--recipe-muted);
+  color: inherit;
   content: counter(recipe-note-index, decimal-leading-zero);
   font-variant-numeric: tabular-nums;
 }
 
 .recipeNoteItem[data-note-relation="edge-related"] {
-  color: var(--recipe-muted);
+  color: inherit;
   text-align: right;
 }
 
@@ -123,18 +128,11 @@
 }
 
 .recipeStaticText {
-  overflow: hidden;
+  overflow: visible;
   color: var(--recipe-muted);
-  font-size: clamp(5px, 1.05vw, 8px);
-  font-weight: 720;
-  letter-spacing: .08em;
-  line-height: 1.2;
-  text-overflow: ellipsis;
-  text-transform: uppercase;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+  white-space: normal;
 }
-
-.recipeStaticText[data-zine-slot-id="page-number"] { text-align: right; }
 
 .recipeError {
   position: absolute;

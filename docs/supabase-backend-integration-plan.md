@@ -1636,3 +1636,10 @@ Photos/语音 Storage、支付、Book 和投票仍按既定范围延后。
 - `ZineDraft` 直接持有浏览器 `File` / Object URL；`manualSpreads`、页面样式、照片放置和裁切焦点只存在当前组件内存。不能把它们视为可恢复的云端草稿，也不能复用 Room 的 `MockSession` 业务存储。
 - 若未来进入后端，至少需要先明确独立的 draft/version/page/asset ownership 边界，以及 Photo Note 敏感性、私有 Storage、RLS、短期 signed URL、服务端媒体处理、版本并发、删除和分享撤销策略。
 - 在 Recipe/AI/Page Plan 的产品决策完成前，不新增 Zine 生产表，不把当前 `page-flip` Reader 的 DOM 或动画状态设计成数据库字段，也不把客户端 AI layout 开关当作已接入生成服务。
+
+## 22. 2026-08-12 Zine Recipe Contract 的后端边界
+
+- 最新 Zine 已在前端实现 Recipe Contract v1、Recipe Application、照片实例焦点、单页/跨页应用、undo/redo 和 development-only Preview Matrix，但仍没有 Supabase Auth/Storage、migration、RLS、RPC、Realtime 或 AI provider 接入。
+- 当前正式执行目录为 5 个 legacy style Recipe 加 1 个 spread Recipe；6 个 Reference Recipe 只是 Gate fixtures，不能直接当作可远程发布的 `active` 目录。Recipe version 需要在未来后端以不可变版本或显式迁移策略保存。
+- 若启动后端，建议按 draft/version/page/asset/application 分层建模：Server Action/RPC 重新校验 Recipe version、页面版本、照片所有权、Note/容量约束和并发版本；客户端不得直接写入 `File`、Object URL、DOM 状态或任意坐标。
+- 私有照片应继续使用私有 Storage、签名 URL、对象归属校验和 RLS；未放置照片/隐藏 Note 是内容显示状态，不是删除或访问控制结果。当前阶段不新增 migration、RPC 或 Storage policy。
