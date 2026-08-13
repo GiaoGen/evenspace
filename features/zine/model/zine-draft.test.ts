@@ -30,6 +30,12 @@ function photo(id: string, width: number, height: number): ZinePhoto {
 }
 
 describe("zineCreatorReducer", () => {
+  it("stores locale as document semantics and rejects unknown locale input", () => {
+    const chinese = zineCreatorReducer(initialZineCreatorState, { type: "SET_LOCALE", locale: "zh-Hant" });
+    expect(chinese.draft.locale).toBe("zh-Hant");
+    expect(zineCreatorReducer(chinese, { type: "SET_LOCALE", locale: "xx" as never })).toBe(chinese);
+  });
+
   it("keeps name and caption values within their UI limits", () => {
     const named = zineCreatorReducer(initialZineCreatorState, {
       type: "SET_NAME",
@@ -176,6 +182,7 @@ describe("zineCreatorReducer", () => {
       step: "manual" as const,
       draft: {
         name: "Cross-page",
+        locale: "en" as const,
         photos: [photo("bridge", 16, 9)],
         styleId: "editorial" as const,
         manualSpreads: [spread],
@@ -222,6 +229,7 @@ describe("zineCreatorReducer", () => {
       step: "manual" as const,
       draft: {
         name: "Versioned spread",
+        locale: "en" as const,
         photos: [photo("bridge", 16, 9)],
         styleId: "editorial" as const,
         manualSpreads: [{

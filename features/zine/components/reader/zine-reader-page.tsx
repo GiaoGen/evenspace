@@ -27,6 +27,8 @@ export function ZineReaderPageView({
       className={className}
       data-density={page.density}
       data-zine-page-index={pageIndex}
+      data-zine-locale={page.locale}
+      lang={page.locale}
       data-zine-manual-page-id={page.kind === "content" ? page.id : undefined}
       aria-label={getPageLabel(page)}
     >
@@ -120,6 +122,8 @@ function ContentPage({
         mode,
         pageNumber: page.pageNumber,
         title: page.title,
+        locale: page.locale,
+        authoredTextItems: page.authoredTextItems,
       }}
     />
   );

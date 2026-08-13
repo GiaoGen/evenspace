@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1640 590" role="img" aria-labelledby="title desc">
+  <title id="title">Grid Contact family five-candidate grayscale concept board</title>
+  <desc id="desc">Five anonymous candidates G-A through G-E shown at the same physical scale. Pages are three by four and spreads are three by two. G-B, G-C and G-E are kept.</desc>
+  <defs>
+    <style>
+      .bg{fill:#f3f3f1}.paper{fill:#fff;stroke:#202020;stroke-width:1.5}.gutter{stroke:#111;stroke-width:1}.safe{fill:none;stroke:#aaa;stroke-width:.7;stroke-dasharray:3 3}.meta{font:12px Arial,sans-serif;fill:#555;letter-spacing:.5px}.label{font:700 20px Arial,sans-serif;fill:#111}.small{font:10px Arial,sans-serif;fill:#555}.tag{font:700 11px Arial,sans-serif;letter-spacing:1.2px}.path{fill:none;stroke:#222;stroke-width:1.2;marker-end:url(#arrow)}.bind{fill:none;stroke:#555;stroke-width:.8;stroke-dasharray:2 2}.num{font:700 8px Arial,sans-serif;fill:#111}.drop{fill:#ddd}.keep{fill:#111}.inverse{fill:#fff}.rule{stroke:#999;stroke-width:.8}
+    </style>
+    <marker id="arrow" viewBox="0 0 6 6" refX="5" refY="3" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0L6 3L0 6Z" fill="#222"/></marker>
+    <symbol id="ph-a" viewBox="0 0 100 70" preserveAspectRatio="xMidYMid slice"><rect width="100" height="70" fill="#c9c9c7"/><path d="M0 49L25 30L48 47L72 20L100 45V70H0Z" fill="#777"/><circle cx="72" cy="18" r="7" fill="#eee"/><rect x="10" y="45" width="16" height="25" fill="#4b4b4b"/></symbol>
+    <symbol id="ph-b" viewBox="0 0 100 70" preserveAspectRatio="xMidYMid slice"><rect width="100" height="70" fill="#a8a8a6"/><rect x="0" y="44" width="100" height="26" fill="#676767"/><circle cx="42" cy="30" r="12" fill="#ededeb"/><rect x="35" y="41" width="15" height="29" fill="#333"/><path d="M65 12H93V52H65Z" fill="#d8d8d6"/></symbol>
+    <symbol id="ph-c" viewBox="0 0 100 70" preserveAspectRatio="xMidYMid slice"><rect width="100" height="70" fill="#d7d7d5"/><path d="M0 40Q30 28 55 41T100 37V70H0Z" fill="#8c8c8a"/><path d="M58 13L71 44H45Z" fill="#4c4c4c"/><circle cx="57" cy="13" r="7" fill="#747474"/></symbol>
+    <symbol id="ph-d" viewBox="0 0 100 70" preserveAspectRatio="xMidYMid slice"><rect width="100" height="70" fill="#bbb"/><path d="M0 20L100 48V70H0Z" fill="#565656"/><rect x="18" y="9" width="23" height="44" fill="#e5e5e3"/><circle cx="70" cy="35" r="12" fill="#8a8a88"/></symbol>
+    <symbol id="ph-e" viewBox="0 0 100 70" preserveAspectRatio="xMidYMid slice"><rect width="100" height="70" fill="#d0d0ce"/><rect x="0" y="48" width="100" height="22" fill="#888"/><path d="M20 48V20H42V48M56 48V8H83V48" fill="#515151"/><rect x="61" y="14" width="8" height="12" fill="#eee"/></symbol>
+  </defs>
+  <rect class="bg" width="1640" height="590"/>
+  <text x="70" y="38" class="label">GRID / CONTACT — FIVE STRUCTURAL CANDIDATES</text>
+  <text x="70" y="59" class="meta">GRAYSCALE · SAME PHYSICAL SCALE · PAGE 180×240 · SPREAD 360×240 · REVIEW LINES ARE NOT RENDERER ASSETS</text>
+
+  <!-- G-A -->
+  <g transform="translate(70 95)">
+    <text class="label" x="0" y="-12">G-A</text><rect class="drop" x="128" y="-28" width="52" height="19"/><text class="tag" x="139" y="-14">DROP</text>
+    <rect class="paper" width="180" height="240"/><rect class="safe" x="12" y="14" width="156" height="210"/>
+    <use href="#ph-a" x="14" y="34" width="72" height="69"/><use href="#ph-b" x="94" y="34" width="72" height="69"/>
+    <use href="#ph-c" x="14" y="111" width="72" height="69"/><use href="#ph-d" x="94" y="111" width="72" height="69"/>
+    <path class="path" d="M23 22H151V195"/><text class="small" x="14" y="220">2×2 EQUAL MATRIX</text>
+    <text class="meta" x="0" y="263">PAGE · R01 · 4P · N0</text><text class="small" x="0" y="282">PATH 01→02→03→04 · baseline redundant</text>
+  </g>
+
+  <!-- G-B -->
+  <g transform="translate(325 95)">
+    <text class="label" x="0" y="-12">G-B</text><rect class="keep" x="128" y="-28" width="52" height="19"/><text class="tag inverse" x="137" y="-14">KEEP</text>
+    <rect class="paper" width="180" height="240"/><rect class="safe" x="10" y="14" width="160" height="210"/>
+    <g>
+      <use href="#ph-a" x="10" y="30" width="49" height="39"/><use href="#ph-b" x="65" y="30" width="49" height="39"/><use href="#ph-c" x="120" y="30" width="49" height="39"/>
+      <use href="#ph-d" x="10" y="76" width="49" height="39"/><use href="#ph-e" x="65" y="76" width="49" height="39"/><use href="#ph-a" x="120" y="76" width="49" height="39"/>
+      <use href="#ph-c" x="10" y="130" width="49" height="39"/><use href="#ph-d" x="65" y="130" width="49" height="39"/><use href="#ph-b" x="120" y="130" width="49" height="39"/>
+      <use href="#ph-e" x="10" y="176" width="49" height="39"/><use href="#ph-a" x="65" y="176" width="49" height="39"/><use href="#ph-d" x="120" y="176" width="49" height="39"/>
+    </g>
+    <path class="path" d="M15 21H162V222"/><text class="small" x="10" y="230">3×4 · 6 + 6 GROUPING</text>
+    <text class="num" x="157" y="23">08</text>
+    <text class="meta" x="0" y="263">PAGE · R02 · 12P · N0</text><text class="small" x="0" y="282">PATH ROW SCAN · high-density archive</text>
+  </g>
+
+  <!-- G-C -->
+  <g transform="translate(580 95)">
+    <text class="label" x="0" y="-12">G-C</text><rect class="keep" x="128" y="-28" width="52" height="19"/><text class="tag inverse" x="137" y="-14">KEEP</text>
+    <rect class="paper" width="180" height="240"/><rect class="safe" x="13" y="14" width="154" height="211"/>
+    <text class="num" x="13" y="24">A</text><use href="#ph-b" x="13" y="30" width="154" height="82"/>
+    <text class="num" x="13" y="133">B</text><use href="#ph-c" x="13" y="140" width="154" height="82"/>
+    <path class="path" d="M173 34V213"/>
+    <text class="meta" x="0" y="263">PAGE · R05 · 2P · N0</text><text class="small" x="0" y="282">PATH A→B · equal scale, no hero</text>
+  </g>
+
+  <!-- G-D -->
+  <g transform="translate(835 95)">
+    <text class="label" x="0" y="-12">G-D</text><rect class="drop" x="308" y="-28" width="52" height="19"/><text class="tag" x="319" y="-14">DROP</text>
+    <rect class="paper" width="360" height="240"/><line class="gutter" x1="180" y1="0" x2="180" y2="240"/><rect class="safe" x="12" y="14" width="336" height="210"/>
+    <use href="#ph-a" x="19" y="73" width="43" height="100"/><use href="#ph-b" x="66" y="73" width="43" height="100"/><use href="#ph-c" x="113" y="73" width="43" height="100"/>
+    <use href="#ph-d" x="160" y="73" width="43" height="100"/><use href="#ph-e" x="207" y="73" width="43" height="100"/><use href="#ph-a" x="254" y="73" width="43" height="100"/><use href="#ph-c" x="301" y="73" width="43" height="100"/>
+    <path class="path" d="M19 57H340"/><text class="small" x="143" y="188">CROSS-GUTTER PHOTO</text>
+    <text class="meta" x="0" y="263">SPREAD · R12 · 7P · N0</text><text class="small" x="0" y="282">EVIDENCE cross-gutter-photo · focus risk</text>
+  </g>
+
+  <!-- G-E -->
+  <g transform="translate(1230 95)">
+    <text class="label" x="0" y="-12">G-E</text><rect class="keep" x="308" y="-28" width="52" height="19"/><text class="tag inverse" x="317" y="-14">KEEP</text>
+    <rect class="paper" width="360" height="240"/><line class="gutter" x1="180" y1="0" x2="180" y2="240"/><rect class="safe" x="12" y="14" width="336" height="210"/>
+    <use href="#ph-a" x="14" y="32" width="70" height="72"/><use href="#ph-b" x="96" y="32" width="70" height="72"/><use href="#ph-c" x="14" y="126" width="70" height="72"/><use href="#ph-d" x="96" y="126" width="70" height="72"/>
+    <text class="tag" x="208" y="43">INDEX</text>
+    <text class="num" x="208" y="75">01</text><line class="rule" x1="226" y1="72" x2="324" y2="72"/><line class="rule" x1="226" y1="80" x2="300" y2="80"/>
+    <text class="num" x="208" y="108">02</text><line class="rule" x1="226" y1="105" x2="332" y2="105"/><line class="rule" x1="226" y1="113" x2="292" y2="113"/>
+    <text class="num" x="208" y="141">03</text><line class="rule" x1="226" y1="138" x2="317" y2="138"/><line class="rule" x1="226" y1="146" x2="305" y2="146"/>
+    <text class="num" x="208" y="174">04</text><line class="rule" x1="226" y1="171" x2="336" y2="171"/><line class="rule" x1="226" y1="179" x2="283" y2="179"/>
+    <path class="bind" d="M208 72C188 72 184 65 166 65M208 105C188 105 184 80 166 80M208 138C188 138 184 155 166 155M208 171C188 171 184 170 166 170"/>
+    <path class="path" d="M333 45V194H197"/>
+    <text class="meta" x="0" y="263">SPREAD · R11 · 4P · N REQUIRED</text><text class="small" x="0" y="282">EVIDENCE 4× Photo–Note cross-page-pair</text>
+  </g>
+
+  <line x1="70" y1="415" x2="1590" y2="415" stroke="#bbb"/>
+  <text x="70" y="448" class="label">DECISION</text>
+  <text x="70" y="475" class="meta">KEEP G-C — LOW-COUNT STRICT COMPARISON · KEEP G-B — HIGH-DENSITY SCANNING · KEEP G-E — REQUIRED PHOTO-NOTE INDEX SPREAD</text>
+  <text x="70" y="502" class="meta">DROP G-A — STRONG BASELINE BUT REDUNDANT BETWEEN LOW/HIGH DUTIES · DROP G-D — LEGAL, BUT GUTTER CROP + HALF-MODULE FOCUS COST</text>
+  <text x="70" y="540" class="small">First-reading arrows, safe areas and binding lines are audit annotations only. All neutral photographic placeholders are original vector constructions and fill their frames.</text>
+</svg>

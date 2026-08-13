@@ -46,7 +46,7 @@ export function OverviewStep({
           </div>
           {style && recipe ? (
             <div className={styles.overviewStyleBody}>
-              <StylePagePreview recipe={recipe} photos={draft.photos} compact />
+              <StylePagePreview recipe={recipe} photos={draft.photos} locale={draft.locale} compact />
               <span><strong>{style.name}</strong><small>{style.description}</small></span>
             </div>
           ) : null}

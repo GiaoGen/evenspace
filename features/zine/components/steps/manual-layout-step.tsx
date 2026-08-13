@@ -156,11 +156,12 @@ export function ManualLayoutStep({
   const structureKey = useMemo(
     () => JSON.stringify({
       name: draft.name,
+      locale: draft.locale,
       styleId: draft.styleId,
       photos: draft.photos.map((photo) => ({ id: photo.id, caption: photo.caption })),
       manualSpreads: draft.manualSpreads,
     }),
-    [draft.manualSpreads, draft.name, draft.photos, draft.styleId],
+    [draft.locale, draft.manualSpreads, draft.name, draft.photos, draft.styleId],
   );
   const sourceRef = useRef<HTMLDivElement>(null);
   const bookSlotRef = useRef<HTMLDivElement>(null);
@@ -925,7 +926,7 @@ export function ManualLayoutStep({
                                 closeDrawer();
                               }}
                             >
-                              <StylePagePreview recipe={recipe} photos={previewPhotos} compact />
+                              <StylePagePreview recipe={recipe} photos={previewPhotos} locale={draft.locale} compact />
                               <small className={styles.recipeStatus} data-status={compatibility.code}>
                                 {compatibilityLabel}
                               </small>

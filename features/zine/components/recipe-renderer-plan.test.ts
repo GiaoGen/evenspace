@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { createRecipeApplication, validateRecipeDefinition } from "../model/recipe-contract";
 import { phaseARecipeFixtures } from "../model/recipe-phase-a-fixtures";
 import { createRecipeRenderPlan, getRecipeRendererColorTokens, resolveRecipeTextAlign } from "./recipe-renderer-plan";
@@ -44,13 +46,27 @@ describe("Phase A Recipe Renderer plan", () => {
       noteRelations: [],
     };
     const application = createRecipeApplication({ recipe, content: { photoIds: [], notesByPhotoId: {} }, anchorPageId: "roles" });
-    const environment = { pageId: "roles", pageSide: "left" as const, pageNumber: 1, title: "Roles" };
+    const environment = { pageId: "roles", pageSide: "left" as const, pageNumber: 1, title: "Roles", locale: "en" as const };
     const editor = createRecipeRenderPlan({ recipe, application, photos: [], environment: { ...environment, mode: "editor" } });
     const reader = createRecipeRenderPlan({ recipe, application, photos: [], environment: { ...environment, mode: "reader" } });
     expect(editor.valid).toBe(true);
     expect(editor.slots.map((slot) => slot.typographyRole)).toEqual(roles);
     expect(editor.slots.map(({ id, typographyRole, typographyToken, textAlign }) => ({ id, typographyRole, typographyToken, textAlign })))
       .toEqual(reader.slots.map(({ id, typographyRole, typographyToken, textAlign }) => ({ id, typographyRole, typographyToken, textAlign })));
+    expect(editor.slots.map(({ id, typographyLayout }) => ({ id, typographyLayout })))
+      .toEqual(reader.slots.map(({ id, typographyLayout }) => ({ id, typographyLayout })));
+  });
+
+  it("uses the Recipe canvas as the typography container without viewport-sized page text", () => {
+    const rendererSource = readFileSync(join(process.cwd(), "features/zine/components/recipe-renderer.tsx"), "utf8");
+    const renderPlanSource = readFileSync(join(process.cwd(), "features/zine/components/recipe-renderer-plan.ts"), "utf8");
+    const rendererCss = readFileSync(join(process.cwd(), "features/zine/components/recipe-renderer.module.css"), "utf8");
+    expect(rendererSource).not.toContain("typographySizes");
+    expect(rendererSource).not.toMatch(/typography[^\n]*vw/u);
+    expect(rendererCss).toContain("container-type: size");
+    expect(rendererCss).not.toMatch(/font-size:[^;]*vw/u);
+    expect(rendererSource).not.toMatch(/editorial-[a-z-]+|title-lead|deck-lead/u);
+    expect(renderPlanSource).not.toMatch(/editorial-[a-z-]+|title-lead|deck-lead/u);
   });
 
   it("mirrors inward and outward alignment without encoding left or right in Recipe data", () => {
@@ -72,13 +88,13 @@ describe("Phase A Recipe Renderer plan", () => {
       recipe,
       application,
       photos: [photo("one")],
-      environment: { pageId: "color-page", pageSide: "left", mode: "editor", pageNumber: 1, title: "Color" },
+      environment: { pageId: "color-page", pageSide: "left", mode: "editor", pageNumber: 1, title: "Color", locale: "en" },
     });
     const reader = createRecipeRenderPlan({
       recipe,
       application,
       photos: [photo("one")],
-      environment: { pageId: "color-page", pageSide: "left", mode: "reader", pageNumber: 1, title: "Color" },
+      environment: { pageId: "color-page", pageSide: "left", mode: "reader", pageNumber: 1, title: "Color", locale: "en" },
     });
     expect(editor.slots.filter((slot) => slot.kind === "color-field")).toEqual(
       reader.slots.filter((slot) => slot.kind === "color-field"),
@@ -106,7 +122,7 @@ describe("Phase A Recipe Renderer plan", () => {
       recipe,
       application,
       photos: [photo("one", "Note")],
-      environment: { pageId: "color-page", pageSide: "left", mode: "reader", pageNumber: 1, title: "Color" },
+      environment: { pageId: "color-page", pageSide: "left", mode: "reader", pageNumber: 1, title: "Color", locale: "en" },
     });
     const note = plan.slots.find((slot) => slot.kind === "note");
     expect(note).toMatchObject({ foregroundToken: "inverse-ink", surfaceToken: "accent-1" });
@@ -130,7 +146,7 @@ describe("Phase A Recipe Renderer plan", () => {
       recipe,
       application,
       photos: [photo("one", "A note that stays data.")],
-      environment: { pageId: "page-one", pageSide: "left", mode: "reader", pageNumber: 1, title: "Fixture" },
+      environment: { pageId: "page-one", pageSide: "left", mode: "reader", pageNumber: 1, title: "Fixture", locale: "en" },
     });
 
     expect(plan.valid).toBe(true);
@@ -166,13 +182,13 @@ describe("Phase A Recipe Renderer plan", () => {
       recipe,
       application,
       photos: [photo("bridge")],
-      environment: { pageId: "left-page", pageSide: "left", mode: "reader", pageNumber: 1, title: "Spread" },
+      environment: { pageId: "left-page", pageSide: "left", mode: "reader", pageNumber: 1, title: "Spread", locale: "en" },
     });
     const right = createRecipeRenderPlan({
       recipe,
       application,
       photos: [photo("bridge")],
-      environment: { pageId: "right-page", pageSide: "right", mode: "reader", pageNumber: 2, title: "Spread" },
+      environment: { pageId: "right-page", pageSide: "right", mode: "reader", pageNumber: 2, title: "Spread", locale: "en" },
     });
 
     expect(application.assignments).toHaveLength(1);
@@ -198,13 +214,13 @@ describe("Phase A Recipe Renderer plan", () => {
       recipe,
       application,
       photos: [],
-      environment: { pageId: "empty-page", pageSide: "left", mode: "editor", pageNumber: 1, title: "Empty" },
+      environment: { pageId: "empty-page", pageSide: "left", mode: "editor", pageNumber: 1, title: "Empty", locale: "en" },
     });
     const reader = createRecipeRenderPlan({
       recipe,
       application,
       photos: [],
-      environment: { pageId: "empty-page", pageSide: "left", mode: "reader", pageNumber: 1, title: "Empty" },
+      environment: { pageId: "empty-page", pageSide: "left", mode: "reader", pageNumber: 1, title: "Empty", locale: "en" },
     });
 
     expect(editor.slots.find((slot) => slot.id === "photo")?.showPhotoPlaceholder).toBe(true);
@@ -236,7 +252,7 @@ describe("Phase A Recipe Renderer plan", () => {
         recipe,
         application,
         photos: [photo("one", "A note for the relation.")],
-        environment: { pageId: "page-one", pageSide: "left", mode: "reader", pageNumber: 1, title: "Fixture" },
+        environment: { pageId: "page-one", pageSide: "left", mode: "reader", pageNumber: 1, title: "Fixture", locale: "en" },
       });
       const note = plan.slots.find((slot) => slot.kind === "note")?.notes?.[0];
 
@@ -282,7 +298,7 @@ describe("Phase A Recipe Renderer plan", () => {
       recipe,
       application,
       photos: [photo("one", "First"), photo("two", "Second")],
-      environment: { pageId: "page-one", pageSide: "left", mode: "reader", pageNumber: 1, title: "Fixture" },
+      environment: { pageId: "page-one", pageSide: "left", mode: "reader", pageNumber: 1, title: "Fixture", locale: "en" },
     });
     const notes = plan.slots.find((slot) => slot.id === "note")?.notes ?? [];
 
@@ -305,7 +321,7 @@ describe("Phase A Recipe Renderer plan", () => {
       recipe: fixture,
       application,
       photos: [photo("one", text)],
-      environment: { pageId: "page-one", pageSide: "left", mode: "reader", pageNumber: 1, title: "Fixture" },
+      environment: { pageId: "page-one", pageSide: "left", mode: "reader", pageNumber: 1, title: "Fixture", locale: "en" },
     });
 
     expect(plan.slots.find((slot) => slot.kind === "note")?.notes?.[0]?.text).toBe(text);

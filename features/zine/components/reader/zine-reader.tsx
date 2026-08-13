@@ -427,7 +427,7 @@ export function ZineReader({
   ].filter(Boolean).join(" ");
 
   return (
-    <main className={styles.reader}>
+    <main className={styles.reader} data-zine-locale={draft.locale} lang={draft.locale}>
       <header className={styles.readerHeader}>
         <button type="button" onClick={onClose} aria-label="Return to zine overview">
           <Icon name="close" size={17} />

@@ -89,6 +89,7 @@ export function createReferencePreviewCell(
     mode,
     pageNumber: index + 1,
     title: recipe.name,
+    locale: "en",
   } satisfies RecipeRenderEnvironment));
   const application = createRecipeApplication({
     recipe,

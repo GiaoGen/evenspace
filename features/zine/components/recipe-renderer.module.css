@@ -3,10 +3,53 @@
   width: 100%;
   height: 100%;
   overflow: hidden;
+  container-type: size;
+  container-name: recipe-canvas;
   background: var(--recipe-background);
   color: var(--recipe-foreground);
-  font-family: var(--font-geist-sans), Arial, sans-serif;
+  --zine-font-display-serif: "Bodoni Moda", "Noto Serif TC";
+  --zine-font-support-sans: "Geist", "Noto Sans TC";
+  --zine-font-metadata-mono: "Geist Mono", "Noto Sans TC";
+  font-family: var(--zine-font-support-sans);
+  font-synthesis: none;
   isolation: isolate;
+}
+
+.recipeCanvas[data-zine-locale="zh-Hans"] {
+  --zine-font-display-serif: "Noto Serif SC";
+  --zine-font-support-sans: "Noto Sans SC";
+  --zine-font-metadata-mono: "Noto Sans SC";
+}
+
+.recipeCanvas[data-zine-locale="zh-Hant"] {
+  --zine-font-display-serif: "Noto Serif TC";
+  --zine-font-support-sans: "Noto Sans TC";
+  --zine-font-metadata-mono: "Noto Sans TC";
+}
+
+.recipeCanvas[data-typography-system="plex-unified-archive-v1"] {
+  --zine-font-display-serif: "IBM Plex Sans", "IBM Plex Sans TC";
+  --zine-font-support-sans: "IBM Plex Sans", "IBM Plex Sans TC";
+  --zine-font-metadata-mono: "IBM Plex Mono", "IBM Plex Sans TC";
+}
+
+.recipeCanvas[data-typography-system="plex-unified-archive-v1"][data-zine-locale="zh-Hans"] {
+  --zine-font-display-serif: "IBM Plex Sans", "IBM Plex Sans SC";
+  --zine-font-support-sans: "IBM Plex Sans", "IBM Plex Sans SC";
+  --zine-font-metadata-mono: "IBM Plex Mono", "IBM Plex Sans SC";
+}
+
+.recipeCanvas [data-typography-font-role="display-serif"] {
+  font-family: var(--zine-font-display-serif);
+}
+
+.recipeCanvas [data-typography-font-role="support-sans"] {
+  font-family: var(--zine-font-support-sans);
+}
+
+.recipeCanvas [data-typography-font-role="metadata-mono"] {
+  font-family: var(--zine-font-metadata-mono);
+  font-variant-numeric: tabular-nums;
 }
 
 .recipePhoto,
@@ -59,14 +102,16 @@
   display: flex;
   flex-wrap: wrap;
   align-items: flex-start;
-  gap: 3px 8px;
+  gap: 0 .8cqw;
   overflow: visible;
   border: 0;
   background: transparent;
   box-shadow: none;
   color: var(--recipe-foreground);
-  font-size: clamp(5px, 1.05vw, 8px);
-  line-height: 1.25;
+  font-size: var(--recipe-typography-fallback-size, 6px);
+  font-size: var(--recipe-typography-size, var(--recipe-typography-fallback-size, 6px));
+  line-height: var(--recipe-typography-line-height, 1.25);
+  letter-spacing: var(--recipe-typography-tracking, 0);
   pointer-events: none;
 }
 
@@ -76,7 +121,7 @@
   overflow-wrap: anywhere;
   background: transparent;
   box-shadow: none;
-  white-space: normal;
+  white-space: pre-wrap;
 }
 
 .recipeNoteSlot[data-note-relations~="adjacent"] {
@@ -95,6 +140,23 @@
 
 .recipeNoteSlot[data-note-relations~="cross-page-pair"] {
   justify-content: space-between;
+}
+
+.recipeNoteSlot[data-typography-role="index"][data-note-relations~="cross-page-pair"] {
+  display: grid;
+  grid-template-columns: 1fr;
+  grid-template-rows: repeat(var(--recipe-note-count), minmax(0, 1fr));
+  counter-reset: recipe-note-index;
+}
+
+.recipeNoteSlot[data-typography-role="index"][data-note-relations~="cross-page-pair"] .recipeNoteItem {
+  counter-increment: recipe-note-index;
+}
+
+.recipeNoteSlot[data-typography-role="index"][data-note-relations~="cross-page-pair"] .recipeNoteItem::before {
+  margin-right: 4px;
+  content: counter(recipe-note-index, decimal-leading-zero);
+  font-variant-numeric: tabular-nums;
 }
 
 .recipeNoteSlot[data-note-relations~="overlay"] {
@@ -131,7 +193,11 @@
   overflow: visible;
   color: var(--recipe-muted);
   overflow-wrap: anywhere;
-  white-space: normal;
+  white-space: pre-wrap;
+  font-size: var(--recipe-typography-fallback-size, 6px);
+  font-size: var(--recipe-typography-size, var(--recipe-typography-fallback-size, 6px));
+  line-height: var(--recipe-typography-line-height, 1.25);
+  letter-spacing: var(--recipe-typography-tracking, 0);
 }
 
 .recipeError {

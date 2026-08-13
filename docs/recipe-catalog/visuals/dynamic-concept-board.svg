@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1640 640" role="img" aria-labelledby="title desc">
+  <title id="title">Dynamic family five-candidate grayscale concept board</title>
+  <desc id="desc">Five anonymous Dynamic candidates D-A through D-E shown at the same physical scale. Pages use a three by four ratio and spreads use a three by two ratio. D-A, D-C and D-D are kept.</desc>
+  <defs>
+    <style>
+      .bg{fill:#f1f1ef}.paper{fill:#fff;stroke:#181818;stroke-width:1.4}.safe{fill:none;stroke:#aaa;stroke-width:.7;stroke-dasharray:3 3}.gutter{stroke:#111;stroke-width:1}.risk{fill:#111;opacity:.08}.h1{font:700 22px Arial,sans-serif;fill:#111;letter-spacing:.4px}.id{font:700 20px Arial,sans-serif;fill:#111}.meta{font:11px Arial,sans-serif;fill:#555;letter-spacing:.4px}.tiny{font:9px Arial,sans-serif;fill:#555}.tag{font:700 10px Arial,sans-serif;letter-spacing:1px}.keep{fill:#111}.drop{fill:#d7d7d5}.white{fill:#fff}.path{fill:none;stroke:#202020;stroke-width:1.2;marker-end:url(#arrow)}.bind{fill:none;stroke:#666;stroke-width:.8;stroke-dasharray:2 2}.rule{stroke:#777;stroke-width:.8}.note{fill:#eee;stroke:#777;stroke-width:.8}.num{font:700 8px Arial,sans-serif;fill:#111}
+    </style>
+    <marker id="arrow" viewBox="0 0 6 6" refX="5" refY="3" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0L6 3L0 6Z" fill="#202020"/></marker>
+    <symbol id="runner" viewBox="0 0 100 70" preserveAspectRatio="xMidYMid slice"><rect width="100" height="70" fill="#c7c7c5"/><path d="M0 52L24 34L46 43L73 22L100 37V70H0Z" fill="#777"/><circle cx="30" cy="24" r="7" fill="#e9e9e7"/><path d="M26 32L39 42L31 51M32 39L20 48M37 42L49 51" fill="none" stroke="#333" stroke-width="5" stroke-linecap="round"/><path d="M55 18H91" stroke="#f1f1ef" stroke-width="3"/><path d="M62 25H98" stroke="#999" stroke-width="2"/></symbol>
+    <symbol id="bike" viewBox="0 0 100 70" preserveAspectRatio="xMidYMid slice"><rect width="100" height="70" fill="#b6b6b4"/><rect y="48" width="100" height="22" fill="#626262"/><circle cx="29" cy="49" r="12" fill="none" stroke="#eee" stroke-width="4"/><circle cx="68" cy="49" r="12" fill="none" stroke="#eee" stroke-width="4"/><path d="M29 49L45 30L54 49H29L41 49L68 49L56 24" fill="none" stroke="#333" stroke-width="4"/><circle cx="55" cy="18" r="6" fill="#ededeb"/></symbol>
+    <symbol id="jump" viewBox="0 0 100 70" preserveAspectRatio="xMidYMid slice"><rect width="100" height="70" fill="#d3d3d1"/><path d="M0 55Q25 41 48 50T100 43V70H0Z" fill="#777"/><circle cx="54" cy="17" r="6" fill="#444"/><path d="M54 24L49 38M50 31L37 24M50 32L64 27M49 38L37 51M49 38L62 50" fill="none" stroke="#444" stroke-width="5" stroke-linecap="round"/><path d="M12 16L38 16M5 24L31 24" stroke="#eee" stroke-width="3"/></symbol>
+    <symbol id="crowd" viewBox="0 0 100 70" preserveAspectRatio="xMidYMid slice"><rect width="100" height="70" fill="#aaa"/><rect y="44" width="100" height="26" fill="#595959"/><circle cx="31" cy="32" r="8" fill="#eee"/><rect x="24" y="40" width="15" height="30" fill="#333"/><circle cx="61" cy="27" r="7" fill="#d8d8d6"/><rect x="55" y="35" width="13" height="35" fill="#777"/><path d="M73 12H94V49H73Z" fill="#dededc"/></symbol>
+    <symbol id="wide" viewBox="0 0 200 84" preserveAspectRatio="xMidYMid slice"><rect width="200" height="84" fill="#c8c8c6"/><path d="M0 62L38 39L72 55L116 24L159 49L200 32V84H0Z" fill="#747474"/><path d="M0 47Q42 32 82 42T164 34T200 39" fill="none" stroke="#e8e8e6" stroke-width="5"/><circle cx="45" cy="28" r="8" fill="#efefed"/><path d="M45 36L57 50M51 43L69 39M54 49L43 65M55 49L72 60" fill="none" stroke="#333" stroke-width="6" stroke-linecap="round"/><circle cx="158" cy="36" r="9" fill="#4e4e4e"/></symbol>
+  </defs>
+  <rect class="bg" width="1640" height="640"/>
+  <text class="h1" x="60" y="38">DYNAMIC — FIVE STRUCTURAL CANDIDATES</text>
+  <text class="meta" x="60" y="60">GRAYSCALE · SAME PHYSICAL SCALE · PAGE 180×240 · SPREAD 360×240 · PATH / SAFE / BINDING MARKS ARE AUDIT ONLY</text>
+
+  <g transform="translate(60 108)">
+    <text class="id" x="0" y="-13">D-A</text><rect class="keep" x="128" y="-29" width="52" height="19"/><text class="tag white" x="137" y="-15">KEEP</text>
+    <rect class="paper" width="180" height="240"/><rect class="safe" x="7" y="12" width="166" height="216"/>
+    <use href="#runner" x="0" y="17" width="166" height="206"/>
+    <path class="path" d="M13 113H169"/><text class="tiny" x="145" y="234">BRAKE</text>
+    <text class="meta" x="0" y="264">PAGE · R01 · 1P · NOTE NONE</text><text class="tiny" x="0" y="283">EDGE ENTRY → THRUST → PAPER STOP</text>
+    <text class="tiny" x="0" y="302">79.12% · 1 ACTIVE BLEED EDGE</text>
+  </g>
+
+  <g transform="translate(300 108)">
+    <text class="id" x="0" y="-13">D-B</text><rect class="drop" x="128" y="-29" width="52" height="19"/><text class="tag" x="139" y="-15">DROP</text>
+    <rect class="paper" width="180" height="240"/><rect class="safe" x="7" y="12" width="166" height="216"/>
+    <use href="#bike" x="0" y="14" width="151" height="144"/><use href="#crowd" x="14" y="170" width="68" height="65"/>
+    <path class="path" d="M13 81H153C166 81 161 145 132 159L84 194"/>
+    <text class="meta" x="0" y="264">PAGE · R03 · 2P · NOTE NONE</text><text class="tiny" x="0" y="283">ADVANCE → FOLD BACK · SCALE 4.91:1</text>
+    <text class="tiny" x="0" y="302">VALID, BUT OVERLAPS A + C DUTIES</text>
+  </g>
+
+  <g transform="translate(540 108)">
+    <text class="id" x="0" y="-13">D-C</text><rect class="keep" x="128" y="-29" width="52" height="19"/><text class="tag white" x="137" y="-15">KEEP</text>
+    <rect class="paper" width="180" height="240"/><rect class="safe" x="9" y="12" width="162" height="216"/>
+    <use href="#runner" x="9" y="14" width="72" height="60"/><use href="#jump" x="99" y="14" width="72" height="60"/><use href="#crowd" x="9" y="98" width="162" height="130"/>
+    <path class="path" d="M21 84H153V93C153 106 139 112 113 116"/>
+    <text class="num" x="12" y="23">01</text><text class="num" x="102" y="23">02</text>
+    <text class="meta" x="0" y="264">PAGE · R06 · 3P · NOTE NONE</text><text class="tiny" x="0" y="283">01 → 02 → DROP / EXPAND TO IMPACT</text>
+    <text class="tiny" x="0" y="302">68.60% · SCALE 4.86:1 · NO BLEED</text>
+  </g>
+
+  <g transform="translate(780 108)">
+    <text class="id" x="0" y="-13">D-D</text><rect class="keep" x="308" y="-29" width="52" height="19"/><text class="tag white" x="317" y="-15">KEEP</text>
+    <rect class="paper" width="360" height="240"/><rect class="safe" x="7" y="12" width="346" height="216"/>
+    <use href="#wide" x="0" y="19" width="360" height="202"/><rect class="risk" x="169" y="19" width="22" height="202"/><line class="gutter" x1="180" y1="0" x2="180" y2="240"/>
+    <path class="path" d="M15 117H345"/><text class="tiny" x="163" y="235">GUTTER RISK</text>
+    <text class="meta" x="0" y="264">SPREAD · R10 · 1P · NOTE NONE · CROSS-GUTTER-PHOTO</text>
+    <text class="tiny" x="0" y="283">OUTER EDGE → GUTTER → OUTER EDGE · 84% · 2 ACTIVE BLEED EDGES</text>
+    <text class="tiny" x="0" y="302">FACE / TEXT / ACTION JOINTS MUST CLEAR CENTER RISK BAND</text>
+  </g>
+
+  <g transform="translate(1200 108)">
+    <text class="id" x="0" y="-13">D-E</text><rect class="drop" x="308" y="-29" width="52" height="19"/><text class="tag" x="319" y="-15">DROP</text>
+    <rect class="paper" width="360" height="240"/><rect class="safe" x="7" y="12" width="346" height="216"/><line class="gutter" x1="180" y1="0" x2="180" y2="240"/>
+    <use href="#bike" x="0" y="29" width="169" height="182"/>
+    <rect class="note" x="274" y="106" width="72" height="29"/><line class="rule" x1="282" y1="116" x2="336" y2="116"/><line class="rule" x1="282" y1="125" x2="326" y2="125"/>
+    <text class="num" x="274" y="101">N1</text><path class="bind" d="M165 120C210 120 228 120 270 120"/><path class="path" d="M14 160C105 160 202 151 273 128"/>
+    <text class="meta" x="0" y="264">SPREAD · R11 · 1P · NOTE REQUIRED</text>
+    <text class="tiny" x="0" y="283">PHOTO → CROSS-PAGE NOTE · LEGAL EVIDENCE</text>
+    <text class="tiny" x="0" y="302">RISK: FIRST READ DRIFTS TO EDITORIAL</text>
+  </g>
+
+  <line x1="60" y1="455" x2="1560" y2="455" stroke="#bbb"/>
+  <text class="h1" x="60" y="493">DECISION</text>
+  <text class="meta" x="60" y="523">KEEP D-A — ONE-PHOTO OUTER-EDGE THRUST · KEEP D-C — THREE-STAGE DROP / SCALE ACCELERATION · KEEP D-D — LEGAL CROSS-GUTTER SWEEP</text>
+  <text class="meta" x="60" y="550">DROP D-B — VALID SWITCHBACK, BUT FIRST-BATCH DUTY IS COVERED MORE DISTINCTLY BY D-A + D-C</text>
+  <text class="meta" x="60" y="574">DROP D-E — LEGAL CROSS-PAGE PAIR, BUT ONE PHOTO + NOTE REMAINS TOO CLOSE TO EDITORIAL ACROSS THE RECORD</text>
+  <text class="tiny" x="60" y="610">All grayscale photographic placeholders are original vector constructions and cover their frames. Formal names are intentionally hidden above; arrows, safe areas, risk bands and binding lines are review annotations only.</text>
+</svg>

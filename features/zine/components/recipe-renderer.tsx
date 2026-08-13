@@ -10,6 +10,10 @@ import {
 } from "../model/recipe-contract";
 import type { ZinePhoto } from "../model/zine-draft";
 import {
+  ZINE_TYPOGRAPHY_SYSTEM_ID,
+  type ZineTypographySystemId,
+} from "../model/zine-typography";
+import {
   createRecipeRenderPlan,
   type RecipeRenderEnvironment,
   type RecipeRenderPlanSlot,
@@ -28,13 +32,15 @@ export function RecipeRenderer({
   application,
   photos,
   environment,
+  typographySystem = ZINE_TYPOGRAPHY_SYSTEM_ID,
 }: {
   readonly recipe: RecipeDefinition;
   readonly application: RecipeApplication;
   readonly photos: readonly ZinePhoto[];
   readonly environment: RecipeRenderEnvironment;
+  readonly typographySystem?: ZineTypographySystemId;
 }) {
-  const plan = createRecipeRenderPlan({ recipe, application, photos, environment });
+  const plan = createRecipeRenderPlan({ recipe, application, photos, environment, typographySystem });
   const theme = recipe.theme ?? {
     background: "#f5f1e9",
     foreground: "#20201d",
@@ -64,6 +70,10 @@ export function RecipeRenderer({
       data-recipe-scope={recipe.scope}
       data-recipe-render-mode={environment.mode}
       data-recipe-valid={plan.valid}
+      data-zine-locale={environment.locale}
+      data-typography-preset={plan.slots.find((slot) => slot.typographyPresetId)?.typographyPresetId}
+      data-typography-system={typographySystem}
+      lang={environment.locale}
       style={canvasStyle}
     >
       {plan.slots.map((slot) => (
@@ -71,7 +81,7 @@ export function RecipeRenderer({
       ))}
       {!plan.valid ? (
         <span className={styles.recipeError} data-recipe-error="true">
-          {plan.issues[0]?.message ?? "Invalid recipe definition."}
+          {plan.issues[0]?.message ?? plan.typographyIssues[0]?.message ?? "Invalid recipe definition."}
         </span>
       ) : null}
     </div>
@@ -109,7 +119,8 @@ function RecipeSlotView({
       data-zine-slot-id={slot.id}
       data-slot-kind={slot.kind}
       data-typography-role={slot.typographyRole}
-      style={{ ...slotStyle, ...foregroundStyle(slot.foregroundToken), ...typographyStyle(slot.typographyToken, slot.textAlign) }}
+      data-typography-font-role={slot.typographyFontRole}
+      style={{ ...slotStyle, ...foregroundStyle(slot.foregroundToken), ...typographyStyle(slot.typographyToken, slot.typographyLayout, slot.textAlign) }}
     >
       {slot.text}
     </span>
@@ -192,7 +203,8 @@ function NoteSlot({
       data-note-relation={relation}
       data-note-relations={relationKinds.join(" ") || undefined}
       data-typography-role={slot.typographyRole}
-      style={{ ...style, ...foregroundStyle(slot.foregroundToken), ...typographyStyle(slot.typographyToken, slot.textAlign), "--recipe-note-count": notes.length } as CSSProperties}
+      data-typography-font-role={slot.typographyFontRole}
+      style={{ ...style, ...foregroundStyle(slot.foregroundToken), ...typographyStyle(slot.typographyToken, slot.typographyLayout, slot.textAlign), "--recipe-note-count": notes.length } as CSSProperties}
     >
       {notes.map((note) => (
         <span
@@ -237,29 +249,22 @@ function colorTokenValue(token: RecipeColorToken | undefined) {
   return `var(--recipe-color-${token})`;
 }
 
-const typographySizes = {
-  xs: "clamp(5px, .9vw, 7px)",
-  sm: "clamp(5px, 1.05vw, 8px)",
-  md: "clamp(6px, 1.35vw, 10px)",
-  lg: "clamp(8px, 1.8vw, 14px)",
-  xl: "clamp(10px, 2.5vw, 20px)",
-} as const;
-const typographyLineHeights = { tight: 1.1, normal: 1.25, open: 1.45 } as const;
-const typographyTracking = { tight: "-.015em", normal: "0", wide: ".08em" } as const;
-
 function typographyStyle(
   token: RecipeTypographyToken | undefined,
+  layout: RecipeRenderPlanSlot["typographyLayout"],
   align: RecipeRenderPlanSlot["textAlign"],
 ): CSSProperties {
-  if (!token) return {};
+  if (!token || !layout) return {};
+  const metrics = layout.metrics;
   return {
-    fontSize: typographySizes[token.size],
-    lineHeight: typographyLineHeights[token.lineHeight],
+    "--recipe-typography-size": `${metrics.normalizedFontSize * 100}cqw`,
+    "--recipe-typography-fallback-size": `${metrics.fallbackFontSizePx}px`,
+    "--recipe-typography-line-height": metrics.lineHeight,
+    "--recipe-typography-tracking": `${metrics.trackingEm}em`,
     fontWeight: token.weight,
-    letterSpacing: typographyTracking[token.tracking],
-    textTransform: token.transform,
+    textTransform: metrics.locale === "en" ? token.transform : "none",
     textAlign: align,
-  };
+  } as CSSProperties;
 }
 
 export function getRecipeRelationLabel(relation: RecipeRelationKind | null) {

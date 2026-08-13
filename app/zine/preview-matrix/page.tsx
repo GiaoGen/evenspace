@@ -3,8 +3,8 @@ import { notFound } from "next/navigation";
 import { ReferenceRecipeGate } from "@/features/zine/components/reference-recipe-gate";
 
 export const metadata: Metadata = {
-  title: "Reference Recipe Preview Matrix",
-  description: "Development-only visual gate for the zine engine reference Recipes.",
+  title: "Recipe Preview Matrix",
+  description: "Development-only visual gate for Reference and formal draft zine Recipes.",
 };
 
 export default function ReferenceRecipePreviewMatrixPage() {

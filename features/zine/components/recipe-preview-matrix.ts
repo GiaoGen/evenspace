@@ -220,6 +220,7 @@ function createPageFixture(
       mode,
       pageNumber: pageSide === "left" ? 1 : 2,
       title: label,
+      locale: "en",
     },
   } satisfies RecipePreviewPageFixture;
 }

@@ -1,6 +1,5 @@
 import {
   deriveSpreadEvidence,
-  recipeDefinitions,
   validateRecipeDefinition,
   type RecipeDefinition,
   type RecipeNoteMode,
@@ -9,6 +8,18 @@ import {
   type RecipeScope,
   type RecipeStatus,
 } from "./recipe-contract";
+import { runtimeRecipeDefinitions } from "./recipe-definition-registry";
+import { QUIET_RECIPE_IDS, quietRecipeDefinitions } from "./quiet-recipe-definitions";
+import {
+  EDITORIAL_PREVIEW_SCENARIO_IDS,
+  EDITORIAL_RECIPE_IDS,
+  editorialRecipeDefinitions,
+} from "./editorial-recipe-definitions";
+import {
+  GRID_CONTACT_PREVIEW_SCENARIO_IDS,
+  GRID_CONTACT_RECIPE_IDS,
+  gridContactRecipeDefinitions,
+} from "./grid-contact-recipe-definitions";
 import { referenceRecipeDefinitions } from "./reference-recipe-definitions";
 
 export const RECIPE_CATALOG_SCHEMA_VERSION = 1 as const;
@@ -33,6 +44,8 @@ export const RECIPE_CATALOG_PREVIEW_SCENARIO_IDS = [
   "cross-gutter",
   "dark-background",
   "color-system",
+  ...EDITORIAL_PREVIEW_SCENARIO_IDS,
+  ...GRID_CONTACT_PREVIEW_SCENARIO_IDS,
 ] as const;
 
 export type RecipeCatalogPreviewScenarioId = (typeof RECIPE_CATALOG_PREVIEW_SCENARIO_IDS)[number];
@@ -140,7 +153,7 @@ const statuses = new Set<RecipeStatus>(["draft", "active", "deprecated"]);
 type CatalogDeclaration = Omit<RecipeCatalogEntry, "catalogSchemaVersion" | "recipe">;
 
 const allCatalogDefinitions: readonly RecipeDefinition[] = [
-  ...recipeDefinitions,
+  ...runtimeRecipeDefinitions,
   ...referenceRecipeDefinitions,
 ];
 
@@ -175,7 +188,7 @@ function createCatalogEntry(
  * they do not introduce new Recipe layouts. Reference entries stay draft.
  */
 export const recipeCatalogEntries: readonly RecipeCatalogEntry[] = [
-  createCatalogEntry(recipeDefinitions.find((recipe) => recipe.id === "recipe-editorial-v1")!, {
+  createCatalogEntry(runtimeRecipeDefinitions.find((recipe) => recipe.id === "recipe-editorial-v1")!, {
     familyId: "editorial",
     status: "active",
     authoring: {
@@ -190,7 +203,7 @@ export const recipeCatalogEntries: readonly RecipeCatalogEntry[] = [
     },
     previewScenarioIds: commonScenarios,
   }),
-  createCatalogEntry(recipeDefinitions.find((recipe) => recipe.id === "recipe-contact-v1")!, {
+  createCatalogEntry(runtimeRecipeDefinitions.find((recipe) => recipe.id === "recipe-contact-v1")!, {
     familyId: "grid-contact",
     status: "active",
     authoring: {
@@ -205,7 +218,7 @@ export const recipeCatalogEntries: readonly RecipeCatalogEntry[] = [
     },
     previewScenarioIds: commonScenarios,
   }),
-  createCatalogEntry(recipeDefinitions.find((recipe) => recipe.id === "recipe-margin-v1")!, {
+  createCatalogEntry(runtimeRecipeDefinitions.find((recipe) => recipe.id === "recipe-margin-v1")!, {
     familyId: "quiet",
     status: "active",
     authoring: {
@@ -220,7 +233,7 @@ export const recipeCatalogEntries: readonly RecipeCatalogEntry[] = [
     },
     previewScenarioIds: commonScenarios,
   }),
-  createCatalogEntry(recipeDefinitions.find((recipe) => recipe.id === "recipe-split-v1")!, {
+  createCatalogEntry(runtimeRecipeDefinitions.find((recipe) => recipe.id === "recipe-split-v1")!, {
     familyId: "dynamic",
     status: "active",
     authoring: {
@@ -235,7 +248,7 @@ export const recipeCatalogEntries: readonly RecipeCatalogEntry[] = [
     },
     previewScenarioIds: commonScenarios,
   }),
-  createCatalogEntry(recipeDefinitions.find((recipe) => recipe.id === "recipe-night-v1")!, {
+  createCatalogEntry(runtimeRecipeDefinitions.find((recipe) => recipe.id === "recipe-night-v1")!, {
     familyId: "chromatic",
     status: "active",
     authoring: {
@@ -250,7 +263,7 @@ export const recipeCatalogEntries: readonly RecipeCatalogEntry[] = [
     },
     previewScenarioIds: commonScenarios,
   }),
-  createCatalogEntry(recipeDefinitions.find((recipe) => recipe.id === "recipe-reference-cross-gutter-v1")!, {
+  createCatalogEntry(runtimeRecipeDefinitions.find((recipe) => recipe.id === "recipe-reference-cross-gutter-v1")!, {
     familyId: "dynamic",
     status: "active",
     authoring: {
@@ -264,6 +277,267 @@ export const recipeCatalogEntries: readonly RecipeCatalogEntry[] = [
       gutterRisk: "high",
     },
     previewScenarioIds: ["minimum", "maximum", "over-capacity", "landscape", "portrait", "standard-spread", "cross-gutter"],
+  }),
+  createCatalogEntry(quietRecipeDefinitions.find((recipe) => recipe.id === QUIET_RECIPE_IDS.heldField)!, {
+    familyId: "quiet",
+    status: "draft",
+    authoring: {
+      ratios: { preferred: ["portrait", "square"], risky: ["ultra-wide"] },
+      slotTopology: "single",
+      compositionAxis: "center",
+      readingDirection: "top-down",
+      colorStrategy: "paper",
+      pace: "slow",
+      subjectEdgeRisk: "medium",
+      gutterRisk: "low",
+    },
+    previewScenarioIds: commonScenarios,
+  }),
+  createCatalogEntry(quietRecipeDefinitions.find((recipe) => recipe.id === QUIET_RECIPE_IDS.scaleEcho)!, {
+    familyId: "quiet",
+    status: "draft",
+    authoring: {
+      ratios: { preferred: ["square", "portrait", "landscape"], risky: ["ultra-wide"] },
+      slotTopology: "diptych",
+      compositionAxis: "diagonal",
+      readingDirection: "top-down",
+      colorStrategy: "paper",
+      pace: "slow",
+      subjectEdgeRisk: "high",
+      gutterRisk: "low",
+    },
+    previewScenarioIds: commonScenarios,
+  }),
+  createCatalogEntry(quietRecipeDefinitions.find((recipe) => recipe.id === QUIET_RECIPE_IDS.horizonBridge)!, {
+    familyId: "quiet",
+    status: "draft",
+    authoring: {
+      ratios: { preferred: ["landscape"], risky: ["portrait", "ultra-wide"] },
+      slotTopology: "cross-gutter",
+      compositionAxis: "horizontal",
+      readingDirection: "ltr",
+      colorStrategy: "paper",
+      pace: "slow",
+      subjectEdgeRisk: "high",
+      gutterRisk: "high",
+    },
+    previewScenarioIds: ["empty", "minimum", "maximum", "over-capacity", "landscape", "portrait", "square", "ultra-wide", "no-note", "left-page", "right-page", "standard-spread", "cross-gutter"],
+  }),
+  createCatalogEntry(editorialRecipeDefinitions.find((recipe) => recipe.id === EDITORIAL_RECIPE_IDS.evidenceAside)!, {
+    familyId: "editorial",
+    status: "draft",
+    authoring: {
+      ratios: { preferred: ["landscape", "portrait", "square"], risky: ["ultra-wide"] },
+      slotTopology: "diptych",
+      compositionAxis: "horizontal",
+      readingDirection: "ltr",
+      colorStrategy: "paper",
+      pace: "medium",
+      subjectEdgeRisk: "high",
+      gutterRisk: "low",
+    },
+    previewScenarioIds: EDITORIAL_PREVIEW_SCENARIO_IDS.filter((scenarioId) => [
+      "empty",
+      "one-photo",
+      "exact-two",
+      "over-capacity-three",
+      "no-note",
+      "short-note",
+      "normal-latin-note",
+      "numeric-note",
+      "cjk-note",
+      "long-word-note",
+      "max-60-four-lines",
+      "over-60",
+      "over-four-lines",
+      "main-landscape-evidence-portrait",
+      "portrait-main-square-evidence",
+      "landscape-evidence-severe-crop",
+      "square-pair",
+      "ultra-wide-risk",
+      "left-page",
+      "right-page",
+      "two-independent-focus",
+      "main-photo-note-no-evidence",
+    ].includes(scenarioId)) as readonly RecipeCatalogPreviewScenarioId[],
+  }),
+  createCatalogEntry(editorialRecipeDefinitions.find((recipe) => recipe.id === EDITORIAL_RECIPE_IDS.acrossTheRecord)!, {
+    familyId: "editorial",
+    status: "draft",
+    authoring: {
+      ratios: { preferred: ["portrait", "square"], risky: ["landscape", "ultra-wide"] },
+      slotTopology: "cross-page-pair",
+      compositionAxis: "horizontal",
+      readingDirection: "ltr",
+      colorStrategy: "paper",
+      pace: "medium",
+      subjectEdgeRisk: "high",
+      gutterRisk: "medium",
+    },
+    previewScenarioIds: EDITORIAL_PREVIEW_SCENARIO_IDS.filter((scenarioId) => [
+      "empty",
+      "empty-note",
+      "one-character-note",
+      "short-note",
+      "across-cjk-note",
+      "max-120-four-lines",
+      "over-120",
+      "over-four-lines",
+      "over-capacity-two",
+      "portrait",
+      "square",
+      "landscape-risk",
+      "ultra-wide-risk",
+      "complete-spread",
+      "left-plan",
+      "right-plan",
+      "focus-continuity",
+      "required-relation",
+      "no-color-field",
+    ].includes(scenarioId)) as readonly RecipeCatalogPreviewScenarioId[],
+  }),
+  createCatalogEntry(editorialRecipeDefinitions.find((recipe) => recipe.id === EDITORIAL_RECIPE_IDS.leadStory)!, {
+    familyId: "editorial",
+    status: "draft",
+    authoring: {
+      ratios: { preferred: ["landscape", "square"], risky: ["ultra-wide"] },
+      slotTopology: "single",
+      compositionAxis: "vertical",
+      readingDirection: "top-down",
+      colorStrategy: "paper",
+      pace: "medium",
+      subjectEdgeRisk: "high",
+      gutterRisk: "low",
+    },
+    previewScenarioIds: EDITORIAL_PREVIEW_SCENARIO_IDS.filter((scenarioId) => [
+      "empty",
+      "photo-title-missing",
+      "required-short-title",
+      "required-title-without-deck",
+      "short-title-deck",
+      "cjk-title-deck",
+      "long-latin-deck",
+      "max-60-three-lines",
+      "title-over-60",
+      "title-over-three-lines",
+      "max-76-deck-two-lines",
+      "deck-over-76",
+      "deck-over-two-lines",
+      "owner-mismatch",
+      "left-page-owned",
+      "right-page-owned",
+      "landscape",
+      "portrait",
+      "square",
+      "ultra-wide",
+      "off-center-focus",
+      "photo-note-hidden",
+      "deck-absence-fixed-geometry",
+      "environment-title-ignored",
+      "text-by-slot-ignored",
+    ].includes(scenarioId)) as readonly RecipeCatalogPreviewScenarioId[],
+  }),
+  createCatalogEntry(gridContactRecipeDefinitions.find((recipe) => recipe.id === GRID_CONTACT_RECIPE_IDS.twinRegister)!, {
+    familyId: "grid-contact",
+    status: "draft",
+    authoring: {
+      ratios: { preferred: ["landscape"], risky: ["portrait", "ultra-wide"] },
+      slotTopology: "stack",
+      compositionAxis: "vertical",
+      readingDirection: "top-down",
+      colorStrategy: "paper",
+      pace: "medium",
+      subjectEdgeRisk: "high",
+      gutterRisk: "low",
+    },
+    previewScenarioIds: GRID_CONTACT_PREVIEW_SCENARIO_IDS.filter((scenarioId) => [
+      "empty",
+      "one-photo",
+      "exact-two",
+      "over-capacity-three",
+      "landscape-pair",
+      "square-pair",
+      "portrait-pair",
+      "mixed-ratios",
+      "ultra-wide-risk",
+      "left-page",
+      "right-page",
+      "independent-focus",
+      "photo-note-hidden",
+      "literal-source",
+    ].includes(scenarioId)) as readonly RecipeCatalogPreviewScenarioId[],
+  }),
+  createCatalogEntry(gridContactRecipeDefinitions.find((recipe) => recipe.id === GRID_CONTACT_RECIPE_IDS.twelveUpLedger)!, {
+    familyId: "grid-contact",
+    status: "draft",
+    authoring: {
+      ratios: { preferred: ["square", "landscape"], risky: ["portrait", "ultra-wide"] },
+      slotTopology: "grid",
+      compositionAxis: "horizontal",
+      readingDirection: "ltr",
+      colorStrategy: "paper",
+      pace: "fast",
+      subjectEdgeRisk: "high",
+      gutterRisk: "low",
+    },
+    previewScenarioIds: GRID_CONTACT_PREVIEW_SCENARIO_IDS.filter((scenarioId) => [
+      "empty",
+      "one-photo",
+      "eleven-photos",
+      "exact-twelve",
+      "over-capacity-thirteen",
+      "twelve-square",
+      "twelve-landscape",
+      "twelve-portrait",
+      "twelve-mixed-ratios",
+      "twelve-independent-focus",
+      "edge-subject-pressure",
+      "three-by-four-topology",
+      "six-plus-six-group-gap",
+      "folio-page-number",
+      "left-page",
+      "right-page",
+    ].includes(scenarioId)) as readonly RecipeCatalogPreviewScenarioId[],
+  }),
+  createCatalogEntry(gridContactRecipeDefinitions.find((recipe) => recipe.id === GRID_CONTACT_RECIPE_IDS.crossRegister)!, {
+    familyId: "grid-contact",
+    status: "draft",
+    authoring: {
+      ratios: { preferred: ["square", "portrait"], risky: ["landscape", "ultra-wide"] },
+      slotTopology: "cross-page-pair",
+      compositionAxis: "horizontal",
+      readingDirection: "ltr",
+      colorStrategy: "paper",
+      pace: "medium",
+      subjectEdgeRisk: "high",
+      gutterRisk: "high",
+    },
+    previewScenarioIds: GRID_CONTACT_PREVIEW_SCENARIO_IDS.filter((scenarioId) => [
+      "empty",
+      "one-note-photo",
+      "two-note-photos",
+      "three-note-photos",
+      "four-photos-no-notes",
+      "missing-one-required-note",
+      "exact-four-valid-notes",
+      "fifth-photo",
+      "short-notes",
+      "exact-18-latin",
+      "exact-18-numeric",
+      "exact-18-cjk",
+      "over-18-characters",
+      "within-18-over-one-line",
+      "long-word",
+      "four-independent-focus",
+      "complete-spread",
+      "left-plan",
+      "right-plan",
+      "focus-continuity",
+      "four-cross-page-evidence",
+      "stable-photo-note-binding",
+      "stable-ordering",
+      "page-number-folios",
+    ].includes(scenarioId)) as readonly RecipeCatalogPreviewScenarioId[],
   }),
   createCatalogEntry(referenceRecipeDefinitions.find((recipe) => recipe.id === "reference-single-photo-no-note-v1")!, {
     familyId: "quiet",

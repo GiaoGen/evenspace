@@ -203,7 +203,7 @@ describe("Recipe Catalog v1.1", () => {
         hiddenNotePhotoIds: [],
       },
       photos: [],
-      environment: { pageId: "page-1", pageSide: "left", mode: "reader", pageNumber: 1, title: "Test" },
+      environment: { pageId: "page-1", pageSide: "left", mode: "reader", pageNumber: 1, title: "Test", locale: "en" },
     });
     const changedEntry = {
       ...entry,
@@ -224,7 +224,7 @@ describe("Recipe Catalog v1.1", () => {
         hiddenNotePhotoIds: [],
       },
       photos: [],
-      environment: { pageId: "page-1", pageSide: "left", mode: "reader", pageNumber: 1, title: "Test" },
+      environment: { pageId: "page-1", pageSide: "left", mode: "reader", pageNumber: 1, title: "Test", locale: "en" },
     })).toEqual(planBefore);
   });
 

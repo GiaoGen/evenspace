@@ -132,6 +132,9 @@
 .styleStep,
 .overviewStep { width: min(100%, 1180px); margin: 0 auto; }
 .nameStep { width: min(100%, 720px); }
+.nameStep { --zine-document-sans: "Geist", "Noto Sans TC"; }
+.nameStep[data-zine-locale="zh-Hans"] { --zine-document-sans: "Noto Sans SC"; }
+.nameStep[data-zine-locale="zh-Hant"] { --zine-document-sans: "Noto Sans TC"; }
 
 .stepIntro { margin-bottom: 22px; }
 .stepIntro > span {
@@ -201,17 +204,50 @@
 .nameCardMeta span { font-weight: 760; letter-spacing: .08em; text-transform: uppercase; }
 .nameCardMeta b { font-weight: 620; }
 
+.localePicker {
+  display: flex;
+  gap: 5px;
+  margin: 12px 0 0;
+  padding: 0;
+  border: 0;
+}
+
+.localePicker legend {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+
+.localePicker button {
+  padding: 5px 8px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 7px;
+  cursor: pointer;
+}
+
+.localePicker button[data-selected="true"] {
+  border-color: var(--ink);
+  background: var(--ink);
+  color: var(--surface);
+}
+
 .nameCard textarea {
   width: 100%;
   min-height: 175px;
-  margin: 31px 0 4px;
+  margin: 20px 0 4px;
   padding: 0;
   overflow: hidden;
   border: 0;
   outline: 0;
   background: transparent;
   color: inherit;
-  font: 760 clamp(40px, 12vw, 64px)/.9 var(--font-geist-sans), Arial, sans-serif;
+  font: 760 clamp(40px, 12vw, 64px)/.9 var(--zine-document-sans);
+  font-synthesis: none;
   letter-spacing: -.065em;
   resize: none;
 }
@@ -236,6 +272,7 @@
 .spinePreview span,
 .spinePreview small { font-size: 6px; font-weight: 720; letter-spacing: .08em; text-transform: uppercase; }
 .spinePreview strong { overflow: hidden; font-size: 9px; font-weight: 720; text-align: center; text-overflow: ellipsis; white-space: nowrap; }
+.spinePreview strong { font-family: var(--zine-document-sans); font-synthesis: none; }
 
 .photoWorkspace {
   overflow: hidden;

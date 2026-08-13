@@ -122,7 +122,9 @@ export function ZineCreator() {
       {state.step === "name" ? (
         <NameStep
           name={state.draft.name}
+          locale={state.draft.locale}
           showError={nameAttempted && !hasName}
+          onLocaleChange={(locale) => dispatch({ type: "SET_LOCALE", locale })}
           onChange={(value) => {
             dispatch({ type: "SET_NAME", value });
             if (value.trim()) setNameAttempted(false);
@@ -138,6 +140,7 @@ export function ZineCreator() {
       ) : state.step === "style" ? (
         <StyleStep
           photos={state.draft.photos}
+          locale={state.draft.locale}
           selectedStyleId={state.draft.styleId}
           onSelect={(styleId) => dispatch({ type: "SET_STYLE", styleId })}
         />

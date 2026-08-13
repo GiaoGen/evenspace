@@ -1,15 +1,17 @@
 import { zineStyleOptions } from "../../model/zine-styles";
-import type { ZinePhoto, ZineStyleId } from "../../model/zine-draft";
+import type { ZineLocale, ZinePhoto, ZineStyleId } from "../../model/zine-draft";
 import { getRecipeForStyle } from "../../model/recipe-contract";
 import { StylePagePreview } from "../style-page-preview";
 import styles from "../zine-creator.module.css";
 
 export function StyleStep({
   photos,
+  locale,
   selectedStyleId,
   onSelect,
 }: {
   readonly photos: readonly ZinePhoto[];
+  readonly locale: ZineLocale;
   readonly selectedStyleId: ZineStyleId | null;
   readonly onSelect: (styleId: ZineStyleId) => void;
 }) {
@@ -39,7 +41,7 @@ export function StyleStep({
                 aria-pressed={selected}
                 onClick={() => onSelect(style.id)}
               >
-                <StylePagePreview recipe={recipe} photos={photos} />
+                <StylePagePreview recipe={recipe} photos={photos} locale={locale} />
                 <span className={styles.styleOptionMeta}>
                   <span><strong>{style.name}</strong><small>{style.pageNote}</small></span>
                   <i aria-hidden="true">{selected ? "✓" : ""}</i>

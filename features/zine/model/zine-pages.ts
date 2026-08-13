@@ -1,4 +1,4 @@
-import type { ZineDraft, ZinePhoto, ZineStyleId } from "./zine-draft";
+import type { ZineDraft, ZineLocale, ZinePhoto, ZineStyleId } from "./zine-draft";
 import {
   createInitialManualSpreads,
   pacePhotosForZine,
@@ -10,6 +10,7 @@ import {
   createNotesByPhotoId,
   createRecipeApplication,
   getRecipeForStyle,
+  type AuthoredTextItem,
   type RecipeApplication,
 } from "./recipe-contract";
 import {
@@ -19,18 +20,21 @@ import {
 
 export type ZineReaderPage =
   | {
+      readonly locale: ZineLocale;
       readonly id: "cover";
       readonly kind: "cover";
       readonly density: "hard";
       readonly title: string;
     }
   | {
+      readonly locale: ZineLocale;
       readonly id: "back";
       readonly kind: "back";
       readonly density: "hard";
       readonly title: string;
     }
   | {
+      readonly locale: ZineLocale;
       readonly id: string;
       readonly kind: "content";
       readonly density: "soft";
@@ -40,8 +44,10 @@ export type ZineReaderPage =
       readonly pageNumber: number;
       readonly side: "left" | "right";
       readonly recipeApplication: RecipeApplication | null;
+      readonly authoredTextItems?: readonly AuthoredTextItem[];
     }
   | {
+      readonly locale: ZineLocale;
       readonly id: string;
       readonly kind: "blank";
       readonly density: "soft";
@@ -50,6 +56,7 @@ export type ZineReaderPage =
       readonly side: "left" | "right";
     }
   | {
+      readonly locale: ZineLocale;
       readonly id: string;
       readonly kind: "add";
       readonly density: "soft";
@@ -59,6 +66,7 @@ export type ZineReaderPage =
       readonly spreadId: string;
     }
   | {
+      readonly locale: ZineLocale;
       readonly id: "colophon";
       readonly kind: "colophon";
       readonly density: "soft";
@@ -90,6 +98,7 @@ export function createZineReaderPages(draft: ZineDraft): readonly ZineReaderPage
   const contentPages = chunk(orderedPhotos, photosPerPage[draft.styleId]).map(
     (photos, index): ZineReaderPage => ({
       id: `content-${index + 1}`,
+      locale: draft.locale,
       kind: "content",
       density: "soft",
       title: draft.name,
@@ -98,17 +107,19 @@ export function createZineReaderPages(draft: ZineDraft): readonly ZineReaderPage
       pageNumber: index + 1,
       side: (index + 1) % 2 === 1 ? "left" : "right",
       recipeApplication: createReaderRecipeApplication(draft, photos, `content-${index + 1}`),
+      authoredTextItems: draft.authoredTextItems ?? [],
     }),
   );
 
   const pages: ZineReaderPage[] = [
-    { id: "cover", kind: "cover", density: "hard", title: draft.name },
+    { id: "cover", kind: "cover", density: "hard", title: draft.name, locale: draft.locale },
     ...contentPages,
   ];
 
   if (contentPages.length % 2 === 1) {
     pages.push({
       id: "colophon",
+      locale: draft.locale,
       kind: "colophon",
       density: "soft",
       title: draft.name,
@@ -117,7 +128,7 @@ export function createZineReaderPages(draft: ZineDraft): readonly ZineReaderPage
     });
   }
 
-  pages.push({ id: "back", kind: "back", density: "hard", title: draft.name });
+  pages.push({ id: "back", kind: "back", density: "hard", title: draft.name, locale: draft.locale });
   return pages;
 }
 
@@ -138,7 +149,7 @@ function createPagesFromManualSpreads(
 ) {
   const photoById = new Map(draft.photos.map((photo) => [photo.id, photo]));
   const pages: ZineReaderPage[] = [
-    { id: "cover", kind: "cover", density: "hard", title: draft.name },
+    { id: "cover", kind: "cover", density: "hard", title: draft.name, locale: draft.locale },
   ];
   const visibleSpreads = includeAddPages
     ? spreads
@@ -150,7 +161,7 @@ function createPagesFromManualSpreads(
       createManualSidePage(draft, spread, "right", pages.length + 1, photoById, includeAddPages),
     );
   }
-  pages.push({ id: "back", kind: "back", density: "hard", title: draft.name });
+  pages.push({ id: "back", kind: "back", density: "hard", title: draft.name, locale: draft.locale });
   return pages;
 }
 
@@ -167,6 +178,7 @@ function createManualSidePage(
   if (includeAddPages) {
     return {
       id: `add-${spread.id}-${side}`,
+      locale: draft.locale,
       kind: "add",
       density: "soft",
       title: draft.name,
@@ -177,6 +189,7 @@ function createManualSidePage(
   }
   return {
     id: `blank-${spread.id}-${side}`,
+    locale: draft.locale,
     kind: "blank",
     density: "soft",
     title: draft.name,
@@ -210,6 +223,7 @@ function manualPageToReaderPage(
     : page.photoIds;
   return {
     id: page.id,
+    locale: draft.locale,
     kind: "content",
     density: "soft",
     title: draft.name,
@@ -221,6 +235,7 @@ function manualPageToReaderPage(
     pageNumber,
     side,
     recipeApplication,
+    authoredTextItems: draft.authoredTextItems ?? [],
   };
 }
 
@@ -239,6 +254,7 @@ function createReaderRecipeApplication(
       contentItemIds: createContentItemIds(pageId, photos.length),
       notesByPhotoId: createNotesByPhotoId(draft.photos),
       defaultFocusByPhotoId: createPhotoFocusDefaults(draft.photos),
+      authoredTextItems: draft.authoredTextItems ?? [],
     },
     anchorPageId: pageId,
   });

@@ -58,6 +58,53 @@
   font-display: swap;
 }
 
+@font-face {
+  font-family: "Noto Sans SC";
+  src: url("/fonts/noto-sans-sc.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: block;
+}
+
+@font-face {
+  font-family: "Noto Sans TC";
+  src: url("/fonts/noto-sans-tc.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: block;
+}
+
+@font-face {
+  font-family: "Noto Serif SC";
+  src: url("/fonts/noto-serif-sc.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 200 900;
+  font-display: block;
+}
+
+@font-face {
+  font-family: "Noto Serif TC";
+  src: url("/fonts/noto-serif-tc.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 200 900;
+  font-display: block;
+}
+
+@font-face { font-family: "IBM Plex Sans"; src: url("/fonts/plex-fallback/plex-sans-400.woff2") format("woff2"); font-style: normal; font-weight: 400; font-display: block; }
+@font-face { font-family: "IBM Plex Sans"; src: url("/fonts/plex-fallback/plex-sans-500.woff2") format("woff2"); font-style: normal; font-weight: 500; font-display: block; }
+@font-face { font-family: "IBM Plex Sans"; src: url("/fonts/plex-fallback/plex-sans-600.woff2") format("woff2"); font-style: normal; font-weight: 600; font-display: block; }
+@font-face { font-family: "IBM Plex Sans"; src: url("/fonts/plex-fallback/plex-sans-700.woff2") format("woff2"); font-style: normal; font-weight: 700; font-display: block; }
+@font-face { font-family: "IBM Plex Mono"; src: url("/fonts/plex-fallback/plex-mono-500.woff2") format("woff2"); font-style: normal; font-weight: 500; font-display: block; }
+@font-face { font-family: "IBM Plex Mono"; src: url("/fonts/plex-fallback/plex-mono-600.woff2") format("woff2"); font-style: normal; font-weight: 600; font-display: block; }
+@font-face { font-family: "IBM Plex Sans SC"; src: url("/fonts/plex-fallback/plex-sans-sc-400.woff2") format("woff2"); font-style: normal; font-weight: 400; font-display: block; }
+@font-face { font-family: "IBM Plex Sans SC"; src: url("/fonts/plex-fallback/plex-sans-sc-500.woff2") format("woff2"); font-style: normal; font-weight: 500; font-display: block; }
+@font-face { font-family: "IBM Plex Sans SC"; src: url("/fonts/plex-fallback/plex-sans-sc-600.woff2") format("woff2"); font-style: normal; font-weight: 600; font-display: block; }
+@font-face { font-family: "IBM Plex Sans SC"; src: url("/fonts/plex-fallback/plex-sans-sc-700.woff2") format("woff2"); font-style: normal; font-weight: 700; font-display: block; }
+@font-face { font-family: "IBM Plex Sans TC"; src: url("/fonts/plex-fallback/plex-sans-tc-400.woff2") format("woff2"); font-style: normal; font-weight: 400; font-display: block; }
+@font-face { font-family: "IBM Plex Sans TC"; src: url("/fonts/plex-fallback/plex-sans-tc-500.woff2") format("woff2"); font-style: normal; font-weight: 500; font-display: block; }
+@font-face { font-family: "IBM Plex Sans TC"; src: url("/fonts/plex-fallback/plex-sans-tc-600.woff2") format("woff2"); font-style: normal; font-weight: 600; font-display: block; }
+@font-face { font-family: "IBM Plex Sans TC"; src: url("/fonts/plex-fallback/plex-sans-tc-700.woff2") format("woff2"); font-style: normal; font-weight: 700; font-display: block; }
+
 @theme inline {
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);

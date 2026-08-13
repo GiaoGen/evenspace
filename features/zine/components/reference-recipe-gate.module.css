@@ -35,6 +35,16 @@
   letter-spacing: -.06em;
 }
 
+.secondaryHeader { margin-top: 48px; }
+
+.secondaryHeader h2 {
+  max-width: 900px;
+  margin: 0;
+  font-size: clamp(26px, 4vw, 48px);
+  line-height: 1;
+  letter-spacing: -.05em;
+}
+
 .header p {
   max-width: 780px;
   margin: 0;
@@ -218,7 +228,22 @@
 
 .slotList strong { color: var(--ink); }
 
+.typographyDiagnostics {
+  display: grid;
+  gap: 3px;
+  overflow-wrap: anywhere;
+  color: var(--muted);
+}
+
+.typographyDiagnostics strong { color: var(--ink); }
+
 .assignmentState { display: flex; flex-wrap: wrap; gap: 5px 10px; }
+
+.assignmentDiagnostics {
+  display: grid;
+  gap: 3px;
+  overflow-wrap: anywhere;
+}
 
 .errorList {
   display: grid;

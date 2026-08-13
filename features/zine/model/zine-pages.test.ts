@@ -31,6 +31,7 @@ describe("zine reader pagination", () => {
   it("keeps the cover and back as single hard pages around complete spreads", () => {
     const draft: ZineDraft = {
       name: "Night notes",
+      locale: "en",
       photos: [photo("one"), photo("two"), photo("three")],
       styleId: "editorial",
       manualSpreads: null,
@@ -46,6 +47,7 @@ describe("zine reader pagination", () => {
   it("groups photos according to the selected page layout", () => {
     const draft: ZineDraft = {
       name: "Contact",
+      locale: "en",
       photos: [photo("1"), photo("2"), photo("3"), photo("4"), photo("5")],
       styleId: "contact",
       manualSpreads: null,
@@ -59,6 +61,7 @@ describe("zine reader pagination", () => {
   it("shows add pages only in the manual editor", () => {
     const draft: ZineDraft = {
       name: "Manual",
+      locale: "en",
       photos: [photo("one"), photo("two")],
       styleId: "editorial",
       manualSpreads: [
@@ -91,6 +94,7 @@ describe("zine reader pagination", () => {
     });
     const draft: ZineDraft = {
       name: "Spread assets",
+      locale: "en",
       photos: [photo("bridge"), photo("extra")],
       styleId: "editorial",
       manualSpreads: [{

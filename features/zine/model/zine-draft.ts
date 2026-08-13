@@ -10,11 +10,16 @@ import {
   createNotesByPhotoId,
   createRecipeApplication,
   evaluateRecipeCompatibility,
-  getRecipeDefinitionByRef,
   getRecipeForStyle,
   getLegacyStyleId,
+  createAuthoredTextOwner,
+  selectAuthoredTextItemsForOwner,
+  validateAuthoredTextItems,
+  type AuthoredTextItem,
+  type RecipeApplication,
   type RecipeRef,
   } from "./recipe-contract";
+import { getRuntimeRecipeDefinitionByRef } from "./recipe-definition-registry";
 import { getActiveRecipeDefinition } from "./recipe-catalog";
 import {
   createContentItemId,
@@ -24,6 +29,12 @@ import {
 
 export const ZINE_NAME_LIMIT = 48;
 export const ZINE_CAPTION_LIMIT = 120;
+export const ZINE_LOCALES = ["en", "zh-Hans", "zh-Hant"] as const;
+export type ZineLocale = (typeof ZINE_LOCALES)[number];
+
+export function isZineLocale(value: unknown): value is ZineLocale {
+  return (ZINE_LOCALES as readonly unknown[]).includes(value);
+}
 
 export const zineProgressSteps = ["name", "photos", "style", "review", "reader"] as const;
 
@@ -47,9 +58,12 @@ export type ZinePhoto = {
 
 export type ZineDraft = {
   readonly name: string;
+  readonly locale: ZineLocale;
   readonly photos: readonly ZinePhoto[];
   readonly styleId: ZineStyleId | null;
   readonly manualSpreads: readonly ZineManualSpread[] | null;
+  /** Optional keeps old drafts readable while authored text rolls out. */
+  readonly authoredTextItems?: readonly AuthoredTextItem[];
 };
 
 export type ZineCreatorState = {
@@ -61,6 +75,7 @@ export const initialZineCreatorState: ZineCreatorState = {
   step: "name",
   draft: {
     name: "",
+    locale: "en",
     photos: [],
     styleId: null,
     manualSpreads: null,
@@ -69,9 +84,13 @@ export const initialZineCreatorState: ZineCreatorState = {
 
 export type ZineCreatorAction =
   | { readonly type: "SET_NAME"; readonly value: string }
+  | { readonly type: "SET_LOCALE"; readonly locale: ZineLocale }
   | { readonly type: "ADD_PHOTOS"; readonly photos: readonly ZinePhoto[] }
   | { readonly type: "REMOVE_PHOTO"; readonly photoId: string }
   | { readonly type: "SET_CAPTION"; readonly photoId: string; readonly value: string }
+  | { readonly type: "UPSERT_AUTHORED_TEXT"; readonly item: AuthoredTextItem }
+  | { readonly type: "UPDATE_AUTHORED_TEXT"; readonly textContentId: string; readonly text: string }
+  | { readonly type: "DELETE_AUTHORED_TEXT"; readonly textContentId: string }
   | {
       readonly type: "SET_PLACEMENT_FOCUS";
       readonly pageId: string;
@@ -113,10 +132,95 @@ export function zineCreatorReducer(
   action: ZineCreatorAction,
   resolveRecipe: (ref: RecipeRef) => ReturnType<typeof getActiveRecipeDefinition> = getActiveRecipeDefinition,
 ): ZineCreatorState {
+  if (action.type === "UPSERT_AUTHORED_TEXT") {
+    const authoredTextItems = state.draft.authoredTextItems ?? [];
+    if (validateAuthoredTextItems(authoredTextItems).length > 0) return state;
+    if (validateAuthoredTextItems([action.item]).length > 0) return state;
+    const existingIndex = authoredTextItems.findIndex((item) => item.id === action.item.id);
+    const nextItems = existingIndex < 0
+      ? [...authoredTextItems, action.item]
+      : authoredTextItems.map((item, index) => index === existingIndex ? action.item : item);
+    if (validateAuthoredTextItems(nextItems).length > 0) return state;
+    const manualSpreads = rebuildAuthoredTextApplications(
+      state.draft.manualSpreads,
+      state.draft.photos,
+      nextItems,
+      action.item.id,
+      resolveRecipe,
+    );
+    if (state.draft.manualSpreads !== null && manualSpreads === null) return state;
+    return {
+      ...state,
+      draft: {
+        ...state.draft,
+        authoredTextItems: nextItems,
+        manualSpreads,
+      },
+    };
+  }
+
+  if (action.type === "UPDATE_AUTHORED_TEXT") {
+    const authoredTextItems = state.draft.authoredTextItems ?? [];
+    if (typeof action.text !== "string") return state;
+    if (validateAuthoredTextItems(authoredTextItems).length > 0) return state;
+    if (!authoredTextItems.some((item) => item.id === action.textContentId)) return state;
+    const nextItems = authoredTextItems.map((item) => item.id === action.textContentId
+      ? { ...item, text: action.text }
+      : item);
+    if (validateAuthoredTextItems(nextItems).length > 0) return state;
+    const manualSpreads = rebuildAuthoredTextApplications(
+      state.draft.manualSpreads,
+      state.draft.photos,
+      nextItems,
+      action.textContentId,
+      resolveRecipe,
+    );
+    if (state.draft.manualSpreads !== null && manualSpreads === null) return state;
+    return {
+      ...state,
+      draft: {
+        ...state.draft,
+        authoredTextItems: nextItems,
+        manualSpreads,
+      },
+    };
+  }
+
+  if (action.type === "DELETE_AUTHORED_TEXT") {
+    const authoredTextItems = state.draft.authoredTextItems ?? [];
+    if (validateAuthoredTextItems(authoredTextItems).length > 0) return state;
+    if (!authoredTextItems.some((item) => item.id === action.textContentId)) return state;
+    const nextItems = authoredTextItems.filter((item) => item.id !== action.textContentId);
+    const manualSpreads = rebuildAuthoredTextApplications(
+      state.draft.manualSpreads,
+      state.draft.photos,
+      nextItems,
+      action.textContentId,
+      resolveRecipe,
+    );
+    if (state.draft.manualSpreads !== null && manualSpreads === null) return state;
+    return {
+      ...state,
+      draft: {
+        ...state.draft,
+        authoredTextItems: nextItems,
+        manualSpreads,
+      },
+    };
+  }
+
   if (action.type === "SET_NAME") {
     return {
       ...state,
       draft: { ...state.draft, name: action.value.slice(0, ZINE_NAME_LIMIT) },
+    };
+  }
+
+  if (action.type === "SET_LOCALE") {
+    if (!isZineLocale(action.locale)) return state;
+    return {
+      ...state,
+      draft: { ...state.draft, locale: action.locale },
     };
   }
 
@@ -131,15 +235,15 @@ export function zineCreatorReducer(
     const photos = state.draft.photos.filter((photo) => photo.id !== action.photoId);
     const manualSpreads = state.draft.manualSpreads?.map((spread) => ({
       ...spread,
-      left: removePhotoFromManualPage(spread.left, action.photoId, photos),
-      right: removePhotoFromManualPage(spread.right, action.photoId, photos),
+      left: removePhotoFromManualPage(spread.left, action.photoId, photos, state.draft.authoredTextItems ?? []),
+      right: removePhotoFromManualPage(spread.right, action.photoId, photos, state.draft.authoredTextItems ?? []),
     })) ?? null;
     return {
       ...state,
       draft: {
         ...state.draft,
         photos,
-        manualSpreads: refreshSpreadApplications(manualSpreads, photos),
+        manualSpreads: refreshSpreadApplications(manualSpreads, photos, state.draft.authoredTextItems ?? []),
       },
     };
   }
@@ -191,7 +295,11 @@ export function zineCreatorReducer(
           styleId: fallbackStyle,
           photoIds: [],
           contentItemIds: [],
-          recipeApplication: createEmptyRecipeApplication(fallbackStyle, `manual-page-${nextPageNumber}`),
+          recipeApplication: createEmptyRecipeApplication(
+            fallbackStyle,
+            `manual-page-${nextPageNumber}`,
+            state.draft.authoredTextItems ?? [],
+          ),
         },
       };
     });
@@ -205,14 +313,14 @@ export function zineCreatorReducer(
     if (!state.draft.manualSpreads) return state;
     const manualSpreads = state.draft.manualSpreads.map((spread) => ({
       ...spread,
-      left: placePhotoOnManualPage(spread.left, action, state.draft.photos),
-      right: placePhotoOnManualPage(spread.right, action, state.draft.photos),
+      left: placePhotoOnManualPage(spread.left, action, state.draft.photos, state.draft.authoredTextItems ?? []),
+      right: placePhotoOnManualPage(spread.right, action, state.draft.photos, state.draft.authoredTextItems ?? []),
     }));
     return {
       ...state,
       draft: {
         ...state.draft,
-        manualSpreads: refreshSpreadApplications(manualSpreads, state.draft.photos),
+        manualSpreads: refreshSpreadApplications(manualSpreads, state.draft.photos, state.draft.authoredTextItems ?? []),
       },
     };
   }
@@ -238,9 +346,17 @@ export function zineCreatorReducer(
       : targetPages.slice(0, 1);
     const photoIds = contentPages.flatMap((page) => page.photoIds);
     const contentItemIds = contentPages.flatMap((page) => page.contentItemIds);
+    const targetPageIds = targetPages.map((page) => page.id);
+    const targetOwner = createAuthoredTextOwner(recipe.scope, action.pageId, targetPageIds);
+    const authoredTextItems = selectAuthoredTextItemsForOwner(
+      state.draft.authoredTextItems ?? [],
+      targetOwner,
+    );
     const compatibility = evaluateRecipeCompatibility(recipe, {
       photoIds,
       notesByPhotoId: createNotesByPhotoId(state.draft.photos),
+      authoredTextItems,
+      owner: targetOwner,
     });
     if (!compatibility.valid) return state;
     const application = createRecipeApplication({
@@ -250,9 +366,11 @@ export function zineCreatorReducer(
         contentItemIds,
         notesByPhotoId: createNotesByPhotoId(state.draft.photos),
         defaultFocusByPhotoId: createPhotoFocusDefaults(state.draft.photos),
+        authoredTextItems,
+        owner: targetOwner,
       },
       anchorPageId: action.pageId,
-      targetPageIds: targetPages.map((page) => page.id),
+      targetPageIds,
       previousApplications: contentPages.flatMap((page) => page.recipeApplication ? [page.recipeApplication] : []),
     });
     return {
@@ -316,7 +434,10 @@ function isUndoableZineAction(action: ZineCreatorAction) {
   return action.type === "APPLY_RECIPE"
     || action.type === "PLACE_MANUAL_PHOTO"
     || action.type === "SET_PLACEMENT_FOCUS"
-    || action.type === "ADD_MANUAL_PAGE";
+    || action.type === "ADD_MANUAL_PAGE"
+    || action.type === "UPSERT_AUTHORED_TEXT"
+    || action.type === "UPDATE_AUTHORED_TEXT"
+    || action.type === "DELETE_AUTHORED_TEXT";
 }
 
 function countManualPages(spreads: readonly ZineManualSpread[]) {
@@ -330,12 +451,14 @@ function removePhotoFromManualPage(
   page: ZineManualPage | null,
   photoId: string,
   photos: readonly ZinePhoto[],
+  authoredTextItems: readonly AuthoredTextItem[],
 ) {
   if (!page) return null;
   return refreshPagePhotoEntries(
     page,
     getPagePhotoEntries(page).filter((entry) => entry.photoId !== photoId),
     photos,
+    authoredTextItems,
   );
 }
 
@@ -343,6 +466,7 @@ function placePhotoOnManualPage(
   page: ZineManualPage | null,
   action: Extract<ZineCreatorAction, { type: "PLACE_MANUAL_PHOTO" }>,
   photos: readonly ZinePhoto[],
+  authoredTextItems: readonly AuthoredTextItem[],
 ) {
   if (!page || page.id !== action.pageId) return page;
   const capacity = photosPerManualPage[page.styleId];
@@ -358,15 +482,16 @@ function placePhotoOnManualPage(
   if (replaceIndex >= 0) {
     const entries = [...withoutIncoming];
     entries.splice(replaceIndex, 1, replacementEntry);
-    return refreshPagePhotoEntries(page, entries, photos);
+    return refreshPagePhotoEntries(page, entries, photos, authoredTextItems);
   }
   if (withoutIncoming.length < capacity) {
-    return refreshPagePhotoEntries(page, [...withoutIncoming, replacementEntry], photos);
+    return refreshPagePhotoEntries(page, [...withoutIncoming, replacementEntry], photos, authoredTextItems);
   }
   return refreshPagePhotoEntries(
     page,
     [...withoutIncoming.slice(0, capacity - 1), replacementEntry],
     photos,
+    authoredTextItems,
   );
 }
 
@@ -381,12 +506,14 @@ function refreshPagePhotoEntries(
   page: ZineManualPage,
   entries: readonly { readonly photoId: string; readonly contentItemId: string }[],
   photos: readonly ZinePhoto[],
+  authoredTextItems: readonly AuthoredTextItem[],
 ) {
   return refreshPagePhotoIds(
     page,
     entries.map((entry) => entry.photoId),
     photos,
     entries.map((entry) => entry.contentItemId),
+    authoredTextItems,
   );
 }
 
@@ -395,6 +522,7 @@ function refreshPagePhotoIds(
   photoIds: readonly string[],
   photos: readonly ZinePhoto[],
   explicitContentItemIds?: readonly string[],
+  authoredTextItems: readonly AuthoredTextItem[] = [],
 ) {
   const contentItemIds = photoIds.map((_, index) => (
     explicitContentItemIds?.[index] ?? page.contentItemIds[index] ?? createContentItemId(page.id, index)
@@ -402,7 +530,7 @@ function refreshPagePhotoIds(
   if (!page.recipeApplication || page.recipeApplication.scope === "spread") {
     return { ...page, photoIds, contentItemIds };
   }
-  const recipe = getRecipeDefinitionByRef({
+  const recipe = getRuntimeRecipeDefinitionByRef({
     id: page.recipeApplication.recipeId,
     version: page.recipeApplication.recipeVersion,
   });
@@ -418,6 +546,8 @@ function refreshPagePhotoIds(
         contentItemIds,
         notesByPhotoId: createNotesByPhotoId(photos),
         defaultFocusByPhotoId: createPhotoFocusDefaults(photos),
+        authoredTextItems,
+        owner: createAuthoredTextOwner("page", page.id, [page.id]),
       },
       anchorPageId: page.recipeApplication.anchorPageId,
       targetPageIds: page.recipeApplication.targetPageIds,
@@ -429,6 +559,7 @@ function refreshPagePhotoIds(
 function refreshSpreadApplications(
   spreads: readonly ZineManualSpread[] | null,
   photos: readonly ZinePhoto[],
+  authoredTextItems: readonly AuthoredTextItem[] = [],
 ) {
   if (!spreads) return null;
   return spreads.map((spread) => {
@@ -438,7 +569,7 @@ function refreshSpreadApplications(
         ? spread.right.recipeApplication
         : null;
     if (!application) return spread;
-    const recipe = getRecipeDefinitionByRef({
+    const recipe = getRuntimeRecipeDefinitionByRef({
       id: application.recipeId,
       version: application.recipeVersion,
     });
@@ -456,6 +587,11 @@ function refreshSpreadApplications(
         contentItemIds: targetPages.flatMap((page) => page.contentItemIds),
         notesByPhotoId: createNotesByPhotoId(photos),
         defaultFocusByPhotoId: createPhotoFocusDefaults(photos),
+        authoredTextItems: selectAuthoredTextItemsForOwner(
+          authoredTextItems,
+          createAuthoredTextOwner("spread", application.anchorPageId, application.targetPageIds),
+        ),
+        owner: createAuthoredTextOwner("spread", application.anchorPageId, application.targetPageIds),
       },
       anchorPageId: application.anchorPageId,
       targetPageIds: application.targetPageIds,
@@ -473,11 +609,175 @@ function refreshSpreadApplications(
   });
 }
 
-function createEmptyRecipeApplication(styleId: ZineStyleId, pageId: string) {
+function createEmptyRecipeApplication(
+  styleId: ZineStyleId,
+  pageId: string,
+  authoredTextItems: readonly AuthoredTextItem[],
+) {
   const recipe = getRecipeForStyle(styleId);
   return recipe
-    ? createRecipeApplication({ recipe, content: { photoIds: [], notesByPhotoId: {} }, anchorPageId: pageId })
+    ? createRecipeApplication({
+        recipe,
+        content: {
+          photoIds: [],
+          notesByPhotoId: {},
+          authoredTextItems,
+          owner: createAuthoredTextOwner("page", pageId, [pageId]),
+        },
+        anchorPageId: pageId,
+      })
     : null;
+}
+
+function rebuildAuthoredTextApplications(
+  spreads: readonly ZineManualSpread[] | null,
+  photos: readonly ZinePhoto[],
+  authoredTextItems: readonly AuthoredTextItem[],
+  changedTextContentId: string,
+  resolveRecipe: (ref: RecipeRef) => ReturnType<typeof getActiveRecipeDefinition>,
+) {
+  if (!spreads) return null;
+  let rejected = false;
+  const nextSpreads = spreads.map((spread) => {
+    const spreadApplication = spread.left?.recipeApplication?.scope === "spread"
+      ? spread.left.recipeApplication
+      : spread.right?.recipeApplication?.scope === "spread"
+        ? spread.right.recipeApplication
+        : null;
+    if (spreadApplication) {
+      const nextApplication = rebuildAuthoredTextApplication({
+        spread,
+        application: spreadApplication,
+        photos,
+        authoredTextItems,
+        changedTextContentId,
+        resolveRecipe,
+      });
+      if (!nextApplication) {
+        rejected = true;
+        return spread;
+      }
+      return replaceSharedApplication(spread, spreadApplication, nextApplication);
+    }
+
+    let nextSpread = spread;
+    for (const side of ["left", "right"] as const) {
+      const page = nextSpread[side];
+      const application = page?.recipeApplication;
+      if (!page || !application || application.scope !== "page") continue;
+      const nextApplication = rebuildAuthoredTextApplication({
+        spread,
+        application,
+        photos,
+        authoredTextItems,
+        changedTextContentId,
+        resolveRecipe,
+      });
+      if (!nextApplication) {
+        rejected = true;
+        continue;
+      }
+      nextSpread = {
+        ...nextSpread,
+        [side]: { ...page, recipeApplication: nextApplication },
+      };
+    }
+    return nextSpread;
+  });
+  return rejected ? null : nextSpreads;
+}
+
+function rebuildAuthoredTextApplication({
+  spread,
+  application,
+  photos,
+  authoredTextItems,
+  changedTextContentId,
+  resolveRecipe,
+}: {
+  readonly spread: ZineManualSpread;
+  readonly application: RecipeApplication;
+  readonly photos: readonly ZinePhoto[];
+  readonly authoredTextItems: readonly AuthoredTextItem[];
+  readonly changedTextContentId: string;
+  readonly resolveRecipe: (ref: RecipeRef) => ReturnType<typeof getActiveRecipeDefinition>;
+}): RecipeApplication | null {
+  const recipe = resolveRecipe({ id: application.recipeId, version: application.recipeVersion });
+  if (!recipe) return application;
+  const targetPages = [spread.left, spread.right].filter((page): page is ZineManualPage => (
+    page !== null
+      && application.targetPageIds.includes(page.id)
+      && hasSameRecipeApplicationIdentity(page.recipeApplication, application)
+  ));
+  if (targetPages.length !== application.targetPageIds.length) return application;
+  const owner = createAuthoredTextOwner(recipe.scope, application.anchorPageId, application.targetPageIds);
+  const content = {
+    photoIds: targetPages.flatMap((page) => page.photoIds),
+    contentItemIds: targetPages.flatMap((page) => page.contentItemIds),
+    notesByPhotoId: createNotesByPhotoId(photos),
+    defaultFocusByPhotoId: createPhotoFocusDefaults(photos),
+    authoredTextItems,
+    owner,
+  };
+  const compatibility = evaluateRecipeCompatibility(recipe, content);
+  const nextApplication = createRecipeApplication({
+    recipe,
+    content,
+    anchorPageId: application.anchorPageId,
+    targetPageIds: application.targetPageIds,
+    previousApplications: [application],
+  });
+  const currentAssignment = application.textAssignments?.some((assignment) => (
+    assignment.textContentId === changedTextContentId
+  )) ?? false;
+  const nextAssignment = nextApplication.textAssignments?.some((assignment) => (
+    assignment.textContentId === changedTextContentId
+  )) ?? false;
+
+  if (compatibility.valid) return nextApplication;
+  if (currentAssignment) return null;
+  if (
+    compatibility.slotId
+    && (compatibility.code === "authored-text-missing" || compatibility.code === "authored-text-owner-mismatch")
+    && recipe.slots.some((slot) => slot.id === compatibility.slotId && slot.kind === "static-text" && slot.required)
+  ) {
+    return null;
+  }
+  if (!nextAssignment) return application;
+  if (
+    nextAssignment
+    && (compatibility.code === "authored-text-too-long" || compatibility.code === "authored-text-too-many-lines")
+    && compatibility.slotId
+    && recipe.slots.some((slot) => slot.id === compatibility.slotId && slot.kind === "static-text" && !slot.required)
+  ) {
+    return {
+      ...nextApplication,
+      textAssignments: nextApplication.textAssignments?.filter((assignment) => (
+        assignment.textContentId !== changedTextContentId
+      )),
+      unplacedTextContentIds: [...new Set([
+        ...(nextApplication.unplacedTextContentIds ?? []),
+        changedTextContentId,
+      ])],
+    };
+  }
+  return application;
+}
+
+function replaceSharedApplication(
+  spread: ZineManualSpread,
+  previous: RecipeApplication,
+  next: RecipeApplication,
+) {
+  return {
+    ...spread,
+    left: spread.left && hasSameRecipeApplicationIdentity(spread.left.recipeApplication, previous)
+      ? { ...spread.left, recipeApplication: next }
+      : spread.left,
+    right: spread.right && hasSameRecipeApplicationIdentity(spread.right.recipeApplication, previous)
+      ? { ...spread.right, recipeApplication: next }
+      : spread.right,
+  };
 }
 
 function updatePlacementOnSpread(

@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1400 700" role="img" aria-labelledby="title desc">
+  <title id="title">Chromatic family five candidate Color-on and Color-off concept board</title>
+  <desc id="desc">Candidates C-A through C-E compare functional color and exact grayscale topology. C-A, C-D and C-E are kept. Page miniatures use three by four and spread miniatures use three by two at one physical scale.</desc>
+  <defs>
+    <style>
+      .bg{fill:#eeeeeb}.paper{fill:#F4F0E8;stroke:#17191C;stroke-width:1}.paperOff{fill:#F4F0E8;stroke:#17191C;stroke-width:1}.a1{fill:#164B8C}.a2{fill:#A83D2B}.a3{fill:#D49A18}.g1{fill:#505050}.g2{fill:#666}.g3{fill:#A6A6A6}.ink{fill:#17191C}.inv{fill:#fff}.safe{fill:none;stroke:#8b8b8b;stroke-width:.45;stroke-dasharray:2 2}.gutter{stroke:#17191C;stroke-width:.65}.h1{font:700 22px Arial,sans-serif;fill:#17191C}.id{font:700 18px Arial,sans-serif;fill:#17191C}.meta{font:10px Arial,sans-serif;fill:#55585D;letter-spacing:.3px}.tiny{font:8px Arial,sans-serif;fill:#55585D}.idx{font:700 5px Arial,sans-serif;letter-spacing:.5px}.tag{font:700 9px Arial,sans-serif;letter-spacing:.8px}.keep{fill:#17191C}.drop{fill:#d2d2cf}.rule{stroke:#777;stroke-width:.7}.bind{fill:none;stroke:#55585D;stroke-width:.55;stroke-dasharray:2 2}.divider{stroke:#b8b8b4;stroke-width:1}
+    </style>
+    <symbol id="photo-land" viewBox="0 0 100 70" preserveAspectRatio="xMidYMid slice"><rect width="100" height="70" fill="#c7c7c5"/><path d="M0 52L23 35L48 49L72 20L100 43V70H0Z" fill="#707070"/><circle cx="72" cy="18" r="7" fill="#eee"/><rect x="15" y="41" width="14" height="29" fill="#383838"/></symbol>
+    <symbol id="photo-portrait" viewBox="0 0 70 100" preserveAspectRatio="xMidYMid slice"><rect width="70" height="100" fill="#bababa"/><path d="M0 75L22 52L39 65L70 36V100H0Z" fill="#666"/><circle cx="43" cy="30" r="10" fill="#eee"/><rect x="34" y="42" width="18" height="42" fill="#333"/><path d="M13 12V90" stroke="#ddd" stroke-width="6"/></symbol>
+    <symbol id="photo-busy" viewBox="0 0 100 70" preserveAspectRatio="xMidYMid slice"><rect width="100" height="70" fill="#D49A18"/><path d="M0 50L20 24L43 54L62 16L82 48L100 27V70H0Z" fill="#164B8C"/><circle cx="31" cy="29" r="13" fill="#A83D2B"/><rect x="68" y="17" width="20" height="40" fill="#F4F0E8"/><path d="M4 15H36M52 61H96" stroke="#17191C" stroke-width="5"/></symbol>
+    <symbol id="photo-face" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid slice"><rect width="100" height="100" fill="#d0d0ce"/><circle cx="63" cy="38" r="19" fill="#eee"/><rect x="48" y="56" width="31" height="44" fill="#4b4b4b"/><path d="M0 78L34 55L47 76V100H0Z" fill="#777"/></symbol>
+  </defs>
+  <rect class="bg" width="1400" height="700"/>
+  <text class="h1" x="45" y="36">CHROMATIC — FIVE FUNCTIONAL COLOR CANDIDATES</text>
+  <text class="meta" x="45" y="58">COLOR-ON + EXACT COLOR-OFF · PAGE 90×120 · SPREAD 180×120 · SAME PHYSICAL SCALE · REVIEW LABELS / SAFE LINES ARE NOT RENDERER ASSETS</text>
+
+  <!-- C-A -->
+  <g transform="translate(45 112)">
+    <text class="id" x="0" y="-14">C-A</text><rect class="keep" x="154" y="-28" width="46" height="18"/><text class="tag inv" x="162" y="-15">KEEP</text>
+    <text class="tiny" x="0" y="2">COLOR-ON</text><text class="tiny" x="105" y="2">COLOR-OFF</text>
+    <g transform="translate(0 10)"><rect class="paper" width="90" height="120"/><rect class="a1" x="4.5" y="7.2" width="81" height="21.6"/><use href="#photo-land" x="4.5" y="36" width="81" height="74.4"/></g>
+    <g transform="translate(105 10)"><rect class="paperOff" width="90" height="120"/><rect class="g1" x="4.5" y="7.2" width="81" height="21.6"/><use href="#photo-land" x="4.5" y="36" width="81" height="74.4"/></g>
+    <text class="meta" x="0" y="154">SINGLE-ACCENT · 1 ACCENT · PAGE</text><text class="tiny" x="0" y="173">1 PHOTO · NOTE NONE · ENTRY FIELD</text><text class="tiny" x="0" y="190">PATH FIELD → PAPER GAP → PHOTO</text>
+  </g>
+
+  <!-- C-B -->
+  <g transform="translate(275 112)">
+    <text class="id" x="0" y="-14">C-B</text><rect class="drop" x="154" y="-28" width="46" height="18"/><text class="tag ink" x="163" y="-15">DROP</text>
+    <text class="tiny" x="0" y="2">COLOR-ON</text><text class="tiny" x="105" y="2">COLOR-OFF</text>
+    <g transform="translate(0 10)"><rect class="paper" width="90" height="120"/><rect class="a1" x="4.5" y="7.2" width="81" height="28.8"/><text class="idx inv" x="9" y="17">AUTHORED TITLE</text><line x1="9" y1="23" x2="62" y2="23" stroke="#fff"/><line x1="9" y1="29" x2="49" y2="29" stroke="#fff"/><use href="#photo-face" x="4.5" y="43.2" width="81" height="55.2"/><rect class="a3" x="4.5" y="103.2" width="81" height="9.6"/></g>
+    <g transform="translate(105 10)"><rect class="paperOff" width="90" height="120"/><rect class="g1" x="4.5" y="7.2" width="81" height="28.8"/><text class="idx inv" x="9" y="17">AUTHORED TITLE</text><line x1="9" y1="23" x2="62" y2="23" stroke="#fff"/><line x1="9" y1="29" x2="49" y2="29" stroke="#fff"/><use href="#photo-face" x="4.5" y="43.2" width="81" height="55.2"/><rect class="g3" x="4.5" y="103.2" width="81" height="9.6"/></g>
+    <text class="meta" x="0" y="154">ZONED · 2 ACCENTS · PAGE</text><text class="tiny" x="0" y="173">1 PHOTO · TITLE + DECK · UI PENDING</text><text class="tiny" x="0" y="190">RISK: EDITORIAL / POSTER FIRST</text>
+  </g>
+
+  <!-- C-C -->
+  <g transform="translate(505 112)">
+    <text class="id" x="0" y="-14">C-C</text><rect class="drop" x="154" y="-28" width="46" height="18"/><text class="tag ink" x="163" y="-15">DROP</text>
+    <text class="tiny" x="0" y="2">COLOR-ON</text><text class="tiny" x="105" y="2">COLOR-OFF</text>
+    <g transform="translate(0 10)"><rect class="paper" width="90" height="120"/><use href="#photo-land" x="4.5" y="14.4" width="52.2" height="72"/><rect class="a2" x="4.5" y="91.2" width="52.2" height="14.4"/><rect class="a1" x="60.3" y="14.4" width="25.2" height="91.2"/><text class="idx inv" x="64" y="25">NOTE</text><line x1="64" y1="35" x2="81" y2="35" stroke="#fff"/><line x1="64" y1="41" x2="79" y2="41" stroke="#fff"/><line x1="64" y1="47" x2="82" y2="47" stroke="#fff"/></g>
+    <g transform="translate(105 10)"><rect class="paperOff" width="90" height="120"/><use href="#photo-land" x="4.5" y="14.4" width="52.2" height="72"/><rect class="g2" x="4.5" y="91.2" width="52.2" height="14.4"/><rect class="g1" x="60.3" y="14.4" width="25.2" height="91.2"/><text class="idx inv" x="64" y="25">NOTE</text><line x1="64" y1="35" x2="81" y2="35" stroke="#fff"/><line x1="64" y1="41" x2="79" y2="41" stroke="#fff"/><line x1="64" y1="47" x2="82" y2="47" stroke="#fff"/></g>
+    <text class="meta" x="0" y="154">ZONED · 2 ACCENTS · PAGE</text><text class="tiny" x="0" y="173">1 PHOTO · NOTE REQUIRED / ALIGNED</text><text class="tiny" x="0" y="190">RISK: EDITORIAL EVIDENCE SIDEBAR</text>
+  </g>
+
+  <!-- C-D -->
+  <g transform="translate(735 112)">
+    <text class="id" x="0" y="-14">C-D</text><rect class="keep" x="154" y="-28" width="46" height="18"/><text class="tag inv" x="162" y="-15">KEEP</text>
+    <text class="tiny" x="0" y="2">COLOR-ON</text><text class="tiny" x="105" y="2">COLOR-OFF</text>
+    <g transform="translate(0 10)"><rect class="paper" width="90" height="120"/><use href="#photo-portrait" x="4.5" y="26.4" width="18.9" height="33.6"/><use href="#photo-face" x="25.2" y="26.4" width="18.9" height="33.6"/><use href="#photo-land" x="45.9" y="26.4" width="18.9" height="33.6"/><use href="#photo-busy" x="66.6" y="26.4" width="18.9" height="33.6"/><rect class="a1" x="4.5" y="67.2" width="18.9" height="19.2"/><rect class="a2" x="25.2" y="67.2" width="18.9" height="19.2"/><rect class="a3" x="45.9" y="67.2" width="18.9" height="19.2"/><rect class="a1" x="66.6" y="67.2" width="18.9" height="19.2"/><text class="idx inv" x="7.2" y="78">01</text><text class="idx inv" x="27.9" y="78">02</text><text class="idx ink" x="48.6" y="78">03</text><text class="idx inv" x="69.3" y="78">04</text></g>
+    <g transform="translate(105 10)"><rect class="paperOff" width="90" height="120"/><use href="#photo-portrait" x="4.5" y="26.4" width="18.9" height="33.6"/><use href="#photo-face" x="25.2" y="26.4" width="18.9" height="33.6"/><use href="#photo-land" x="45.9" y="26.4" width="18.9" height="33.6"/><use href="#photo-busy" x="66.6" y="26.4" width="18.9" height="33.6"/><rect class="g1" x="4.5" y="67.2" width="18.9" height="19.2"/><rect class="g2" x="25.2" y="67.2" width="18.9" height="19.2"/><rect class="g3" x="45.9" y="67.2" width="18.9" height="19.2"/><rect class="g1" x="66.6" y="67.2" width="18.9" height="19.2"/><text class="idx inv" x="7.2" y="78">01</text><text class="idx inv" x="27.9" y="78">02</text><text class="idx ink" x="48.6" y="78">03</text><text class="idx inv" x="69.3" y="78">04</text></g>
+    <text class="meta" x="0" y="154">RHYTHMIC · 3 ACCENTS · PAGE</text><text class="tiny" x="0" y="173">4 PHOTOS · PHYSICAL 9:16 · 5.88% EACH</text><text class="tiny" x="0" y="190">A1-A2-A3-A1 · SECOND CUE 01–04</text>
+  </g>
+
+  <!-- C-E -->
+  <g transform="translate(965 112)">
+    <text class="id" x="0" y="-14">C-E</text><rect class="keep" x="334" y="-28" width="46" height="18"/><text class="tag inv" x="342" y="-15">KEEP</text>
+    <text class="tiny" x="0" y="2">COLOR-ON</text><text class="tiny" x="190" y="2">COLOR-OFF</text>
+    <g transform="translate(0 10)"><rect class="paper" width="180" height="120"/><line class="gutter" x1="90" y1="0" x2="90" y2="120"/><use href="#photo-land" x="5.4" y="12" width="73.8" height="81.6"/><rect class="a3" x="5.4" y="98.4" width="73.8" height="14.4"/><text class="idx ink" x="9" y="107">IMAGE 01</text><rect class="a1" x="97.2" y="12" width="75.6" height="86.4"/><text class="idx inv" x="104" y="27">FIELD NOTE</text><line x1="104" y1="40" x2="160" y2="40" stroke="#fff"/><line x1="104" y1="48" x2="154" y2="48" stroke="#fff"/><line x1="104" y1="56" x2="164" y2="56" stroke="#fff"/><path class="bind" d="M79 58C87 58 90 58 97 58"/></g>
+    <g transform="translate(190 10)"><rect class="paperOff" width="180" height="120"/><line class="gutter" x1="90" y1="0" x2="90" y2="120"/><use href="#photo-land" x="5.4" y="12" width="73.8" height="81.6"/><rect class="g3" x="5.4" y="98.4" width="73.8" height="14.4"/><text class="idx ink" x="9" y="107">IMAGE 01</text><rect class="g1" x="97.2" y="12" width="75.6" height="86.4"/><text class="idx inv" x="104" y="27">FIELD NOTE</text><line x1="104" y1="40" x2="160" y2="40" stroke="#fff"/><line x1="104" y1="48" x2="154" y2="48" stroke="#fff"/><line x1="104" y1="56" x2="164" y2="56" stroke="#fff"/><path class="bind" d="M79 58C87 58 90 58 97 58"/></g>
+    <text class="meta" x="0" y="154">ZONED · 2 ACCENTS · SPREAD · 1 PHOTO</text><text class="tiny" x="0" y="173">NOTE REQUIRED · EVIDENCE PHOTO–NOTE CROSS-PAGE-PAIR</text><text class="tiny" x="0" y="190">COLOR FIELD IS NOT EVIDENCE · SECOND CUE: SIDE + LABEL + RELATION</text>
+  </g>
+
+  <line class="divider" x1="45" y1="390" x2="1355" y2="390"/>
+  <text class="h1" x="45" y="430">DECISION</text>
+  <text class="meta" x="45" y="460">KEEP C-A — SINGLE-ACCENT / NO TEXT · KEEP C-D — RHYTHMIC / THREE ACCENTS / FOUR PHOTOS · KEEP C-E — ZONED / REQUIRED NOTE / LEGAL SPREAD</text>
+  <text class="meta" x="45" y="488">DROP C-B — AUTHORED TITLE + PHOTO REMAINS TOO CLOSE TO EDITORIAL LEAD STORY; VISIBLE AUTHORED UI IS PENDING</text>
+  <text class="meta" x="45" y="516">DROP C-C — LEGAL PAGE NOTE ZONE, BUT EDITORIAL ASIDE COLLISION AND LOWER STRUCTURAL GAIN THAN C-E</text>
+  <text class="meta" x="45" y="558">COLOR-OFF USES LUMINANCE-ORDERED FIELDS, NOT DELETED COLOR FIELDS. TOPOLOGY COLLISION TEST: SINGLE THRESHOLD ≠ FOUR INDEXED BEATS ≠ CROSS-PAGE PHOTO/NOTE.</text>
+  <text class="tiny" x="45" y="610">Palette: paper #F4F0E8 · A1 #164B8C · A2 #A83D2B · A3 #D49A18 · inverse #FFFFFF. All placeholders are original vector constructions and cover their frames.</text>
+  <text class="tiny" x="45" y="632">Review labels, safe lines, binding lines, contrast annotations and Color-off simulations are documentation only—not Renderer assets.</text>
+</svg>

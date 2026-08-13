@@ -1,19 +1,23 @@
-import { ZINE_NAME_LIMIT } from "../../model/zine-draft";
+import { ZINE_LOCALES, ZINE_NAME_LIMIT, type ZineLocale } from "../../model/zine-draft";
 import styles from "../zine-creator.module.css";
 
 export function NameStep({
   name,
+  locale,
   showError,
   onChange,
+  onLocaleChange,
 }: {
   readonly name: string;
+  readonly locale: ZineLocale;
   readonly showError: boolean;
   readonly onChange: (value: string) => void;
+  readonly onLocaleChange: (locale: ZineLocale) => void;
 }) {
   const trimmedName = name.trim();
 
   return (
-    <section className={styles.nameStep} aria-labelledby="zine-name-heading">
+    <section className={styles.nameStep} data-zine-locale={locale} lang={locale} aria-labelledby="zine-name-heading">
       <header className={styles.stepIntro}>
         <span>01 / Name your zine</span>
         <h1 id="zine-name-heading">Give this moment a name.</h1>
@@ -28,6 +32,20 @@ export function NameStep({
             <span>Zine title</span>
             <b>{name.length} / {ZINE_NAME_LIMIT}</b>
           </div>
+          <fieldset className={styles.localePicker}>
+            <legend>Document language and glyph region</legend>
+            {ZINE_LOCALES.map((value) => (
+              <button
+                type="button"
+                aria-pressed={locale === value}
+                data-selected={locale === value}
+                key={value}
+                onClick={() => onLocaleChange(value)}
+              >
+                {value === "en" ? "English" : value === "zh-Hans" ? "简体中文" : "繁體中文"}
+              </button>
+            ))}
+          </fieldset>
           <textarea
             autoFocus
             rows={3}

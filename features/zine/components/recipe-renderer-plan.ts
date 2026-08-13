@@ -3,6 +3,9 @@ import {
   adaptRecipeSlot,
   adaptRecipeTheme,
   adaptRecipeTypography,
+  estimateRecipeTextLayout,
+  resolveRecipeTypographyFontRole,
+  resolveRecipeTypographyPreset,
   resolveRecipeTextSurface,
   type RecipeApplication,
   type RecipeDefinition,
@@ -15,9 +18,19 @@ import {
   type RecipeTextAlign,
   type RecipeTypographyRole,
   type RecipeTypographyToken,
+  type RecipeTypographyFontRole,
+  type RecipeTypographyPresetId,
+  type RecipeTextLayout,
+  type AuthoredTextItem,
 } from "../model/recipe-contract";
 import { normalizePlacement } from "../model/recipe-placement";
-import type { ZinePhoto } from "../model/zine-draft";
+import type { ZineLocale, ZinePhoto } from "../model/zine-draft";
+import {
+  createZineTypographyIssue,
+  ZINE_TYPOGRAPHY_SYSTEM_ID,
+  type ZineTypographySystemId,
+  type ZineTypographyIssue,
+} from "../model/zine-typography";
 
 export type RecipeRenderPageSide = "left" | "right";
 export type RecipeRenderMode = "editor" | "reader" | "preview";
@@ -33,7 +46,9 @@ export type RecipeRenderEnvironment = {
   readonly mode: RecipeRenderMode;
   readonly pageNumber: number;
   readonly title: string;
+  readonly locale: ZineLocale;
   readonly textBySlotId?: Readonly<Record<string, string>>;
+  readonly authoredTextItems?: readonly AuthoredTextItem[];
 };
 
 export type RecipeRenderPlanSlot = {
@@ -55,11 +70,18 @@ export type RecipeRenderPlanSlot = {
   readonly imageWidthPercent?: number;
   readonly notes?: readonly RecipeRenderNote[];
   readonly text?: string;
+  readonly textContentId?: string;
+  readonly contentKey?: string;
   readonly fillToken?: RecipeColorToken;
   readonly foregroundToken?: RecipeColorToken;
   readonly surfaceToken?: RecipeColorToken;
   readonly typographyRole?: RecipeTypographyRole;
   readonly typographyToken?: RecipeTypographyToken;
+  readonly typographyLayout?: RecipeTextLayout;
+  readonly typographyPresetId?: RecipeTypographyPresetId;
+  readonly typographyFontRole?: RecipeTypographyFontRole;
+  readonly locale?: ZineLocale;
+  readonly maxLines?: number;
   readonly textAlign?: "start" | "center" | "end";
 };
 
@@ -70,6 +92,7 @@ export type RecipeRenderNote = {
   readonly text: string;
   readonly relation: RecipeNoteRelation["kind"] | null;
   readonly index: number;
+  readonly typographyLayout?: RecipeTextLayout;
 };
 
 export type RecipeRenderPlan = {
@@ -77,6 +100,7 @@ export type RecipeRenderPlan = {
   readonly scope: RecipeDefinition["scope"];
   readonly valid: boolean;
   readonly issues: ReturnType<typeof validateRecipeDefinition>["issues"];
+  readonly typographyIssues: readonly ZineTypographyIssue[];
   readonly slots: readonly RecipeRenderPlanSlot[];
 };
 
@@ -85,14 +109,18 @@ export function createRecipeRenderPlan({
   application,
   photos,
   environment,
+  typographySystem = ZINE_TYPOGRAPHY_SYSTEM_ID,
 }: {
   readonly recipe: RecipeDefinition;
   readonly application: RecipeApplication;
   readonly photos: readonly ZinePhoto[];
   readonly environment: RecipeRenderEnvironment;
+  readonly typographySystem?: ZineTypographySystemId;
 }): RecipeRenderPlan {
   const validation = validateRecipeDefinition(recipe);
   const typography = adaptRecipeTypography(recipe.theme);
+  const typographyPresetId = resolveRecipeTypographyPreset(recipe.theme);
+  const typographyIssues: ZineTypographyIssue[] = [];
   const photoById = new Map(photos.map((photo) => [photo.id, photo]));
   const assignmentByPhotoSlotId = new Map(
     application.assignments.map((assignment) => [assignment.photoSlotId, assignment]),
@@ -168,7 +196,22 @@ export function createRecipeRenderPlan({
     if (adaptedSlot.kind === "note") {
       const notes = assignmentsByNoteSlotId.get(adaptedSlot.id) ?? [];
       if (notes.length === 0) continue;
+      const notesWithLayout = notes.map((note) => ({
+        ...note,
+        typographyLayout: estimateRecipeTextLayout(recipe, adaptedSlot, note.text, environment.locale),
+      }));
       const surface = resolveRecipeTextSurface(recipe, adaptedSlot);
+      const typographyRole = adaptedSlot.role!;
+      const typographyFontRole = resolveRecipeTypographyFontRole(recipe.theme, typographyRole);
+      addTypographyIssue(
+        typographyIssues,
+        notes.map((note) => note.text).join("\n"),
+        environment.locale,
+        typographyPresetId,
+        typographyFontRole,
+        typography[typographyRole].weight,
+        typographySystem,
+      );
       slots.push({
         id: adaptedSlot.id,
         pageId: environment.pageId,
@@ -177,19 +220,47 @@ export function createRecipeRenderPlan({
         zIndex: adaptedSlot.zIndex,
         showPhotoPlaceholder: false,
         crossSpread: localRect.crossSpread,
-        notes,
+        notes: notesWithLayout,
         foregroundToken: adaptedSlot.foregroundToken,
         surfaceToken: surface.surfaceToken,
-        typographyRole: adaptedSlot.role,
-        typographyToken: typography[adaptedSlot.role!],
+        typographyRole,
+        typographyToken: typography[typographyRole],
+        typographyLayout: estimateRecipeTextLayout(recipe, adaptedSlot, notes.map((note) => note.text).join("\n"), environment.locale),
+        typographyPresetId,
+        typographyFontRole,
+        locale: environment.locale,
+        maxLines: adaptedSlot.maxLines,
         textAlign: resolveRecipeTextAlign(adaptedSlot.align, environment.pageSide),
       });
       continue;
     }
 
-    const text = resolveStaticText(adaptedSlot, environment);
+    const authoredAssignment = adaptedSlot.textSource === "authored"
+      ? application.textAssignments?.find((assignment) => (
+          assignment.staticTextSlotId === adaptedSlot.id
+          && assignment.contentKey === adaptedSlot.contentKey
+        ))
+      : undefined;
+    const authoredItem = authoredAssignment
+      ? environment.authoredTextItems?.find((item) => (
+          item.id === authoredAssignment.textContentId
+          && item.contentKey === adaptedSlot.contentKey
+        ))
+      : undefined;
+    const text = resolveStaticText(adaptedSlot, environment, authoredItem?.text);
     if (!text) continue;
     const surface = resolveRecipeTextSurface(recipe, adaptedSlot);
+    const typographyRole = adaptedSlot.role!;
+    const typographyFontRole = resolveRecipeTypographyFontRole(recipe.theme, typographyRole);
+    addTypographyIssue(
+      typographyIssues,
+      text,
+      environment.locale,
+      typographyPresetId,
+      typographyFontRole,
+      typography[typographyRole].weight,
+      typographySystem,
+    );
     slots.push({
       id: adaptedSlot.id,
       pageId: environment.pageId,
@@ -199,10 +270,17 @@ export function createRecipeRenderPlan({
       showPhotoPlaceholder: false,
       crossSpread: localRect.crossSpread,
       text,
+      textContentId: authoredAssignment?.textContentId,
+      contentKey: adaptedSlot.contentKey,
       foregroundToken: adaptedSlot.foregroundToken,
       surfaceToken: surface.surfaceToken,
-      typographyRole: adaptedSlot.role,
-      typographyToken: typography[adaptedSlot.role!],
+      typographyRole,
+      typographyToken: typography[typographyRole],
+      typographyLayout: estimateRecipeTextLayout(recipe, adaptedSlot, text, environment.locale),
+      typographyPresetId,
+      typographyFontRole,
+      locale: environment.locale,
+      maxLines: adaptedSlot.maxLines,
       textAlign: resolveRecipeTextAlign(adaptedSlot.align, environment.pageSide),
     });
   }
@@ -210,10 +288,28 @@ export function createRecipeRenderPlan({
   return {
     recipeId: recipe.id,
     scope: recipe.scope,
-    valid: validation.valid,
+    valid: validation.valid && typographyIssues.length === 0,
     issues: validation.issues,
+    typographyIssues,
     slots: slots.toSorted((left, right) => left.zIndex - right.zIndex),
   };
+}
+
+function addTypographyIssue(
+  issues: ZineTypographyIssue[],
+  text: string,
+  locale: ZineLocale,
+  presetId: RecipeTypographyPresetId,
+  fontRole: RecipeTypographyFontRole,
+  weight: RecipeTypographyToken["weight"],
+  system: ZineTypographySystemId,
+) {
+  const issue = createZineTypographyIssue({ text, locale, presetId, fontRole, weight, system });
+  if (!issue) return;
+  const key = `${issue.system}:${issue.locale}:${issue.presetId}:${issue.fontRole}:${issue.codePoints.join(",")}`;
+  if (!issues.some((candidate) => (
+    `${candidate.system}:${candidate.locale}:${candidate.presetId}:${candidate.fontRole}:${candidate.codePoints.join(",")}` === key
+  ))) issues.push(issue);
 }
 
 export function resolveRecipeTextAlign(
@@ -229,7 +325,9 @@ export function resolveRecipeTextAlign(
 function resolveStaticText(
   slot: Extract<RecipeSlot, { kind: "static-text" }>,
   environment: RecipeRenderEnvironment,
+  authoredText?: string,
 ) {
+  if (slot.textSource === "authored") return authoredText?.trim() ?? "";
   const override = environment.textBySlotId?.[slot.id];
   if (override !== undefined) return override.trim();
   if (slot.textSource === "title") return environment.title.trim();

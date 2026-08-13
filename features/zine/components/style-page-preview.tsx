@@ -1,5 +1,5 @@
 import type { RecipeDefinition } from "../model/recipe-contract";
-import type { ZinePhoto } from "../model/zine-draft";
+import type { ZineLocale, ZinePhoto } from "../model/zine-draft";
 import {
   createNotesByPhotoId,
   createRecipeApplication,
@@ -14,10 +14,12 @@ import styles from "./zine-creator.module.css";
 export function StylePagePreview({
   recipe,
   photos,
+  locale,
   compact = false,
 }: {
   readonly recipe: RecipeDefinition;
   readonly photos: readonly ZinePhoto[];
+  readonly locale: ZineLocale;
   readonly compact?: boolean;
 }) {
   const application = createRecipeApplication({
@@ -43,6 +45,7 @@ export function StylePagePreview({
           mode: "preview",
           pageNumber: 1,
           title: recipe.name,
+          locale,
         }}
       />
     </div>

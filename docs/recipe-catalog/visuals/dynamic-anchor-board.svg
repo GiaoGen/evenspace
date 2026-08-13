@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1660 1780" role="img" aria-labelledby="title desc">
+  <title id="title">Dynamic family selected anchor stress board</title>
+  <desc id="desc">Edge Thrust, Drop Sequence and Gutter Sweep shown in six states each: ideal content, landscape pressure, portrait or square pressure, no Note, longest legal Note, and page-side or spread focus.</desc>
+  <defs>
+    <style>
+      .bg{fill:#f1f1ef}.paper{fill:#fff;stroke:#202020;stroke-width:1.15}.safe{fill:none;stroke:#aaa;stroke-width:.55;stroke-dasharray:2 2}.gutter{stroke:#111;stroke-width:.8}.risk{fill:#111;opacity:.09}.h1{font:700 24px Arial,sans-serif;fill:#111}.h2{font:700 18px Arial,sans-serif;fill:#111}.state{font:700 10px Arial,sans-serif;fill:#222;letter-spacing:.5px}.meta{font:10px Arial,sans-serif;fill:#555}.tiny{font:8px Arial,sans-serif;fill:#555}.num{font:700 7px Arial,sans-serif;fill:#111}.divider{stroke:#bbb;stroke-width:1}.reject{fill:#ddd;stroke:#555;stroke-width:.8}.rejectText{font:700 8px Arial,sans-serif;fill:#333}.arrow{fill:none;stroke:#222;stroke-width:1;marker-end:url(#arrow)}.dark{fill:#222}.white{fill:#fff}
+    </style>
+    <marker id="arrow" viewBox="0 0 6 6" refX="5" refY="3" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0L6 3L0 6Z" fill="#222"/></marker>
+    <symbol id="landscape" viewBox="0 0 100 65" preserveAspectRatio="xMidYMid slice"><rect width="100" height="65" fill="#c5c5c3"/><path d="M0 50L26 30L47 43L73 19L100 39V65H0Z" fill="#747474"/><circle cx="29" cy="22" r="6" fill="#ededeb"/><path d="M28 29L40 39M35 36L50 31M38 39L27 54M39 39L53 50" fill="none" stroke="#333" stroke-width="5" stroke-linecap="round"/><path d="M58 14H94M64 22H100" stroke="#eee" stroke-width="3"/></symbol>
+    <symbol id="portrait" viewBox="0 0 65 100" preserveAspectRatio="xMidYMid slice"><rect width="65" height="100" fill="#bcbcbc"/><path d="M0 72L21 49L38 64L65 34V100H0Z" fill="#686868"/><circle cx="39" cy="28" r="9" fill="#eee"/><rect x="31" y="38" width="16" height="45" fill="#333"/><path d="M12 15V88" stroke="#ddd" stroke-width="5"/></symbol>
+    <symbol id="square" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid slice"><rect width="100" height="100" fill="#d0d0ce"/><rect y="68" width="100" height="32" fill="#737373"/><circle cx="66" cy="42" r="13" fill="#444"/><path d="M66 55L51 75M66 55L82 73M63 51L46 42M69 50L84 36" fill="none" stroke="#444" stroke-width="7" stroke-linecap="round"/><circle cx="17" cy="18" r="9" fill="#eee"/></symbol>
+    <symbol id="wide" viewBox="0 0 200 82" preserveAspectRatio="xMidYMid slice"><rect width="200" height="82" fill="#c8c8c6"/><path d="M0 61L35 39L69 54L115 22L160 49L200 31V82H0Z" fill="#747474"/><path d="M0 45Q41 30 82 41T165 33T200 38" fill="none" stroke="#e9e9e7" stroke-width="5"/><circle cx="45" cy="27" r="8" fill="#efefed"/><path d="M45 35L58 48M52 43L70 38M55 48L44 64M56 48L73 59" fill="none" stroke="#333" stroke-width="6" stroke-linecap="round"/><circle cx="159" cy="35" r="9" fill="#4d4d4d"/></symbol>
+    <g id="edge-base"><rect class="paper" width="105" height="140"/><rect class="safe" x="4" y="7" width="97" height="126"/><use href="#landscape" x="0" y="10" width="97" height="120"/></g>
+    <g id="drop-base"><rect class="paper" width="105" height="140"/><rect class="safe" x="5" y="7" width="95" height="126"/><use href="#landscape" x="5" y="8" width="42" height="35"/><use href="#square" x="58" y="8" width="42" height="35"/><use href="#wide" x="5" y="57" width="95" height="76"/><text class="num" x="7" y="16">01</text><text class="num" x="60" y="16">02</text></g>
+    <g id="sweep-base"><rect class="paper" width="210" height="140"/><rect class="safe" x="4" y="7" width="202" height="126"/><use href="#wide" x="0" y="11" width="210" height="118"/><rect class="risk" x="99" y="11" width="12" height="118"/><line class="gutter" x1="105" y1="0" x2="105" y2="140"/></g>
+  </defs>
+  <rect class="bg" width="1660" height="1780"/>
+  <text class="h1" x="60" y="42">DYNAMIC — SELECTED ANCHOR STRESS BOARD</text>
+  <text class="meta" x="60" y="66">18 STATES · PAGE 105×140 / SPREAD 210×140 AT ONE PHYSICAL SCALE · ALL PHOTOS COVER · ORIGINAL GRAYSCALE VECTOR CONTENT</text>
+
+  <g transform="translate(60 108)">
+    <text class="h2" x="0" y="0">01 · EDGE THRUST</text><text class="meta" x="190" y="0">ROLE 01 · dynamic-edge-thrust-v1 · PAGE · EXACTLY 1 · NOTE NONE · ONE ACTIVE OUTER BLEED</text>
+    <g transform="translate(0 38)"><text class="state" y="-10">IDEAL · LEFT→RIGHT ACTION</text><use href="#edge-base"/><path class="arrow" d="M8 69H99"/></g>
+    <g transform="translate(250 38)"><text class="state" y="-10">LANDSCAPE / ULTRA-WIDE</text><rect class="paper" width="105" height="140"/><use href="#wide" x="0" y="10" width="97" height="120"/><text class="tiny" x="0" y="156">safe if subject clears x .82–.92</text></g>
+    <g transform="translate(500 38)"><text class="state" y="-10">PORTRAIT / SQUARE PRESSURE</text><rect class="paper" width="105" height="140"/><use href="#portrait" x="0" y="10" width="97" height="120"/><text class="tiny" x="0" y="156">heavy cover crop · focus required</text></g>
+    <g transform="translate(750 38)"><text class="state" y="-10">NO NOTE · MIN = 1</text><use href="#edge-base"/><text class="tiny" x="0" y="156">same geometry · no reflow</text></g>
+    <g transform="translate(1000 38)"><text class="state" y="-10">LONG NOTE N/A · #02 REJECT</text><use href="#edge-base"/><rect class="reject" x="114" y="50" width="43" height="32"/><text class="rejectText" x="125" y="69">#02</text><path d="M116 52L155 80M155 52L116 80" stroke="#444"/></g>
+    <g transform="translate(1280 38)"><text class="state" y="-10">PAGE-SIDE / FOCUS</text><use href="#edge-base"/><rect x="66" y="24" width="16" height="25" fill="none" stroke="#111" stroke-dasharray="2 2"/><text class="tiny" x="0" y="156">active edge must match physical outer edge</text></g>
+    <text class="meta" x="0" y="222">ADVANTAGE  A single rectangle produces an unmistakable directional page without text, color, rotation or overlap.</text>
+    <text class="meta" x="0" y="243">RISK  Portrait crop and right-edge subjects can break the endpoint; hidden-arrow read must remain Dynamic rather than Quiet.</text>
+  </g>
+  <line class="divider" x1="60" y1="420" x2="1600" y2="420"/>
+
+  <g transform="translate(60 475)">
+    <text class="h2" x="0" y="0">02 · DROP SEQUENCE</text><text class="meta" x="210" y="0">ROLE 06 · dynamic-drop-sequence-v1 · PAGE · EXACTLY 3 · NOTE NONE · 10% + 10% + 48.6%</text>
+    <g transform="translate(0 38)"><text class="state" y="-10">IDEAL · TWO PHASES → IMPACT</text><use href="#drop-base"/><path class="arrow" d="M17 49H88V56C88 63 80 67 67 69"/></g>
+    <g transform="translate(250 38)"><text class="state" y="-10">LANDSCAPE ACTION SET</text><rect class="paper" width="105" height="140"/><use href="#wide" x="5" y="8" width="42" height="35"/><use href="#landscape" x="58" y="8" width="42" height="35"/><use href="#wide" x="5" y="57" width="95" height="76"/></g>
+    <g transform="translate(500 38)"><text class="state" y="-10">PORTRAIT / SQUARE MIX</text><rect class="paper" width="105" height="140"/><use href="#portrait" x="5" y="8" width="42" height="35"/><use href="#square" x="58" y="8" width="42" height="35"/><use href="#portrait" x="5" y="57" width="95" height="76"/><text class="tiny" x="0" y="156">top slices: severe side crop</text></g>
+    <g transform="translate(750 38)"><text class="state" y="-10">NO NOTE · MIN = 3</text><use href="#drop-base"/><text class="tiny" x="0" y="156">2 photos → needs-content; no blanks</text></g>
+    <g transform="translate(1000 38)"><text class="state" y="-10">LONG NOTE N/A · #04 REJECT</text><use href="#drop-base"/><rect class="reject" x="114" y="50" width="43" height="32"/><text class="rejectText" x="125" y="69">#04</text><path d="M116 52L155 80M155 52L116 80" stroke="#444"/></g>
+    <g transform="translate(1280 38)"><text class="state" y="-10">PAGE FOCUS · FIXED PATH</text><use href="#drop-base"/><path class="arrow" d="M17 49H88V56C88 63 80 67 67 69"/><text class="tiny" x="0" y="156">phase IDs persist; no auto reorder</text></g>
+    <text class="meta" x="0" y="222">ADVANTAGE  The 1:4.86 scale jump and right-then-down path express action stages while every slot stays rectangular and framed.</text>
+    <text class="meta" x="0" y="243">RISK  Both 10% slices need real Reader legibility; unrelated images turn the structure into a generic collage or Editorial evidence row.</text>
+  </g>
+  <line class="divider" x1="60" y1="787" x2="1600" y2="787"/>
+
+  <g transform="translate(60 842)">
+    <text class="h2" x="0" y="0">03 · GUTTER SWEEP</text><text class="meta" x="205" y="0">ROLE 10 · dynamic-gutter-sweep-v1 · SPREAD · EXACTLY 1 · NOTE NONE · CROSS-GUTTER-PHOTO</text>
+    <g transform="translate(0 38)"><text class="state" y="-10">IDEAL · FULL SPREAD SWEEP</text><use href="#sweep-base"/><path class="arrow" d="M9 69H201"/></g>
+    <g transform="translate(250 38)"><text class="state" y="-10">LANDSCAPE / ULTRA-WIDE</text><use href="#sweep-base"/><text class="tiny" x="0" y="156">preferred: distributed subjects</text></g>
+    <g transform="translate(500 38)"><text class="state" y="-10">PORTRAIT / SQUARE PRESSURE</text><rect class="paper" width="210" height="140"/><use href="#portrait" x="0" y="11" width="210" height="118"/><rect class="risk" x="99" y="11" width="12" height="118"/><line class="gutter" x1="105" y1="0" x2="105" y2="140"/><text class="tiny" x="0" y="156">visual Gate likely rejects portrait</text></g>
+    <g transform="translate(750 38)"><text class="state" y="-10">NO NOTE · MIN = 1</text><use href="#sweep-base"/><text class="tiny" x="0" y="156">same atomic spread; no reflow</text></g>
+    <g transform="translate(1000 38)"><text class="state" y="-10">LONG NOTE N/A · #02 REJECT</text><use href="#sweep-base"/><rect class="reject" x="218" y="52" width="42" height="30"/><text class="rejectText" x="229" y="70">#02</text><path d="M220 54L258 80M258 54L220 80" stroke="#444"/></g>
+    <g transform="translate(1280 38)"><text class="state" y="-10">LEFT / RIGHT PAGE FOCUS</text><rect class="paper" width="105" height="140"/><use href="#wide" x="0" y="11" width="105" height="118"/><text class="tiny" x="0" y="155">LEFT: entry + environment</text><rect class="paper" x="120" width="105" height="140"/><use href="#wide" x="120" y="11" width="105" height="118"/><text class="tiny" x="120" y="155">RIGHT: release + subject</text></g>
+    <text class="meta" x="0" y="222">ADVANTAGE  One 84% photograph, two active outer bleeds and a real gutter crossing make the strongest family-specific horizontal action.</text>
+    <text class="meta" x="0" y="243">RISK  Faces, signage and action joints must clear the center risk band; each focused page must remain understandable.</text>
+  </g>
+
+  <line class="divider" x1="60" y1="1155" x2="1600" y2="1155"/>
+  <text class="h2" x="60" y="1200">PAIRWISE DIFFERENCE / CROSS-FAMILY BOUNDARY</text>
+  <text class="meta" x="60" y="1230">EDGE ↔ DROP = 8 · EDGE ↔ SWEEP = 8 · DROP ↔ SWEEP = 11 · threshold ≥ 4 passed.</text>
+  <text class="meta" x="60" y="1253">QUIET boundary — active bleed, high density and action endpoints replace pause / contemplation; Gutter Sweep is 84% + two outer bleeds, unlike framed Horizon Bridge.</text>
+  <text class="meta" x="60" y="1276">EDITORIAL boundary — no title, deck or Note duty; Drop’s small photos are required action phases, not evidence thumbnails.</text>
+  <text class="meta" x="60" y="1299">GRID boundary — no equal scan modules; 10% / 10% / 48.6% scale collision deliberately breaks contact-sheet equality.</text>
+  <text class="meta" x="60" y="1322">CHROMATIC boundary — every direction works in grayscale; future color may mark a path but cannot create one.</text>
+
+  <text class="h2" x="60" y="1380">USER VISUAL GATE</text>
+  <text class="meta" x="60" y="1410">1  EDGE: after hiding arrows, does one-sided bleed read as thrust; and should opposite page-side use be rejected rather than mirrored?</text>
+  <text class="meta" x="60" y="1433">2  DROP: are both 10% phase slices legible at real Reader size, and does the eye reliably travel 01 → 02 → impact?</text>
+  <text class="meta" x="60" y="1456">3  SWEEP: with real action photography, do the gutter-safe subject zones and both single-page focus views remain coherent?</text>
+  <text class="meta" x="60" y="1479">4  All three: do portrait / square pressure states remain honest enough, or should their acceptable-ratio metadata be narrowed?</text>
+
+  <rect class="dark" x="60" y="1530" width="1540" height="104"/>
+  <text class="state white" x="84" y="1562">AUDIT LAYER ONLY</text>
+  <text class="meta white" x="84" y="1587">Safe-area guides, arrows, numbers, risk bands and rejection marks are documentation annotations—not Renderer assets.</text>
+  <text class="meta white" x="84" y="1610">Optional content never reflows geometry. These anchors have no Note or authored-text dependency; every photo covers its fixed frame.</text>
+  <text class="tiny" x="60" y="1685">Grayscale placeholders are original vector constructions. They show subject position, directional cues and crop risk without copying network-source photography.</text>
+</svg>

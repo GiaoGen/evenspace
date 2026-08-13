@@ -58,6 +58,7 @@ export function createInitialManualSpreads(draft: ZineDraft): readonly ZineManua
               contentItemIds: createContentItemIds(pageId, photoIds.length),
               notesByPhotoId: createNotesByPhotoId(draft.photos),
               defaultFocusByPhotoId: createPhotoFocusDefaults(draft.photos),
+              authoredTextItems: draft.authoredTextItems ?? [],
             },
             anchorPageId: pageId,
           })

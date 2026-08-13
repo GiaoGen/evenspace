@@ -309,7 +309,7 @@ F0.6-C 针对性测试与全量测试已通过：
 
 - 锁定七个语义 role：`title | deck | label | folio | caption | note | index`；文字 Slot 显式声明 `role`，可选声明受控 `align: start | center | end | inward | outward`。
 - Theme 提供按 role 索引的有限 Typography Token：`size: xs..xl`、`lineHeight: tight | normal | open`、`weight: 400 | 500 | 600 | 700`、`tracking: tight | normal | wide`、`transform: none | uppercase`。
-- 产品内置完整默认 preset；Recipe 不提供字体 family/URL，只继续使用产品批准的 Geist/font registry。字号的最小枚举值映射为 `clamp(5px, .9vw, 7px)`，最终单页可读性仍由人工视觉 Gate 判断。
+- 产品内置完整默认 preset；Recipe 不提供字体 family/URL，只继续使用产品批准的 Geist/font registry。F3-B2.2 将角色字号改为相对每个 Recipe canvas 的 normalized metrics，并以 `cqw` 加确定性 px fallback 消除 viewport-dependent page text；最终单页可读性仍由人工视觉 Gate 判断。
 - 现代 Definition 必须为每个文字 Slot 声明合法 role，且 Theme 必须显式覆盖使用到的 role。旧 registry 精确匹配的 Definition 继续通过 adapter 推导：`page-number -> folio`、`note -> note`、其他 static text -> `label`，并保留旧 Slot 层级和近似视觉。
 - Note Slot 只允许 `caption | note | index`；`folio` 必须使用 `page-number` source，`page-number` 必须使用 `folio`；`title` 只允许 `title` 或 `literal` source。
 - Slot 不能携带 size/weight/font/CSS/class/component；Theme 和 Typography Token 都执行有限字段 allowlist。任意字体、CSS、className、组件、transform 字符串等注入继续拒绝。

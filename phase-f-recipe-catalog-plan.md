@@ -1,12 +1,14 @@
 # Phase F：正式 Recipe Catalog 设计与落地计划书
 
-> 状态：F0/F1、F0.5、F0.6 与 F2/F2.1 已完成；用户于 2026-08-13 批准 F2-D01 至 F2-D18，下一门禁为 F3-A Anchor 设计审批  
+> 状态：F0/F1、F0.5、F0.6、F0.7-A/A.1 与 F2/F2.1 已完成并通过协调校验；五家族 15 个 Anchor 已获用户视觉批准，F3-A6 审计为 GO；F3-B1 Quiet 与 F3-B2/B2.1/B2.2 Editorial Gate 已由用户人工视觉检查通过；F3-B3 Grid/Contact 的三个 formal draft 已实现，但其视觉 Gate 现暂停。F3-T1 D01–D08 与 P1/P2/P3 已获用户批准；F3-T2 runtime/specimen 实现及技术验证完成，当前停止在 Typography Reality 用户视觉 Gate。当前实现进度 9/15、人工视觉通过 6/15；未激活任何 Recipe，未进入 F3-B4 Dynamic
 > 前置条件：Recipe Contract v1、通用 Renderer、Placement、Photo Note、兼容性/撤销、Preview Matrix 与 Reference Recipe Gate 已完成。  
-> 当前静态基线（2026-08-13）：TypeScript、零警告 ESLint、244 项测试与 Next.js 生产构建通过。  
+> 当前自动化基线（2026-08-14）：typecheck、零警告 lint、60 test files / 315 tests、Next.js 16.2.10 production build 已通过；Quiet Matrix 为 41 组 / 82 cells，Editorial Matrix 为 66 组 / 132 cells，Grid/Contact Matrix 为 54 组 / 108 cells；Typography Matrix 为 84 cards / 336 Renderer canvases。用户已通过 Quiet、Editorial 与 F3-B2.2 Typography Reality 人工视觉 Gate；Grid/Contact 的视觉检查等待 F3-T2 用户视觉 Gate 收口后再回归。
 > 执行分工：Sol 负责视觉体系、Anchor 与独立审计；Luna 负责获批规格的数据实现。所有浏览器视觉验证仍由用户手动完成。  
 > 本阶段范围：正式内页 Recipe Catalog。封面、封底和书背将在后续独立 Contract 中处理。
 
----
+> F3-B2 / F3-B2.1 / F3-B2.2 进度（2026-08-14）：Editorial 的三个 Recipe 保持 formal draft Definition、精确 Catalog Entry 与开发 Preview Matrix；矩阵为 66 个场景组 / 132 个 Editor-Reader cells。F3-B2.2 建立 canvas-relative Typography metrics、共享 line estimator 与外部 typography diagnostics，重新审计 Evidence 60/4、Lead deck 76/2、Lead title 60/3、Across 120/4；用户已通过移动端真实换行复验，以及 Lead title 60/3、Across Note 120/4、Quiet Scale Echo 最长 Note 回归。三项仍为 `draft`，视觉通过不等于 active；现正式进入 F3-B3。
+
+> F3-B3 / F3-T 进度（2026-08-14）：Twin Register、Twelve-up Ledger 与 Cross Register 已建立 formal draft Definition、精确 Catalog/Registry 与独立 Matrix，共 54 个场景组 / 108 个 Editor-Reader cells。F3-T1 已批准；F3-T2 已固定 S1/S2 资产、受控 preset、locale 路由、coverage hard fail 与真实 specimen。三项仍为 `draft`。用户完成 Typography Reality 与全部 9 个已实现 Anchor 回归后，才可恢复 F3-B4。
 
 ## 1. 阶段目标
 
@@ -545,6 +547,28 @@ F0.6 只实现被批准且阻挡正式 Catalog 的最小能力。不得顺手设
 - 全部通过 Validator、Compatibility 和 Application 测试。
 - 执行模型只运行静态测试和生产构建，不启动浏览器。
 - 用户完成 Preview Matrix 与实际编辑器的手动视觉验证。
+
+### 10.2 Phase F3-T：Typography 插入阶段
+
+F3-B3 实现暴露了“现有七个 typography role 共享 Geist Sans、CJK 由系统 fallback 决定”的全局艺术指导与 reality gap。为避免继续用单一 sans 审批 Grid/Contact，且避免 F3-B4/F3-B5 在未知字体系统上累积视觉债，插入两个严格分离的阶段：
+
+#### F3-T1 — Typography Art Direction & Font System Decision（已批准）
+
+- 只进行官方来源/许可/CJK/摄影编辑研究、现状审计、2–3 套完整方向、受控 preset、specimen 内容矩阵与用户裁决材料。
+- 交付 [Typography Art Direction](./docs/recipe-catalog/typography-art-direction.md)、[Typography Source Dossier](./docs/recipe-catalog/typography-source-dossier.md) 与 [Typography Specimen Matrix](./docs/recipe-catalog/typography-specimen-matrix.md)。
+- 禁止下载字体、改动字体文件、TS/TSX/CSS/测试/Recipe Definition/Token、启动服务器/浏览器、激活 Recipe 或进入 F3-B4。
+- 当前推荐 S1 Duplex Photo-Essay，S2 Plex Unified Archive 为唯一保守 fallback；S3 Moda-First Fashion Gloss 因 CJK hard fail 淘汰。以上均等待 D01–D08 用户裁决，不构成自动批准。
+
+#### F3-T2 — Typography Asset, Specimen & Runtime Reality（当前：等待用户视觉 Gate）
+
+- 只有用户通过 F3-T1 Gate 后才可单独派发；固定 upstream release、license、hash、locale、weight、unicode-range 与真实 bytes，形成字体资产 manifest。
+- 用获批 S1 与锁定 fallback S2 在同一内容、几何、preset metrics 下完成繁中/简中/英文/混排、最长文本、font-ready、Editor/Reader 与移动端 specimen。
+- 任何 contract/token/estimator/CSS/资产变更必须在 F3-T2 任务中逐项最小化，不得把 F3-T1 文档当成实现授权。
+- F3-T2 完成后先回归 Quiet、Editorial、Grid/Contact 全部 **9 个已实现 Anchor** 及既有压力点；Grid/Contact visual Gate 重新开放。只有该 Gate 通过后才恢复 F3-B4 Dynamic；F3-B5 同样保持暂停。
+
+#### Gate F3-T2（当前停止点）
+
+用户检查 S1/S2 关键 specimen 与 Quiet、Editorial、Grid/Contact 9 个已实现 Anchor。视觉 Gate 未通过前不恢复 F3-B4/F3-B5，不激活任何 Recipe。
 
 ---
 

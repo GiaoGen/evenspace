@@ -9,11 +9,14 @@ import {
   createRecipeApplication,
   deriveCanvasMetrics,
   deriveSpreadEvidence,
+  estimateRecipeTextLayout,
   estimateRecipeNoteLines,
   evaluateRecipeCompatibility,
   getRecipeForStyle,
+  getRecipeTypographyLayoutMetrics,
   isLegacyRecipeDefinition,
   phaseDRecipeDefinitions,
+  measureRecipeTextLineWidth,
   resolveRecipeTextSurface,
   recipeDefinitions,
   validateRecipeDefinition,
@@ -96,6 +99,32 @@ describe("Recipe Contract v1", () => {
         title: { size: "lg", lineHeight: "tight", weight: 600, tracking: "normal", transform: "none" },
       },
     }).title).toMatchObject({ size: "lg", weight: 600 });
+  });
+
+  it("uses one canvas-relative typography metric source for roles and line fitting", () => {
+    const recipe = getRecipeForStyle("editorial");
+    expect(recipe).toBeDefined();
+    if (!recipe) return;
+    const noteSlot = recipe.slots.find((slot) => slot.kind === "note");
+    expect(noteSlot?.kind).toBe("note");
+    if (noteSlot?.kind !== "note") return;
+
+    const noteMetrics = getRecipeTypographyLayoutMetrics("note", DEFAULT_RECIPE_TYPOGRAPHY.note);
+    const titleMetrics = getRecipeTypographyLayoutMetrics("title", DEFAULT_RECIPE_TYPOGRAPHY.title);
+    const wideMetrics = getRecipeTypographyLayoutMetrics("note", { ...DEFAULT_RECIPE_TYPOGRAPHY.note, tracking: "wide" });
+    expect(titleMetrics.normalizedFontSize).toBeGreaterThan(noteMetrics.normalizedFontSize);
+    expect(titleMetrics.lineHeight).toBe(1.1);
+    expect(measureRecipeTextLineWidth("record", wideMetrics)).toBeGreaterThan(measureRecipeTextLineWidth("record", noteMetrics));
+
+    const latin = estimateRecipeTextLayout(recipe, { ...noteSlot, rect: { ...noteSlot.rect, width: .1, height: .5 } }, "abcde");
+    const cjk = estimateRecipeTextLayout(recipe, { ...noteSlot, rect: { ...noteSlot.rect, width: .1, height: .5 } }, "清晨車站光");
+    const explicit = estimateRecipeTextLayout(recipe, { ...noteSlot, rect: { ...noteSlot.rect, width: .5, height: .5 } }, "one\ntwo");
+    const longWord = estimateRecipeTextLayout(recipe, { ...noteSlot, rect: { ...noteSlot.rect, width: .1, height: .5 } }, "pneumonoultramicroscopicsilicovolcanoconiosis");
+    expect(cjk.estimatedLines).toBeGreaterThan(latin.estimatedLines);
+    expect(explicit.estimatedLines).toBe(2);
+    expect(longWord.estimatedLines).toBeGreaterThan(1);
+    expect(explicit.fits).toBe(true);
+    expect(explicit.lineBoxHeight).toBeLessThan(explicit.slotHeight);
   });
 
   it("adapts legacy text slots to folio, note, and label without using slot ids", () => {
