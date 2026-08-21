@@ -16,23 +16,24 @@ import {
 import { createPortal } from "react-dom";
 import type { PageFlip } from "page-flip";
 import { Icon } from "@/components/ui/icon";
+import { createUuid } from "@/core/domain/uuid";
 import {
+  getAuthoredTextEditorFields,
+  getAuthoredTextEditorValidation,
+  type AuthoredTextEditorField,
+} from "../../model/authored-text-editor";
+import {
+  createManualRecipeApplicationContext,
+  getManualRecipeApplicability,
   splitPhotosIntoVisualRows,
   type ZineDraft,
 } from "../../model/zine-draft";
-import type { ZinePageSide } from "../../model/zine-manual-layout";
-import type { RecipeRef } from "../../model/recipe-contract";
+import type { ZineManualPage, ZinePageSide } from "../../model/zine-manual-layout";
+import type { AuthoredTextItem, RecipeDefinition, RecipeRef } from "../../model/recipe-contract";
 import { createManualEditorPages } from "../../model/zine-pages";
 import { getPhotoUseCounts } from "../../model/photo-usage";
-import {
-  createNotesByPhotoId,
-  evaluateRecipeCompatibility,
-  getRecipeCompatibilityLabel,
-} from "../../model/recipe-contract";
-import {
-  getActiveRecipeCatalogEntries,
-  getActiveRecipeDefinition,
-} from "../../model/recipe-catalog";
+import { evaluateRecipeCompatibility, getRecipeCompatibilityLabel } from "../../model/recipe-contract";
+import type { RecipeRuntimePolicy } from "../../model/recipe-catalog";
 import { normalizePlacement } from "../../model/recipe-placement";
 import { syncVisiblePlacementFocus } from "../placement-focus-dom";
 import { StylePagePreview } from "../style-page-preview";
@@ -74,6 +75,14 @@ type PlacementTarget = {
   readonly photoId: string;
 };
 
+type EmptyPhotoSlotTarget = {
+  readonly pageId: string;
+  readonly recipeRef: RecipeRef;
+  readonly photoSlotId: string;
+  readonly applicationAnchorPageId: string;
+  readonly targetPageIds: readonly string[];
+};
+
 type PointerIntent = {
   readonly pointerId: number;
   readonly pageIndex: number | null;
@@ -82,6 +91,8 @@ type PointerIntent = {
   readonly startClientY: number;
   readonly allowFocusNavigation: boolean;
   readonly addPage: { readonly spreadId: string; readonly side: ZinePageSide } | null;
+  readonly emptyPhotoSlot: { readonly pageId: string; readonly photoSlotId: string } | null;
+  readonly removePhoto: { readonly pageId: string; readonly placementId: string; readonly photoSlotId: string } | null;
   moved: boolean;
 };
 
@@ -101,34 +112,93 @@ const defaultCameraGeometry: CameraGeometry = {
   shift: 205,
 };
 
-const activeRecipeChoices = getActiveRecipeCatalogEntries()
-  .map((entry) => ({
-    entry,
-    recipe: getActiveRecipeDefinition(entry.recipe),
-  }))
-  .filter((choice): choice is typeof choice & { recipe: NonNullable<typeof choice.recipe> } => choice.recipe !== null);
+function commitAuthoredTextField({
+  recipe,
+  field,
+  text,
+  locale,
+  onUpsert,
+  onUpdate,
+  onDelete,
+}: {
+  readonly recipe: RecipeDefinition | null;
+  readonly field: AuthoredTextEditorField;
+  readonly text: string;
+  readonly locale: ZineDraft["locale"];
+  readonly onUpsert: (item: AuthoredTextItem) => void;
+  readonly onUpdate: (textContentId: string, text: string) => void;
+  readonly onDelete: (textContentId: string) => void;
+}) {
+  if (!recipe) return;
+  const validation = getAuthoredTextEditorValidation(recipe, field, text, locale);
+  if (!text.trim()) {
+    if (!field.required && field.item) onDelete(field.item.id);
+    return;
+  }
+  if (!validation.valid) return;
+  if (field.item) {
+    if (field.item.text !== text) onUpdate(field.item.id, text);
+    return;
+  }
+  onUpsert({
+    id: createUuid(),
+    owner: field.owner,
+    contentKey: field.contentKey,
+    roleHint: field.role,
+    text,
+  });
+}
 
-const recipeWaterfallRows = [
-  activeRecipeChoices
-    .filter((_, index) => index % 2 === 0),
-  activeRecipeChoices
-    .filter((_, index) => index % 2 === 1),
-] as const;
+function getAuthoredTextOwnerLabel(owner: AuthoredTextItem["owner"]) {
+  return owner.kind === "page"
+    ? `Page · ${owner.pageId}`
+    : `Spread · ${owner.targetPageIds.join(" + ")}`;
+}
 
-const activeRecipeCount = recipeWaterfallRows.flat().length;
+export function getManualRecipeCompatibility({
+  recipe,
+  focusedPage,
+  draft,
+}: {
+  readonly recipe: RecipeDefinition;
+  readonly focusedPage: ZineManualPage | null;
+  readonly draft: ZineDraft;
+}) {
+  if (!focusedPage) {
+    return { code: "incompatible" as const, valid: false, reason: "Focus a page first.", hiddenNotePhotoIds: [] };
+  }
+  const context = draft.manualSpreads && createManualRecipeApplicationContext({
+    recipe,
+    manualSpreads: draft.manualSpreads,
+    anchorPageId: focusedPage.id,
+    photos: draft.photos,
+    authoredTextItems: draft.authoredTextItems ?? [],
+  });
+  if (!context) {
+    return { code: "incompatible" as const, valid: false, reason: "A spread Recipe needs both pages.", hiddenNotePhotoIds: [] };
+  }
+  return evaluateRecipeCompatibility(recipe, context.content);
+}
 
 export function ManualLayoutStep({
   draft,
+  recipeRuntimePolicy,
   onPlacementFocusChange,
   onAddPage,
   onPlacePhoto,
+  onPlacePhotoInRecipeSlot,
+  onRemoveRecipePhoto,
   onApplyRecipe,
+  onUpsertAuthoredText,
+  onUpdateAuthoredText,
+  onDeleteAuthoredText,
   canUndo,
   canRedo,
   onUndo,
   onRedo,
 }: {
   readonly draft: ZineDraft;
+  readonly recipeRuntimePolicy: RecipeRuntimePolicy;
   readonly onPlacementFocusChange: (
     pageId: string,
     placementId: string,
@@ -142,12 +212,27 @@ export function ManualLayoutStep({
     photoId: string,
     replacePhotoId?: string,
   ) => void;
+  readonly onPlacePhotoInRecipeSlot: (
+    pageId: string,
+    recipeRef: RecipeRef,
+    photoSlotId: string,
+    photoId: string,
+  ) => void;
+  readonly onRemoveRecipePhoto: (pageId: string, placementId: string, photoSlotId: string) => void;
   readonly onApplyRecipe: (pageId: string, recipeRef: RecipeRef) => void;
+  readonly onUpsertAuthoredText: (item: AuthoredTextItem) => void;
+  readonly onUpdateAuthoredText: (textContentId: string, text: string) => void;
+  readonly onDeleteAuthoredText: (textContentId: string) => void;
   readonly canUndo: boolean;
   readonly canRedo: boolean;
   readonly onUndo: () => void;
   readonly onRedo: () => void;
 }) {
+  const recipeWaterfallRows = useMemo(() => [
+    recipeRuntimePolicy.choices.filter((_, index) => index % 2 === 0),
+    recipeRuntimePolicy.choices.filter((_, index) => index % 2 === 1),
+  ] as const, [recipeRuntimePolicy]);
+  const activeRecipeCount = recipeRuntimePolicy.choices.length;
   const pages = useMemo(() => createManualEditorPages(draft), [draft]);
   const photoById = useMemo(
     () => new Map(draft.photos.map((photo) => [photo.id, photo])),
@@ -193,7 +278,11 @@ export function ManualLayoutStep({
   const [portalReady, setPortalReady] = useState(false);
   const [drawerKind, setDrawerKind] = useState<DrawerKind | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [preparedRecipeRef, setPreparedRecipeRef] = useState<RecipeRef | null>(null);
+  const [authoredTextDrafts, setAuthoredTextDrafts] = useState<Record<string, string>>({});
+  const [emptyPhotoSlotTarget, setEmptyPhotoSlotTarget] = useState<EmptyPhotoSlotTarget | null>(null);
   const drawerTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const commitAuthoredTextRef = useRef<() => void>(() => {});
   const lastPage = pages.length - 1;
 
   const setPhotoSelection = useCallback((placement: PlacementTarget | null) => {
@@ -204,13 +293,15 @@ export function ManualLayoutStep({
   }, []);
 
   const closeDrawer = useCallback(() => {
+    if (drawerKind === "layout") commitAuthoredTextRef.current();
+    if (drawerKind === "photos") setEmptyPhotoSlotTarget(null);
     setDrawerOpen(false);
     if (drawerTimerRef.current) clearTimeout(drawerTimerRef.current);
     drawerTimerRef.current = setTimeout(() => {
       setDrawerKind(null);
       drawerTimerRef.current = null;
     }, 240);
-  }, []);
+  }, [drawerKind]);
 
   const openDrawer = useCallback((kind: DrawerKind) => {
     if (cameraMotionRef.current !== "idle") return;
@@ -482,8 +573,16 @@ export function ManualLayoutStep({
 
     const frame = getPhotoFrame(event.target);
     const placement = getPlacementTarget(event.target);
+    const emptyPhotoSlot = getEmptyPhotoSlotTarget(event.target);
+    const removePhoto = getRemovePhotoTarget(event.target);
     const pageIndex = getPageIndex(event.target);
     const selectedPlacementId = selectedPlacementIdRef.current;
+
+    if (emptyPhotoSlot || removePhoto) {
+      blockPointerGesture(event);
+      pointerIntentRef.current = createPointerIntent(event, pageIndex, null, false, emptyPhotoSlot, removePhoto);
+      return;
+    }
 
     if (selectedPlacementId !== null) {
       blockPointerGesture(event);
@@ -622,6 +721,32 @@ export function ManualLayoutStep({
       pointerIntentRef.current = null;
       if (event.type !== "pointercancel") {
         if (!intent.moved && intent.pageIndex !== null) {
+          if (intent.emptyPhotoSlot) {
+            const page = pages.find((candidate) => candidate.kind === "content" && candidate.id === intent.emptyPhotoSlot!.pageId);
+            const application = page?.kind === "content" ? page.recipeApplication : null;
+            if (application) {
+              setEmptyPhotoSlotTarget({
+                pageId: intent.emptyPhotoSlot.pageId,
+                recipeRef: { id: application.recipeId, version: application.recipeVersion },
+                photoSlotId: intent.emptyPhotoSlot.photoSlotId,
+                applicationAnchorPageId: application.anchorPageId,
+                targetPageIds: application.targetPageIds,
+              });
+              openDrawer("photos");
+            }
+            finishBlockedPointer(event);
+            return;
+          }
+          if (intent.removePhoto) {
+            onRemoveRecipePhoto(
+              intent.removePhoto.pageId,
+              intent.removePhoto.placementId,
+              intent.removePhoto.photoSlotId,
+            );
+            setPhotoSelection(null);
+            finishBlockedPointer(event);
+            return;
+          }
           const addPage = intent.addPage;
           if (addPage) {
             onAddPage(addPage.spreadId, addPage.side);
@@ -734,11 +859,85 @@ export function ManualLayoutStep({
         spread.left?.id === focusedContentPage.id || spread.right?.id === focusedContentPage.id
       )) ?? null
     : null;
+  const focusedManualPage = focusedContentPage
+    ? [focusedSpread?.left, focusedSpread?.right].find((page): page is ZineManualPage => page?.id === focusedContentPage.id) ?? null
+    : null;
   const photoRows = useMemo(() => splitPhotosIntoVisualRows(draft.photos), [draft.photos]);
   const photoUseCounts = useMemo(
     () => getPhotoUseCounts(draft.manualSpreads),
     [draft.manualSpreads],
   );
+  const preparedRecipe = preparedRecipeRef ? recipeRuntimePolicy.resolve(preparedRecipeRef) : null;
+  const preparedAuthoredTextOwner = !preparedRecipe || !focusedManualPage || !draft.manualSpreads
+    ? null
+    : createManualRecipeApplicationContext({
+      recipe: preparedRecipe,
+      manualSpreads: draft.manualSpreads,
+      anchorPageId: focusedManualPage.id,
+      photos: draft.photos,
+      authoredTextItems: draft.authoredTextItems ?? [],
+    })?.content.owner ?? null;
+  const authoredTextFields = preparedRecipe && preparedAuthoredTextOwner
+    ? getAuthoredTextEditorFields({
+        recipe: preparedRecipe,
+        owner: preparedAuthoredTextOwner,
+        authoredTextItems: draft.authoredTextItems ?? [],
+      })
+    : [];
+
+  function prepareAuthoredText(recipeRef: RecipeRef) {
+    const recipe = recipeRuntimePolicy.resolve(recipeRef);
+    if (!recipe || !focusedManualPage || !draft.manualSpreads) return;
+    const context = createManualRecipeApplicationContext({
+      recipe,
+      manualSpreads: draft.manualSpreads,
+      anchorPageId: focusedManualPage.id,
+      photos: draft.photos,
+      authoredTextItems: draft.authoredTextItems ?? [],
+    });
+    if (!context?.content.owner) return;
+    const fields = getAuthoredTextEditorFields({
+      recipe,
+      owner: context.content.owner,
+      authoredTextItems: draft.authoredTextItems ?? [],
+    });
+    setPreparedRecipeRef(recipeRef);
+    setAuthoredTextDrafts(Object.fromEntries(fields.map((field) => [field.contentKey, field.item?.text ?? ""])));
+  }
+
+  useEffect(() => {
+    commitAuthoredTextRef.current = () => {
+      const fields = preparedRecipe && preparedAuthoredTextOwner
+        ? getAuthoredTextEditorFields({
+            recipe: preparedRecipe,
+            owner: preparedAuthoredTextOwner,
+            authoredTextItems: draft.authoredTextItems ?? [],
+          })
+        : [];
+      for (const field of fields) {
+        commitAuthoredTextField({
+          recipe: preparedRecipe,
+          field,
+          text: authoredTextDrafts[field.contentKey] ?? field.item?.text ?? "",
+          locale: draft.locale,
+          onUpsert: onUpsertAuthoredText,
+          onUpdate: onUpdateAuthoredText,
+          onDelete: onDeleteAuthoredText,
+        });
+      }
+    };
+  }, [authoredTextDrafts, draft.authoredTextItems, draft.locale, onDeleteAuthoredText, onUpdateAuthoredText, onUpsertAuthoredText, preparedAuthoredTextOwner, preparedRecipe]);
+
+  function openLayoutDrawer() {
+    const application = focusedContentPage?.recipeApplication;
+    if (application) {
+      prepareAuthoredText({ id: application.recipeId, version: application.recipeVersion });
+    } else {
+      setPreparedRecipeRef(null);
+      setAuthoredTextDrafts({});
+    }
+    openDrawer("layout");
+  }
 
   return (
     <section className={styles.manualLayoutStep} aria-labelledby="manual-layout-heading">
@@ -776,7 +975,13 @@ export function ManualLayoutStep({
 
           <div ref={sourceRef} className={styles.sourcePages} aria-hidden="true">
             {pages.map((page, index) => (
-              <ZineReaderPageView key={page.id} page={page} pageIndex={index} mode="editor" />
+              <ZineReaderPageView
+                key={page.id}
+                page={page}
+                pageIndex={index}
+                mode="editor"
+                resolveRecipe={recipeRuntimePolicy.resolve}
+              />
             ))}
           </div>
 
@@ -798,7 +1003,7 @@ export function ManualLayoutStep({
                 <Icon name="image" size={16} />
                 <span>Photos</span>
               </button>
-              <button type="button" onClick={() => openDrawer("layout")}>
+              <button type="button" onClick={openLayoutDrawer}>
                 <Icon name="grid" size={16} />
                 <span>排版</span>
               </button>
@@ -838,6 +1043,51 @@ export function ManualLayoutStep({
                   </p>
                 ) : null}
 
+                {drawerKind === "layout" && preparedRecipe && authoredTextFields.length > 0 ? (
+                  <section className={styles.authoredTextEditor} aria-label={`${preparedRecipe.name} text`}>
+                    <div className={styles.authoredTextEditorHeading}>
+                      <strong>Prepare text · {preparedRecipe.name}</strong>
+                      <small>{preparedRecipe.scope === "spread" ? "Shared across this spread" : "This page only"} · {preparedAuthoredTextOwner ? getAuthoredTextOwnerLabel(preparedAuthoredTextOwner) : "No owner"}</small>
+                    </div>
+                    <div className={styles.authoredTextFields}>
+                      {authoredTextFields.map((field) => {
+                        const text = authoredTextDrafts[field.contentKey] ?? field.item?.text ?? "";
+                        const validation = getAuthoredTextEditorValidation(preparedRecipe, field, text, draft.locale);
+                        return (
+                          <label className={styles.authoredTextField} data-invalid={!validation.valid} key={field.contentKey}>
+                            <span>
+                              <strong>{field.role}</strong>
+                              <small>{field.required ? "Required" : "Optional"} · {text.trim().length}/{field.maxCharacters} characters · {validation.layout.estimatedLines}/{field.maxLines} lines</small>
+                            </span>
+                            <textarea
+                              value={text}
+                              rows={Math.min(3, Math.max(1, field.maxLines))}
+                              aria-label={`${field.role} text`}
+                              aria-describedby={`${field.contentKey}-validation`}
+                              onChange={(event) => setAuthoredTextDrafts((current) => ({
+                                ...current,
+                                [field.contentKey]: event.target.value,
+                              }))}
+                              onBlur={() => commitAuthoredTextField({
+                                recipe: preparedRecipe,
+                                field,
+                                text: authoredTextDrafts[field.contentKey] ?? field.item?.text ?? "",
+                                locale: draft.locale,
+                                onUpsert: onUpsertAuthoredText,
+                                onUpdate: onUpdateAuthoredText,
+                                onDelete: onDeleteAuthoredText,
+                              })}
+                            />
+                            <small id={`${field.contentKey}-validation`}>
+                              {validation.valid ? (field.required ? "Ready to apply." : "Leave empty to remove.") : validation.reason}
+                            </small>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </section>
+                ) : null}
+
                 {drawerKind === "photos" ? (
                   <div className={styles.horizontalWaterfall}>
                     {photoRows.map((row, rowIndex) => (
@@ -852,6 +1102,18 @@ export function ManualLayoutStep({
                               style={{ "--photo-ratio": getPhotoRatio(photo) } as CSSProperties}
                               onClick={() => {
                                 if (!focusedContentPage) return;
+                                if (emptyPhotoSlotTarget) {
+                                  onPlacePhotoInRecipeSlot(
+                                    emptyPhotoSlotTarget.pageId,
+                                    emptyPhotoSlotTarget.recipeRef,
+                                    emptyPhotoSlotTarget.photoSlotId,
+                                    photo.id,
+                                  );
+                                  setEmptyPhotoSlotTarget(null);
+                                  setPhotoSelection(null);
+                                  closeDrawer();
+                                  return;
+                                }
                                 const replacePhotoId = selectedPhotoId && focusedContentPage.photos.some(
                                   (item) => item.id === selectedPhotoId,
                                 ) ? selectedPhotoId : undefined;
@@ -891,46 +1153,46 @@ export function ManualLayoutStep({
                                 return photo ? [photo] : [];
                               })
                             : draft.photos;
-                          const compatibility = focusedContentPage
-                            ? recipe.scope === "spread" && (!focusedSpread?.left || !focusedSpread.right)
-                              ? {
-                                  code: "incompatible" as const,
-                                  valid: false,
-                                  reason: "A spread Recipe needs both pages.",
-                                  hiddenNotePhotoIds: [],
-                                }
-                              : evaluateRecipeCompatibility(recipe, {
-                                  photoIds: recipePhotoIds,
-                                  notesByPhotoId: createNotesByPhotoId(draft.photos),
-                                })
-                            : {
-                                code: "incompatible" as const,
-                                valid: false,
-                                reason: "Focus a page first.",
-                                hiddenNotePhotoIds: [],
-                              };
-                          const compatibilityLabel = compatibility
-                            ? getRecipeCompatibilityLabel(compatibility.code)
-                            : "Focus a page first.";
+                          const applicability = getManualRecipeApplicability({
+                            recipe,
+                            focusedPage: focusedManualPage,
+                            draft,
+                          });
+                          const compatibility = applicability.manualCompatibility;
+                          const compatibilityLabel = applicability.canApplyInManualEditor
+                            ? getManualApplicabilityLabel(applicability)
+                            : getRecipeCompatibilityLabel(compatibility.code);
+                          const canPrepareAuthoredText = compatibility.code === "authored-text-missing"
+                            || compatibility.code === "authored-text-too-long"
+                            || compatibility.code === "authored-text-too-many-lines"
+                            || compatibility.code === "authored-text-owner-mismatch"
+                            || compatibility.code === "authored-text-invalid";
+                          const preparingText = preparedRecipe?.id === recipe.id
+                            && preparedRecipe.version === entry.recipe.version;
                           return (
                             <button
                               type="button"
                               className={styles.recipeChoice}
                               data-selected={selected}
-                              disabled={!compatibility?.valid}
-                              title={compatibility?.reason ?? recipe.description}
+                              data-preparing-text={preparingText}
+                              disabled={!applicability.canApplyInManualEditor && !canPrepareAuthoredText}
+                              title={applicability.reason ?? recipe.description}
                               key={`${entry.recipe.id}@${entry.recipe.version}`}
                               onClick={() => {
-                                if (!focusedContentPage || !compatibility?.valid) return;
-                                onApplyRecipe(focusedContentPage.id, entry.recipe);
-                                closeDrawer();
+                                if (!focusedContentPage) return;
+                                if (applicability.canApplyInManualEditor) {
+                                  onApplyRecipe(focusedContentPage.id, entry.recipe);
+                                  closeDrawer();
+                                  return;
+                                }
+                                if (canPrepareAuthoredText) prepareAuthoredText(entry.recipe);
                               }}
                             >
                               <StylePagePreview recipe={recipe} photos={previewPhotos} locale={draft.locale} compact />
-                              <small className={styles.recipeStatus} data-status={compatibility.code}>
-                                {compatibilityLabel}
+                              <small className={styles.recipeStatus} data-status={applicability.canApplyInManualEditor ? "compatible" : compatibility.code}>
+                                {preparingText ? "Prepare text" : compatibilityLabel}
                               </small>
-                              <span><strong>{recipe.name}</strong><small>{compatibility.valid ? `${recipe.scope === "spread" ? "双页 · " : "单页 · "}${recipe.capabilities.notes.mode === "none" ? "无文字" : recipe.capabilities.notes.mode === "required" ? "需要 Note" : "可选 Note"}` : compatibility.reason}</small></span>
+                              <span><strong>{recipe.name}{entry.status === "draft" ? " · Draft" : ""}</strong><small>{applicability.canApplyInManualEditor ? `${recipe.scope === "spread" ? "双页 · " : "单页 · "}${recipe.capabilities.notes.mode === "none" ? "无文字" : recipe.capabilities.notes.mode === "required" ? "需要 Note" : "可选 Note"}` : compatibility.reason}</small></span>
                             </button>
                           );
                         })}
@@ -962,6 +1224,8 @@ function createPointerIntent(
   pageIndex: number | null,
   placement: PlacementTarget | null,
   allowFocusNavigation: boolean,
+  emptyPhotoSlot: PointerIntent["emptyPhotoSlot"] = null,
+  removePhoto: PointerIntent["removePhoto"] = null,
 ): PointerIntent {
   return {
     pointerId: event.pointerId,
@@ -971,6 +1235,8 @@ function createPointerIntent(
     startClientY: event.clientY,
     allowFocusNavigation,
     addPage: getAddPageTarget(event.target),
+    emptyPhotoSlot,
+    removePhoto,
     moved: false,
   };
 }
@@ -989,6 +1255,23 @@ function getPlacementTarget(target: EventTarget): PlacementTarget | null {
   const photoId = frame?.dataset.zinePhotoId;
   if (!placementId || !pageId || !photoSlotId || !photoId) return null;
   return { placementId, pageId, photoSlotId, photoId };
+}
+
+function getEmptyPhotoSlotTarget(target: EventTarget): PointerIntent["emptyPhotoSlot"] {
+  if (!(target instanceof Element)) return null;
+  const slot = target.closest<HTMLElement>("[data-zine-empty-photo-slot]");
+  const pageId = slot?.dataset.zinePageId;
+  const photoSlotId = slot?.dataset.zineSlotId;
+  return pageId && photoSlotId ? { pageId, photoSlotId } : null;
+}
+
+function getRemovePhotoTarget(target: EventTarget): PointerIntent["removePhoto"] {
+  if (!(target instanceof Element)) return null;
+  const button = target.closest<HTMLElement>("[data-zine-remove-photo]");
+  const pageId = button?.dataset.zinePageId;
+  const placementId = button?.dataset.zinePlacementId;
+  const photoSlotId = button?.dataset.zineSlotId;
+  return pageId && placementId && photoSlotId ? { pageId, placementId, photoSlotId } : null;
 }
 
 function getPageIndex(target: EventTarget) {
@@ -1011,6 +1294,19 @@ function getAddPageTarget(target: EventTarget) {
 function getPhotoRatio(photo: { readonly width: number; readonly height: number }) {
   if (photo.width <= 0 || photo.height <= 0) return "1";
   return String(Math.min(1.8, Math.max(.72, photo.width / photo.height)));
+}
+
+function getManualApplicabilityLabel(applicability: ReturnType<typeof getManualRecipeApplicability>) {
+  const incomplete = applicability.completionCompatibility.valid
+    ? ""
+    : ` · ${getRecipeCompatibilityLabel(applicability.completionCompatibility.code)}`;
+  if (applicability.photoDeficit > 0) {
+    return `Can apply · ${applicability.photoDeficit} empty slot${applicability.photoDeficit === 1 ? "" : "s"}${incomplete}`;
+  }
+  if (applicability.photoExcess > 0) {
+    return `Can apply · ${applicability.photoExcess} photo${applicability.photoExcess === 1 ? "" : "s"} returns unused${incomplete}`;
+  }
+  return "Compatible";
 }
 
 function getSpreadStart(pageIndex: number) {

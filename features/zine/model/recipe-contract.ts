@@ -627,6 +627,46 @@ export function estimateRecipeTextLines(
   return estimateRecipeTextLayout(recipe, slot, text).estimatedLines;
 }
 
+/**
+ * The one authored-text limit check used by compatibility, the visible editor,
+ * and the Renderer-facing line estimator.  Keeping it here prevents a UI
+ * counter from approving text that the application reducer would reject.
+ */
+export function validateAuthoredTextSlot(
+  recipe: RecipeDefinition,
+  slot: RecipeStaticTextSlot,
+  text: string,
+  locale: ZineLocale = "en",
+) {
+  const trimmed = text.trim();
+  const layout = estimateRecipeTextLayout(recipe, slot, text, locale);
+  if (slot.required && trimmed.length === 0) {
+    return {
+      valid: false,
+      code: "authored-text-missing" as const,
+      reason: `Required authored text '${slot.contentKey}' is empty.`,
+      layout,
+    };
+  }
+  if (trimmed.length > (slot.maxCharacters ?? 0)) {
+    return {
+      valid: false,
+      code: "authored-text-too-long" as const,
+      reason: `Authored text '${slot.contentKey}' exceeds the ${slot.maxCharacters ?? 0}-character limit.`,
+      layout,
+    };
+  }
+  if (layout.estimatedLines > (slot.maxLines ?? 0) || !layout.fits) {
+    return {
+      valid: false,
+      code: "authored-text-too-many-lines" as const,
+      reason: `Authored text '${slot.contentKey}' exceeds the ${slot.maxLines ?? 0}-line limit.`,
+      layout,
+    };
+  }
+  return { valid: true as const, code: null, reason: null, layout };
+}
+
 /** v1.1 semantic slots. A color-field is the only slot that can paint a fill. */
 export type SemanticRecipeSlot =
   | RecipePhotoSlot
@@ -1614,6 +1654,31 @@ export function evaluateRecipeCompatibility(
   recipe: RecipeDefinition,
   content: RecipeContent,
 ): RecipeCompatibility {
+  return evaluateRecipeCompatibilityWithOptions(recipe, content, {});
+}
+
+/**
+ * Manual authoring may leave photo slots temporarily empty or return excess
+ * photos to the unplaced set.  All other Contract diagnostics stay strict.
+ */
+export function evaluateRecipeCompatibilityWithManualPhotoTolerance(
+  recipe: RecipeDefinition,
+  content: RecipeContent,
+): RecipeCompatibility {
+  return evaluateRecipeCompatibilityWithOptions(recipe, content, {
+    allowPhotoCountMismatch: true,
+    allowMissingRequiredNoteWhenNoPhotos: true,
+  });
+}
+
+function evaluateRecipeCompatibilityWithOptions(
+  recipe: RecipeDefinition,
+  content: RecipeContent,
+  options: {
+    readonly allowPhotoCountMismatch?: boolean;
+    readonly allowMissingRequiredNoteWhenNoPhotos?: boolean;
+  },
+): RecipeCompatibility {
   const validation = validateRecipeDefinition(recipe);
   if (!validation.valid) {
     return {
@@ -1625,7 +1690,9 @@ export function evaluateRecipeCompatibility(
   }
   const count = content.photoIds.length;
   const notePhotoIds = content.photoIds.filter((id) => Boolean(content.notesByPhotoId[id]?.trim()));
-  if (count < recipe.capabilities.photos.min && !recipe.capabilities.allowsEmptyDraft) {
+  if (!options.allowPhotoCountMismatch
+    && count < recipe.capabilities.photos.min
+    && !recipe.capabilities.allowsEmptyDraft) {
     return {
       code: "needs-content",
       valid: false,
@@ -1633,7 +1700,7 @@ export function evaluateRecipeCompatibility(
       hiddenNotePhotoIds: [],
     };
   }
-  if (count > recipe.capabilities.photos.max) {
+  if (!options.allowPhotoCountMismatch && count > recipe.capabilities.photos.max) {
     return {
       code: "too-much-content",
       valid: false,
@@ -1642,7 +1709,8 @@ export function evaluateRecipeCompatibility(
     };
   }
   if (recipe.capabilities.notes.mode === "required"
-    && notePhotoIds.length < Math.max(1, recipe.capabilities.photos.min)) {
+    && notePhotoIds.length < Math.max(1, recipe.capabilities.photos.min)
+    && !(options.allowMissingRequiredNoteWhenNoPhotos && count === 0)) {
     return {
       code: "needs-content",
       valid: false,
@@ -1796,30 +1864,12 @@ function evaluateAuthoredTextCompatibility(
       }
       continue;
     }
-    if (slot.required && item.text.trim().length === 0) {
+    const textValidation = validateAuthoredTextSlot(recipe, slot, item.text);
+    if (!textValidation.valid) {
       return {
-        code: "authored-text-missing",
+        code: textValidation.code,
         valid: false,
-        reason: `Required authored text '${slot.contentKey}' is empty.`,
-        contentKey: slot.contentKey,
-        slotId: slot.id,
-      };
-    }
-    if (item.text.trim().length > (slot.maxCharacters ?? 0)) {
-      return {
-        code: "authored-text-too-long",
-        valid: false,
-        reason: `Authored text '${slot.contentKey}' exceeds the ${slot.maxCharacters ?? 0}-character limit.`,
-        contentKey: slot.contentKey,
-        slotId: slot.id,
-      };
-    }
-    const layout = estimateRecipeTextLayout(recipe, slot, item.text);
-    if (layout.estimatedLines > (slot.maxLines ?? 0) || !layout.fits) {
-      return {
-        code: "authored-text-too-many-lines",
-        valid: false,
-        reason: `Authored text '${slot.contentKey}' exceeds the ${slot.maxLines ?? 0}-line limit.`,
+        reason: textValidation.reason,
         contentKey: slot.contentKey,
         slotId: slot.id,
       };

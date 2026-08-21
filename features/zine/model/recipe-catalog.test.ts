@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   adaptRecipeSlot,
   baseRecipeDefinitions,
+  createRecipeApplication,
   DEFAULT_RECIPE_TYPOGRAPHY,
   deriveSpreadEvidence,
   evaluateRecipeCompatibility,
@@ -12,6 +13,8 @@ import {
   validateLegacyRecipeRegistry,
 } from "./recipe-contract";
 import {
+  createRecipeRuntimePolicy,
+  developmentManualRecipeRuntimePolicy,
   deriveRecipeFacts,
   getActiveRecipeCatalogEntries,
   getActiveRecipeDefinition,
@@ -19,10 +22,12 @@ import {
   getRecipeCatalogEntry,
   resolveActiveRecipe,
   resolveDevelopmentRecipe,
+  productionRecipeRuntimePolicy,
   recipeCatalogEntries,
   validateRecipeCatalog,
   validateRecipeCatalogEntry,
 } from "./recipe-catalog";
+import { formalRecipeDefinitions, runtimeRecipeDefinitions } from "./recipe-definition-registry";
 import { resolveLegacyRecipe } from "./recipe-contract";
 import { createRecipeRenderPlan } from "../components/recipe-renderer-plan";
 
@@ -34,6 +39,101 @@ describe("Recipe Catalog v1.1", () => {
     expect(getDevelopmentRecipeCatalogEntries()
       .filter((entry) => entry.recipe.id.startsWith("reference-"))
       .every((entry) => entry.status === "draft")).toBe(true);
+  });
+
+  it("publishes exactly 21 active runtime Recipes in production", () => {
+    expect(productionRecipeRuntimePolicy.choices).toHaveLength(21);
+    expect(productionRecipeRuntimePolicy.choices.every(({ entry }) => entry.status === "active")).toBe(true);
+    expect(productionRecipeRuntimePolicy.choices.every(({ recipe }) => runtimeRecipeDefinitions.includes(recipe))).toBe(true);
+  });
+
+  it("makes the same 21 active runtime Recipes available to development manual layout", () => {
+    expect(developmentManualRecipeRuntimePolicy.choices).toHaveLength(21);
+    expect(developmentManualRecipeRuntimePolicy.choices.filter(({ entry }) => entry.status === "active")).toHaveLength(21);
+    expect(developmentManualRecipeRuntimePolicy.choices.filter(({ entry }) => entry.status === "draft")).toHaveLength(0);
+    expect(developmentManualRecipeRuntimePolicy.choices.some(({ entry }) => entry.recipe.id.startsWith("reference-"))).toBe(false);
+  });
+
+  it("keeps deprecated, invalid, unknown-version, and reference-only entries out of development runtime policy", () => {
+    const source = recipeCatalogEntries[0]!;
+    const definition = runtimeRecipeDefinitions.find((candidate) => candidate.id === source.recipe.id)!;
+    const invalidDefinition = {
+      ...definition,
+      slots: definition.slots.map((slot) => slot.kind === "photo" ? { ...slot, fit: undefined } : slot),
+    } as RecipeDefinition;
+    const reference = recipeCatalogEntries.find((entry) => entry.recipe.id === "reference-single-photo-no-note-v1")!;
+    const policy = createRecipeRuntimePolicy(
+      ["active", "draft"],
+      [
+        { ...source, status: "deprecated" },
+        { ...source, status: "draft" },
+        reference,
+      ],
+      [invalidDefinition],
+    );
+
+    expect(policy.choices).toEqual([]);
+    expect(policy.resolve({ id: source.recipe.id, version: source.recipe.version + 1 })).toBeNull();
+    expect(policy.resolve(reference.recipe)).toBeNull();
+  });
+
+  it("activates the exact fifteen formal RecipeRefs across five families", () => {
+    const formal = formalRecipeDefinitions;
+    const activeFormal = getActiveRecipeCatalogEntries().filter((entry) => formal.some((definition) => (
+      definition.id === entry.recipe.id && definition.version === entry.recipe.version
+    )));
+    expect(activeFormal).toHaveLength(15);
+    expect(new Set(activeFormal.map((entry) => entry.familyId))).toEqual(new Set([
+      "quiet", "editorial", "grid-contact", "dynamic", "chromatic",
+    ]));
+    for (const familyId of ["quiet", "editorial", "grid-contact", "dynamic", "chromatic"] as const) {
+      expect(activeFormal.filter((entry) => entry.familyId === familyId)).toHaveLength(3);
+    }
+    expect(activeFormal.every((entry) => entry.status === "active")).toBe(true);
+    expect(activeFormal.every((entry) => resolveActiveRecipe(entry.recipe) !== null)).toBe(true);
+  });
+
+  it("keeps Reference-only drafts and legacy runtime reads separate from activation", () => {
+    expect(recipeCatalogEntries.filter((entry) => entry.recipe.id.startsWith("reference-")).every((entry) => entry.status === "draft")).toBe(true);
+    expect(developmentManualRecipeRuntimePolicy.choices.some(({ entry }) => entry.recipe.id.startsWith("reference-"))).toBe(false);
+    expect(productionRecipeRuntimePolicy.resolve({ id: "reference-cross-page-pairs-v1", version: 1 })).toBeNull();
+    expect(productionRecipeRuntimePolicy.resolve({ id: "recipe-editorial-v1", version: 1 })?.id).toBe("recipe-editorial-v1");
+    expect(productionRecipeRuntimePolicy.resolve({ id: "recipe-editorial-v1", version: 2 })).toBeNull();
+  });
+
+  it("resolves one formal active Definition into the same Editor and Reader Render Plan", () => {
+    const recipe = developmentManualRecipeRuntimePolicy.resolve({ id: "quiet-held-field-v1", version: 1 });
+    if (!recipe) return;
+    const application = createRecipeApplication({
+      recipe,
+      content: { photoIds: ["photo-1"], notesByPhotoId: {} },
+      anchorPageId: "page-1",
+      targetPageIds: ["page-1"],
+    });
+    const plans = (["editor", "reader"] as const).map((mode) => createRecipeRenderPlan({
+      recipe,
+      application,
+      photos: [{
+        id: "photo-1",
+        file: {} as File,
+        previewUrl: "blob:photo-1",
+        fileName: "photo-1.jpg",
+        width: 4,
+        height: 3,
+        caption: "",
+        defaultFocusX: 50,
+        defaultFocusY: 50,
+      }],
+      environment: { pageId: "page-1", pageSide: "left", mode, pageNumber: 1, title: "Test", locale: "en" },
+    }));
+    expect(plans[0]).toMatchObject({ recipeId: recipe.id, scope: recipe.scope, valid: true });
+    expect(plans[1]).toMatchObject({ recipeId: recipe.id, scope: recipe.scope, valid: true });
+    const comparableSlots = (slots: readonly Record<string, unknown>[]) => slots.map((slot) => (
+      Object.fromEntries(Object.entries(slot).filter(([key]) => (
+        key !== "showPhotoPlaceholder" && key !== "interactivePhotoPlaceholder"
+      )))
+    ));
+    expect(comparableSlots(plans[0]!.slots)).toEqual(comparableSlots(plans[1]!.slots));
   });
 
   it("resolves Definitions by the exact Catalog id and version", () => {

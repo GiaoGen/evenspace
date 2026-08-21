@@ -15,6 +15,7 @@ import {
 import type { PageFlip } from "page-flip";
 import { Icon } from "@/components/ui/icon";
 import type { ZineDraft } from "../../model/zine-draft";
+import type { RecipeRuntimeResolver } from "../../model/recipe-catalog";
 import { createZineReaderPages } from "../../model/zine-pages";
 import { ZineReaderPageView } from "./zine-reader-page";
 import styles from "./zine-reader.module.css";
@@ -54,9 +55,11 @@ const defaultCameraGeometry: CameraGeometry = {
 export function ZineReader({
   draft,
   onClose,
+  resolveRecipe,
 }: {
   readonly draft: ZineDraft;
   readonly onClose: () => void;
+  readonly resolveRecipe: RecipeRuntimeResolver;
 }) {
   const pages = useMemo(() => createZineReaderPages(draft), [draft]);
   const sourceRef = useRef<HTMLDivElement>(null);
@@ -463,7 +466,13 @@ export function ZineReader({
 
         <div ref={sourceRef} className={styles.sourcePages} aria-hidden="true">
           {pages.map((page, index) => (
-            <ZineReaderPageView key={page.id} page={page} pageIndex={index} mode="reader" />
+            <ZineReaderPageView
+              key={page.id}
+              page={page}
+              pageIndex={index}
+              mode="reader"
+              resolveRecipe={resolveRecipe}
+            />
           ))}
         </div>
 

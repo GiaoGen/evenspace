@@ -65,6 +65,7 @@ export type RecipeRenderPlanSlot = {
   readonly focusY?: number;
   readonly scale?: number;
   readonly showPhotoPlaceholder: boolean;
+  readonly interactivePhotoPlaceholder: boolean;
   readonly crossSpread: boolean;
   readonly imageStartPercent?: number;
   readonly imageWidthPercent?: number;
@@ -161,6 +162,7 @@ export function createRecipeRenderPlan({
         rect: localRect.rect,
         zIndex: adaptedSlot.zIndex,
         showPhotoPlaceholder: false,
+        interactivePhotoPlaceholder: false,
         crossSpread: localRect.crossSpread,
         fillToken: adaptedSlot.fillToken,
       });
@@ -186,6 +188,7 @@ export function createRecipeRenderPlan({
         placementKey: assignment ? `${environment.pageId}:${assignment.placementId}` : undefined,
         ...placement,
         showPhotoPlaceholder: environment.mode !== "reader",
+        interactivePhotoPlaceholder: environment.mode === "editor",
         crossSpread: localRect.crossSpread,
         imageStartPercent: localRect.imageStartPercent,
         imageWidthPercent: localRect.imageWidthPercent,
@@ -219,6 +222,7 @@ export function createRecipeRenderPlan({
         rect: localRect.rect,
         zIndex: adaptedSlot.zIndex,
         showPhotoPlaceholder: false,
+        interactivePhotoPlaceholder: false,
         crossSpread: localRect.crossSpread,
         notes: notesWithLayout,
         foregroundToken: adaptedSlot.foregroundToken,
@@ -268,6 +272,7 @@ export function createRecipeRenderPlan({
       rect: localRect.rect,
       zIndex: adaptedSlot.zIndex,
       showPhotoPlaceholder: false,
+      interactivePhotoPlaceholder: false,
       crossSpread: localRect.crossSpread,
       text,
       textContentId: authoredAssignment?.textContentId,

@@ -124,9 +124,9 @@ describe("Phase F3-B1 Quiet formal Recipe Definitions", () => {
   });
 
   it("adds formal Definitions through one non-circular runtime registry", () => {
-    expect(formalRecipeDefinitions).toHaveLength(9);
+    expect(formalRecipeDefinitions).toHaveLength(15);
     expect(formalRecipeDefinitions.slice(0, 3)).toEqual(quietRecipeDefinitions);
-    expect(runtimeRecipeDefinitions).toHaveLength(15);
+    expect(runtimeRecipeDefinitions).toHaveLength(21);
     for (const definition of quietRecipeDefinitions) {
       expect(getRuntimeRecipeDefinitionByRef({ id: definition.id, version: 1 })).toBe(definition);
       expect(getRuntimeRecipeDefinitionByRef({ id: definition.id, version: 2 })).toBeNull();
@@ -134,16 +134,18 @@ describe("Phase F3-B1 Quiet formal Recipe Definitions", () => {
     expect(runtimeRecipeDefinitions.filter((definition) => definition.id.startsWith("recipe-")).length).toBe(6);
   });
 
-  it("keeps all Quiet Catalog entries draft, development-valid, and out of active production queries", () => {
+  it("keeps Quiet Definitions migration-draft while Catalog entries are active", () => {
     expect(validateRecipeCatalog()).toEqual([]);
-    expect(getActiveRecipeCatalogEntries()).toHaveLength(6);
-    expect(getActiveRecipeCatalogEntries().some((entry) => entry.recipe.id.startsWith("quiet-"))).toBe(false);
+    expect(getActiveRecipeCatalogEntries()).toHaveLength(21);
+    const formalIds = new Set<string>(quietRecipeDefinitions.map((definition) => definition.id));
+    expect(getActiveRecipeCatalogEntries().filter((entry) => formalIds.has(entry.recipe.id))).toHaveLength(3);
     for (const definition of quietRecipeDefinitions) {
       const development = resolveDevelopmentRecipe({ id: definition.id, version: definition.version });
-      expect(development.entry).toMatchObject({ familyId: "quiet", status: "draft" });
+      expect(definition.status).toBe("draft");
+      expect(development.entry).toMatchObject({ familyId: "quiet", status: "active" });
       expect(development.definition).toBe(definition);
       expect(development.validation?.valid).toBe(true);
-      expect(getActiveRecipeDefinition({ id: definition.id, version: definition.version })).toBeNull();
+      expect(getActiveRecipeDefinition({ id: definition.id, version: definition.version })).toBe(definition);
     }
     expect(getRecipeCatalogEntry({ id: QUIET_RECIPE_IDS.heldField, version: 1 })?.authoring).toEqual({
       ratios: { preferred: ["portrait", "square"], risky: ["ultra-wide"] },

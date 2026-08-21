@@ -6,6 +6,8 @@ import {
 import { quietRecipeDefinitions } from "./quiet-recipe-definitions";
 import { editorialRecipeDefinitions } from "./editorial-recipe-definitions";
 import { gridContactRecipeDefinitions } from "./grid-contact-recipe-definitions";
+import { dynamicRecipeDefinitions } from "./dynamic-recipe-definitions";
+import { chromaticRecipeDefinitions } from "./chromatic-recipe-definitions";
 
 /**
  * Runtime Definition registry. Contract owns schema and legacy/base fixtures;
@@ -15,6 +17,8 @@ export const formalRecipeDefinitions: readonly RecipeDefinition[] = [
   ...quietRecipeDefinitions,
   ...editorialRecipeDefinitions,
   ...gridContactRecipeDefinitions,
+  ...dynamicRecipeDefinitions,
+  ...chromaticRecipeDefinitions,
 ];
 
 export const runtimeRecipeDefinitions: readonly RecipeDefinition[] = [

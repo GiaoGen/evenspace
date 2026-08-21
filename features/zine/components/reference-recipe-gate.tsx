@@ -3,6 +3,8 @@ import { getDevelopmentRecipeCatalogEntry, resolveDevelopmentRecipe } from "../m
 import { createQuietPreviewMatrix, quietPreviewScenarios, type QuietPreviewCell } from "../model/quiet-recipe-matrix";
 import { createEditorialPreviewMatrix, editorialPreviewScenarios, type EditorialPreviewCell } from "../model/editorial-recipe-matrix";
 import { createGridContactPreviewMatrix, gridContactPreviewScenarios, type GridContactPreviewCell } from "../model/grid-contact-recipe-matrix";
+import { createDynamicPreviewMatrix, dynamicPreviewScenarios, type DynamicPreviewCell } from "../model/dynamic-recipe-matrix";
+import { createChromaticPreviewMatrix, chromaticPreviewScenarios, type ChromaticPreviewCell } from "../model/chromatic-recipe-matrix";
 import { RecipeRenderer } from "./recipe-renderer";
 import styles from "./reference-recipe-gate.module.css";
 
@@ -10,6 +12,8 @@ const referencePreviewMatrix = createReferencePreviewMatrix();
 const quietPreviewMatrix = createQuietPreviewMatrix();
 const editorialPreviewMatrix = createEditorialPreviewMatrix();
 const gridContactPreviewMatrix = createGridContactPreviewMatrix();
+const dynamicPreviewMatrix = createDynamicPreviewMatrix();
+const chromaticPreviewMatrix = createChromaticPreviewMatrix();
 
 export function ReferenceRecipeGate() {
   const recipes = [...new Map(referencePreviewMatrix.map((cell) => [cell.recipeId, cell.recipe])).values()];
@@ -82,6 +86,38 @@ export function ReferenceRecipeGate() {
       <div className={styles.sectionStack}>
         {[...new Set(gridContactPreviewMatrix.map((cell) => cell.recipeId))].map((recipeId) => (
           <GridContactRecipeSection key={recipeId} recipeId={recipeId} />
+        ))}
+      </div>
+
+      <header className={`${styles.header} ${styles.secondaryHeader}`} data-dynamic-anchor-gate="true">
+        <p className={styles.eyebrow}>Phase F3-B4 / Dynamic Anchor Gate</p>
+        <h2>Dynamic Formal Draft Preview Matrix</h2>
+        <p>
+          Edge Thrust, Drop Sequence, and Gutter Sweep remain draft-only formal Definitions.
+          The matrix verifies controlled bleed, exact ordered assignments, independent placement focus,
+          and one atomic cross-gutter photograph through the shared Application, Render Plan, and Renderer.
+        </p>
+      </header>
+
+      <div className={styles.sectionStack}>
+        {[...new Set(dynamicPreviewMatrix.map((cell) => cell.recipeId))].map((recipeId) => (
+          <DynamicRecipeSection key={recipeId} recipeId={recipeId} />
+        ))}
+      </div>
+
+      <header className={`${styles.header} ${styles.secondaryHeader}`} data-chromatic-anchor-gate="true">
+        <p className={styles.eyebrow}>Phase F3-B5 / Chromatic Anchor Gate</p>
+        <h2>Chromatic Formal Draft Preview Matrix</h2>
+        <p>
+          Entry Field, Four Beat, and Cross-field Note remain draft-only formal Definitions.
+          The matrix verifies functional Color Fields, approved color-on/off palettes, exact ordered
+          assignments, required Photo Note evidence, and Editor/Reader parity through the shared pipeline.
+        </p>
+      </header>
+
+      <div className={styles.sectionStack}>
+        {[...new Set(chromaticPreviewMatrix.map((cell) => cell.recipeId))].map((recipeId) => (
+          <ChromaticRecipeSection key={recipeId} recipeId={recipeId} />
         ))}
       </div>
     </main>
@@ -268,12 +304,102 @@ function GridContactRecipeSection({ recipeId }: { readonly recipeId: string }) {
   );
 }
 
+function DynamicRecipeSection({ recipeId }: { readonly recipeId: string }) {
+  const cells = dynamicPreviewMatrix.filter((cell) => cell.recipeId === recipeId);
+  const recipe = cells[0]?.recipe;
+  if (!recipe) return null;
+  const developmentResolution = resolveDevelopmentRecipe({ id: recipe.id, version: recipe.version });
+  const catalogEntry = developmentResolution.entry;
+  const catalogValidation = developmentResolution.validation;
+  const scenarios = dynamicPreviewScenarios.filter((scenario) => scenario.recipeId === recipeId);
+
+  return (
+    <section
+      className={styles.recipeSection}
+      data-dynamic-recipe-id={recipe.id}
+      aria-labelledby={`${recipe.id}-heading`}
+    >
+      <header className={styles.recipeHeader}>
+        <div>
+          <h2 id={`${recipe.id}-heading`}>{recipe.name}</h2>
+          <p>{recipe.description}</p>
+        </div>
+        <div className={styles.recipeMeta}>
+          <span className={styles.recipeBadge}>{recipe.id}</span>
+          <span>formal catalog: {catalogEntry?.status ?? "missing"}</span>
+          <span>catalog validator: {catalogValidation?.valid ? "valid" : "invalid"}</span>
+          <span>{recipe.scope} · exact {recipe.capabilities.photos.min} photo{recipe.capabilities.photos.min === 1 ? "" : "s"}</span>
+          <span>notes: {recipe.capabilities.notes.mode}</span>
+        </div>
+      </header>
+      {scenarios.map((scenario) => (
+        <div className={styles.scenarioGroup} key={scenario.id}>
+          <div className={styles.scenarioHeader}>
+            <h3>{scenario.label}</h3>
+            <small>{scenario.id}</small>
+          </div>
+          <div className={styles.cellGrid}>
+            {cells
+              .filter((cell) => cell.scenario === scenario.id)
+              .map((cell) => <PreviewCellView key={cell.id} cell={cell} matrix="dynamic" />)}
+          </div>
+        </div>
+      ))}
+    </section>
+  );
+}
+
+function ChromaticRecipeSection({ recipeId }: { readonly recipeId: string }) {
+  const cells = chromaticPreviewMatrix.filter((cell) => cell.recipeId === recipeId);
+  const recipe = cells[0]?.recipe;
+  if (!recipe) return null;
+  const developmentResolution = resolveDevelopmentRecipe({ id: recipe.id, version: recipe.version });
+  const catalogEntry = developmentResolution.entry;
+  const catalogValidation = developmentResolution.validation;
+  const scenarios = chromaticPreviewScenarios.filter((scenario) => scenario.recipeId === recipeId);
+
+  return (
+    <section
+      className={styles.recipeSection}
+      data-chromatic-recipe-id={recipe.id}
+      aria-labelledby={`${recipe.id}-heading`}
+    >
+      <header className={styles.recipeHeader}>
+        <div>
+          <h2 id={`${recipe.id}-heading`}>{recipe.name}</h2>
+          <p>{recipe.description}</p>
+        </div>
+        <div className={styles.recipeMeta}>
+          <span className={styles.recipeBadge}>{recipe.id}</span>
+          <span>formal catalog: {catalogEntry?.status ?? "missing"}</span>
+          <span>catalog validator: {catalogValidation?.valid ? "valid" : "invalid"}</span>
+          <span>{recipe.scope} · exact {recipe.capabilities.photos.min} photo{recipe.capabilities.photos.min === 1 ? "" : "s"}</span>
+          <span>notes: {recipe.capabilities.notes.mode}</span>
+        </div>
+      </header>
+      {scenarios.map((scenario) => (
+        <div className={styles.scenarioGroup} key={scenario.id}>
+          <div className={styles.scenarioHeader}>
+            <h3>{scenario.label}</h3>
+            <small>{scenario.id}</small>
+          </div>
+          <div className={styles.cellGrid}>
+            {cells
+              .filter((cell) => cell.scenario === scenario.id)
+              .map((cell) => <PreviewCellView key={cell.id} cell={cell} matrix="chromatic" />)}
+          </div>
+        </div>
+      ))}
+    </section>
+  );
+}
+
 function PreviewCellView({
   cell,
   matrix,
 }: {
-  readonly cell: ReferencePreviewCell | QuietPreviewCell | EditorialPreviewCell | GridContactPreviewCell;
-  readonly matrix: "reference" | "quiet" | "editorial" | "grid-contact";
+  readonly cell: ReferencePreviewCell | QuietPreviewCell | EditorialPreviewCell | GridContactPreviewCell | DynamicPreviewCell | ChromaticPreviewCell;
+  readonly matrix: "reference" | "quiet" | "editorial" | "grid-contact" | "dynamic" | "chromatic";
 }) {
   const catalogEntry = getDevelopmentRecipeCatalogEntry({ id: cell.recipe.id, version: cell.recipe.version });
   const catalogValidation = catalogEntry
@@ -319,6 +445,8 @@ function PreviewCellView({
       data-quiet-preview-cell={matrix === "quiet" ? "true" : undefined}
       data-editorial-preview-cell={matrix === "editorial" ? "true" : undefined}
       data-grid-contact-preview-cell={matrix === "grid-contact" ? "true" : undefined}
+      data-dynamic-preview-cell={matrix === "dynamic" ? "true" : undefined}
+      data-chromatic-preview-cell={matrix === "chromatic" ? "true" : undefined}
       data-recipe-id={cell.recipeId}
       data-fixture-id={cell.fixtureId}
       data-mode={cell.mode}

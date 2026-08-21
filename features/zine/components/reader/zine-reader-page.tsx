@@ -1,5 +1,5 @@
 import { Icon } from "@/components/ui/icon";
-import { getActiveRecipeDefinition } from "../../model/recipe-catalog";
+import type { RecipeRuntimeResolver } from "../../model/recipe-catalog";
 import type { ZineReaderPage } from "../../model/zine-pages";
 import { RecipeRenderer } from "../recipe-renderer";
 import styles from "./zine-reader.module.css";
@@ -8,10 +8,12 @@ export function ZineReaderPageView({
   page,
   pageIndex,
   mode,
+  resolveRecipe,
 }: {
   readonly page: ZineReaderPage;
   readonly pageIndex: number;
   readonly mode: "editor" | "reader";
+  readonly resolveRecipe: RecipeRuntimeResolver;
 }) {
   const sideClass = page.kind === "content" || page.kind === "colophon" || page.kind === "blank" || page.kind === "add"
     ? page.side === "left" ? styles.leftPage : styles.rightPage
@@ -41,7 +43,7 @@ export function ZineReaderPageView({
       ) : page.kind === "add" ? (
         <AddPage spreadId={page.spreadId} side={page.side} />
       ) : page.kind === "blank" ? null : (
-        <ContentPage page={page} mode={mode} />
+        <ContentPage page={page} mode={mode} resolveRecipe={resolveRecipe} />
       )}
     </article>
   );
@@ -100,13 +102,15 @@ function Colophon({ title, pageNumber }: { readonly title: string; readonly page
 function ContentPage({
   page,
   mode,
+  resolveRecipe,
 }: {
   readonly page: Extract<ZineReaderPage, { kind: "content" }>;
   readonly mode: "editor" | "reader";
+  readonly resolveRecipe: RecipeRuntimeResolver;
 }) {
   const application = page.recipeApplication;
   const recipe = application
-    ? getActiveRecipeDefinition({ id: application.recipeId, version: application.recipeVersion })
+    ? resolveRecipe({ id: application.recipeId, version: application.recipeVersion })
     : null;
   if (!recipe || !application) {
     return <span className={styles.missingRecipe}>Recipe unavailable</span>;

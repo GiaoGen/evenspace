@@ -101,8 +101,8 @@ describe("Phase F3-B2 Editorial formal Recipe Definitions", () => {
   });
 
   it("registers only exact Editorial id/version refs without legacy mapping", () => {
-    expect(formalRecipeDefinitions).toHaveLength(9);
-    expect(runtimeRecipeDefinitions).toHaveLength(15);
+    expect(formalRecipeDefinitions).toHaveLength(15);
+    expect(runtimeRecipeDefinitions).toHaveLength(21);
     for (const definition of editorialRecipeDefinitions) {
       expect(getRuntimeRecipeDefinitionByRef({ id: definition.id, version: 1 })).toBe(definition);
       expect(getRuntimeRecipeDefinitionByRef({ id: definition.id, version: 2 })).toBeNull();
@@ -110,15 +110,18 @@ describe("Phase F3-B2 Editorial formal Recipe Definitions", () => {
     expect(editorialRecipeDefinitions.every((definition) => !Object.hasOwn(definition, "legacy"))).toBe(true);
   });
 
-  it("keeps Editorial Catalog entries draft-only and development-valid", () => {
+  it("keeps Editorial Definitions migration-draft while Catalog entries are active", () => {
     expect(validateRecipeCatalog()).toEqual([]);
-    expect(getActiveRecipeCatalogEntries()).toHaveLength(6);
+    expect(getActiveRecipeCatalogEntries()).toHaveLength(21);
+    const formalIds = new Set<string>(editorialRecipeDefinitions.map((definition) => definition.id));
+    expect(getActiveRecipeCatalogEntries().filter((entry) => formalIds.has(entry.recipe.id))).toHaveLength(3);
     for (const definition of editorialRecipeDefinitions) {
       const development = resolveDevelopmentRecipe({ id: definition.id, version: definition.version });
-      expect(development.entry).toMatchObject({ familyId: "editorial", status: "draft" });
+      expect(definition.status).toBe("draft");
+      expect(development.entry).toMatchObject({ familyId: "editorial", status: "active" });
       expect(development.definition).toBe(definition);
       expect(development.validation?.valid).toBe(true);
-      expect(getActiveRecipeDefinition({ id: definition.id, version: definition.version })).toBeNull();
+      expect(getActiveRecipeDefinition({ id: definition.id, version: definition.version })).toBe(definition);
     }
     expect(getRecipeCatalogEntry({ id: EDITORIAL_RECIPE_IDS.evidenceAside, version: 1 })?.authoring).toEqual({
       ratios: { preferred: ["landscape", "portrait", "square"], risky: ["ultra-wide"] },

@@ -189,3 +189,58 @@
 - 新增 `/zine/typography-specimen`：28 条固定内容 × 3 presets × S1/S2 × Editor/Reader = 84 cards / 336 canvases。360px/1440px 本地浏览器无横向溢出、无 overlay/console error，168 对 computed typography Editor/Reader 零差异；T28 形成 12 个预期 invalid canvas。
 - 自动化 Gate：typecheck、ESLint 0 warnings、60 test files / 315 tests、Next 16.2.10 production build 全通过。完整记录见 [F3-T2 Typography Runtime Reality Record](./f3-t2-typography-runtime-reality-record.md)。
 - 未激活 Recipe，未恢复 F3-B4/F3-B5。停止在 **Phase F3-T2 Typography Reality 用户视觉 Gate**；用户需比较关键 specimen 并回归 9 个已实现 Anchor。
+
+## 2026-08-14 — Phase F3-B4 Dynamic Draft Implementation
+
+- 用户明确授权只实施 F3-B4 静态范围；该授权不表示先前 Grid/Contact 或 Typography Reality 人工视觉 Gate 已通过，也不授权进入 Chromatic。
+- 已实现 `dynamic-edge-thrust-v1`、`dynamic-drop-sequence-v1` 与 `dynamic-gutter-sweep-v1` 的 formal draft Definition、exact Registry resolver、draft Catalog Entry 和独立 Preview Matrix。formal/runtime registry 分别为 12/18；active/menu 保持 6。
+- Dynamic Matrix 为 Edge 12、Drop 15、Gutter 13，共 **40 个场景组 / 80 个 Editor-Reader cells**。Edge 验证单侧 bleed 与不静默镜像；Drop 验证 exact-3 稳定顺序、4.86:1 尺度跳变和三项独立 focus；Gutter 验证一个 assignment/placement 跨左右 Render Plan 与唯一 `cross-gutter-photo` evidence。
+- 静态 Gate 通过：typecheck；ESLint 0 warnings；62 test files / 331 tests；Next.js 16.2.10 production build；`/zine/preview-matrix` 静态生成。完整记录见 [F3-B4 Dynamic Implementation Record](./f3-b4-dynamic-implementation-record.md)。
+- 本批未修改 Contract，未增加 Recipe 专用 JSX/CSS/Renderer 分支，未启动服务器/浏览器/浏览器自动化，未做字体审美裁决，未激活 Recipe，未进入 F3-B5 Chromatic。当前实现进度 **12/15**，人工视觉通过仍为 **6/15**。
+
+## 2026-08-21 — Phase F3-B5 Chromatic Draft Implementation
+
+- 已实现 `chromatic-entry-field-v1`、`chromatic-four-beat-v1` 与 `chromatic-cross-field-note-v1` 的 formal draft Definition、exact Registry resolver、draft Catalog Entry 和独立 Preview Matrix；formal/runtime registry 分别为 15/21，active/menu 保持 6。
+- Entry 保持 exact-1、无文字/Note 的功能色阈值；Four Beat 保持方案 A 的单行 exact-4、物理 9:16、01–04 与 A1→A2→A3→A1；Cross-field 保持 exact-1 required Photo Note、非空至 90/4 与唯一 `cross-page-pair` evidence。Color Field 从不自证 spread。
+- Chromatic Matrix 为 Entry 12、Four 14、Cross-field 17，共 **43 个场景组 / 86 个 Editor-Reader cells**；覆盖 color-on/off、比例/裁切事实、稳定 focus/order、hidden/unplaced 内容、左右 plan、1–11/12/90 字与正确溢出诊断。
+- 自动化 Gate 通过：typecheck；ESLint 0 warnings；64 test files / 349 tests；Next.js 16.2.10 production build；`/zine/preview-matrix` 静态生成。完整记录见 [F3-B5 Chromatic Implementation Record](./f3-b5-chromatic-implementation-record.md)。
+- 本批未修改 Contract，未增加 Recipe 专用 JSX/CSS/Renderer 分支，未启动服务器/浏览器/浏览器自动化，未作字体审美裁决，未激活 Recipe，也未进入 45 个扩展 Recipe。当前首批 Anchor 实现进度为 **15/15**；停止在 F3-B5 formal draft 实施完成状态。
+
+## 2026-08-21 — Phase F3-C1 Development Catalog Bridge & Manual Application Reality
+
+- 已建立 production（6 exact active runtime Recipe）与 development manual（6 active + 15 valid formal draft = 21）统一 Runtime Policy。Reference Preview fixture、deprecated、invalid 与未知版本不进入 development 产品路径；`resolveActiveRecipe` 未放宽。
+- 环境仅在 `ZineCreator` 选择并注入 resolver；菜单、APPLY_RECIPE、history、authored-text application refresh、Manual Editor 与 Reader 对同一 exact `RecipeRef` 使用同一 resolver。
+- menu/reducer 共享 page/spread target、owner、photoIds、notesByPhotoId、authored items 与 `targetPageIds` content builder，因此 Lead Story 缺 title、Cross-field 缺 Note、spread 缺页等诊断不再可能菜单/应用不一致。development 菜单显示 21 项，draft 以 `Draft` 标识；production 保持 6 且不可直接应用 draft。
+- 自动化与 production build Gate 已在本批完成；未启动服务器、浏览器或浏览器自动化。15 项仍为 `draft`，未激活、未进入 F4/45 项扩展。下一阶段只能是 F3-C2 visible authored-text UI。
+
+## 2026-08-21 — Phase F3-C2 Authored Text Visible Editing UI
+
+- Manual Layout 的既有 Layout 抽屉现在由 authored `static-text` slot 派生可见字段；author-text 不兼容卡片进入 `Prepare text` 状态，已应用 Recipe 重开 Layout 也可编辑。没有新增主流程按钮、抽屉/弹窗或 Reader 控制层。
+- 字段坚持 owner + contentKey（不持久化 Slot ID）：page 严格当前页，spread 保持两页原子 owner；显示 role、required、字符/行数限额与真实缺失/超限原因。Lead Story title 是 required 60/3，deck 是 optional 76/2。
+- Contract 的 `validateAuthoredTextSlot` 现在统一 Compatibility 与 UI 的字符和 canvas-relative Unicode line estimation；失焦/关闭抽屉才派发 UPSERT/UPDATE/DELETE，非法更新不改旧有效状态，optional 空值删除并保持 Undo/Redo/recompute 链路。
+- development resolver 继续为 21（6 active + 15 draft），production 为 6 active；Editor/Reader 沿用 F3-C1 exact resolver 与共享 Render Plan。新增纯字段/owner/限制回归，并保持既有 authored reducer、Reader parity、legacy 与 policy 测试。
+- 未激活 Recipe、未改几何/字体/颜色/后端、未启动服务器/浏览器/浏览器自动化；没有实施 F3-C3。下一阶段只能是 F3-C3 photo tolerance/removal path。
+
+## 2026-08-21 — Phase F3-C3 Manual Photo Tolerance, Empty Slot Interaction & Photo Removal
+
+- strict `evaluateRecipeCompatibility` 继续承担完整 Content/Note/authored/owner/Definition 诊断；仅 Manual Layout 经 shared applicability 允许 photo deficit/excess。缺图与超量不再禁用 Recipe 卡片，required authored text、required Photo Note（零图自然未出现除外）、容量/owner/Definition/Resolver/缺页 spread 仍阻断。
+- 应用不足照片时仅创建已有 assignment，Editor 显示通用可点击加号 Slot，Reader 不显示空框；超量稳定保留前 N 张并将末位写入 `unplacedPhotoIds`，不删除 Draft photo 或 Photo Note。
+- 空 Slot 触摸抬起后复用顶部 Photos 菜单，按 exact recipe ref + slot 填图；已在同一 Application 使用的照片会移动。选中照片才显示 Remove 控制，按 pageId/placementId/photoSlotId 解除 assignment。page 隔离、spread/cross-gutter 原子共享、focus/scale/placement 稳定、usage 与 Undo/Redo 均有回归。
+- 15 项仍为 `draft`，development 21 / production 6 policy 不变；未启动服务器、浏览器或浏览器自动化，未激活且未进入 F4。
+
+## 2026-08-21 — Phase F3-C4 First Formal Recipe Catalog Activation
+
+- 用户已完成 F3-C3 真实手动排版验证并授权首批生产激活。精确激活15个 formal Recipe：Quiet 的 `quiet-held-field-v1`、`quiet-scale-echo-v1`、`quiet-horizon-bridge-v1`；Editorial 的 `editorial-lead-story-v1`、`editorial-evidence-aside-v1`、`editorial-across-the-record-v1`；Grid/Contact 的 `grid-contact-twin-register-v1`、`grid-contact-twelve-up-ledger-v1`、`grid-contact-cross-register-v1`；Dynamic 的 `dynamic-edge-thrust-v1`、`dynamic-drop-sequence-v1`、`dynamic-gutter-sweep-v1`；Chromatic 的 `chromatic-entry-field-v1`、`chromatic-four-beat-v1`、`chromatic-cross-field-note-v1`，全部保持 version 1。
+- Catalog `status` 是唯一发布权威。Definition 的迁移期 `status: "draft"` 保留为兼容输入，不能覆盖 Catalog；没有新增 legacy 映射，Legacy registry 与旧 draft 读取路径继续有效。
+- Production 与 development Manual Runtime Policy 均为21项：原6项 active 保留，加本批15项 active。Reference-only fixture、deprecated、invalid、未知版本和缺失 Definition 不进入真实产品策略；Preview 仍通过独立 development 查询显示 draft/诊断。
+- active 菜单不再为这15项显示 Draft；F3-C3 的 photo tolerance、空 Slot 补图、移除、Photo Note、authored text、page/spread、Undo/Redo 与 Editor/Reader 共享 Render Plan 不变。
+- 本批没有修改 Recipe 设计、Contract、Renderer、Typography、字体载荷或 UI 结构，未进入 F4；剩余45项尚未正式设计。
+- 未启动服务器、浏览器或浏览器自动化。完整验证记录见 [F3-C4 First Formal Recipe Catalog Activation Record](./f3-c4-first-formal-catalog-activation-record.md)。
+
+## 2026-08-21 — Phase F4-W1 Formal Recipe Catalog Expansion — Wave 1 Design
+
+- 完成 20 个 `proposed-design` Recipe：Quiet、Editorial、Grid/Contact、Dynamic、Chromatic 各 4 个；对应 Family Bible 未占用角色，首批 15 个 active Recipe 未改动。
+- 交付精确 normalized geometry、Photo/Note relation、authored contentKey、固定状态、ratio/crop 风险、focus、color/text surface、评分与 AI 适配 metadata；所有设计均保持 Contract v1.1 的 cover、有限 token/role/preset、固定几何与两类 spread evidence 边界。
+- 35×35 Difference Matrix 覆盖 595 个唯一 pair，最低 4/10；6 项临界组合均已按 topology/scale/path/text/color 逐项说明。35 项 Usability Matrix 明确 Wave 2 缺口与已拥挤方向。
+- 已生成 overview 与五家族 SVG（每项有 minimum/partial、intended complete、risk/stress；Chromatic 加 color-on/off），并完成 SVG XML 解析检查。未启动 server 或 browser。
+- **停止点：Phase F4-W1 User Visual Design Gate。** 本批没有修改 TypeScript、TSX、CSS、RecipeDefinition、CatalogEntry、Renderer 或产品菜单；20 项尚未实现、尚未激活，未进入 Wave 2。

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   initialZineCreatorState,
+  createRecipeContentForManualPages,
   splitPhotosIntoVisualRows,
   ZINE_CAPTION_LIMIT,
   ZINE_NAME_LIMIT,
@@ -9,11 +10,18 @@ import {
   zineCreatorReducer,
   type ZinePhoto,
 } from "./zine-draft";
-import { adaptRecipeSlot, baseRecipeDefinitions, createRecipeApplication, DEFAULT_RECIPE_TYPOGRAPHY, type RecipeDefinition } from "./recipe-contract";
-import { recipeCatalogEntries, resolveActiveRecipe } from "./recipe-catalog";
+import { adaptRecipeSlot, baseRecipeDefinitions, createRecipeApplication, DEFAULT_RECIPE_TYPOGRAPHY, evaluateRecipeCompatibility, type RecipeDefinition } from "./recipe-contract";
+import {
+  createRecipeRuntimePolicy,
+  developmentManualRecipeRuntimePolicy,
+  productionRecipeRuntimePolicy,
+  recipeCatalogEntries,
+  resolveActiveRecipe,
+} from "./recipe-catalog";
 import { phaseARecipeFixtures } from "./recipe-phase-a-fixtures";
 import { phaseDRecipeDefinitions } from "./recipe-contract";
 import type { ZineManualSpread } from "./zine-manual-layout";
+import { getPhotoUseCounts } from "./photo-usage";
 
 function photo(id: string, width: number, height: number): ZinePhoto {
   return {
@@ -504,7 +512,7 @@ describe("zineCreatorReducer", () => {
     );
   });
 
-  it("does not partially apply a Recipe when compatibility fails", () => {
+  it("applies an overfull manual Recipe while returning its tail photo to unplaced", () => {
     const withPhotos = zineCreatorReducer(initialZineCreatorState, {
       type: "ADD_PHOTOS",
       photos: [photo("one", 4, 3), photo("two", 4, 3)],
@@ -528,15 +536,175 @@ describe("zineCreatorReducer", () => {
         }, ...spreads.slice(1)],
       },
     };
-    const rejected = zineCreatorReducer(overfull, {
+    const applied = zineCreatorReducer(overfull, {
       type: "APPLY_RECIPE",
       pageId: first.left.id,
       recipeRef: { id: "recipe-editorial-v1", version: 1 },
     });
 
-    expect(rejected).toBe(overfull);
-    expect(rejected.draft.manualSpreads?.[0]?.left?.photoIds).toEqual(["one", "two"]);
-    expect(rejected.draft.manualSpreads?.[0]?.right).toEqual(first.right);
+    const application = applied.draft.manualSpreads?.[0]?.left?.recipeApplication;
+    expect(applied).not.toBe(overfull);
+    expect(application?.assignments.map((assignment) => assignment.photoId)).toEqual(["one"]);
+    expect(application?.unplacedPhotoIds).toEqual(["two"]);
+    expect(applied.draft.manualSpreads?.[0]?.right).toEqual(first.right);
+  });
+
+  it("applies formal page and spread drafts through the injected development resolver", () => {
+    const withPhotos = zineCreatorReducer(initialZineCreatorState, {
+      type: "ADD_PHOTOS",
+      photos: [
+        photo("one", 4, 3),
+        { ...photo("two", 4, 3), caption: "Field note" },
+      ],
+    });
+    const manual = zineCreatorReducer(
+      zineCreatorReducer(withPhotos, { type: "SET_STYLE", styleId: "editorial" }),
+      { type: "GO_TO", step: "manual" },
+      developmentManualRecipeRuntimePolicy.resolve,
+    );
+    const first = manual.draft.manualSpreads?.[0];
+    if (!first?.left || !first.right) return;
+
+    const pageApplied = zineCreatorReducer(manual, {
+      type: "APPLY_RECIPE",
+      pageId: first.left.id,
+      recipeRef: { id: "quiet-held-field-v1", version: 1 },
+    }, developmentManualRecipeRuntimePolicy.resolve);
+    expect(pageApplied.draft.manualSpreads?.[0]?.left?.recipeApplication).toMatchObject({
+      recipeId: "quiet-held-field-v1",
+      recipeVersion: 1,
+      scope: "page",
+    });
+    expect(pageApplied.draft.photos[1]?.caption).toBe("Field note");
+
+    const crossFieldReady = {
+      ...manual,
+      draft: {
+        ...manual.draft,
+        manualSpreads: manual.draft.manualSpreads?.map((spread, index) => index === 0 && spread.right
+          ? { ...spread, right: { ...spread.right, photoIds: [], contentItemIds: [] } }
+          : spread) ?? null,
+      },
+    };
+    const spreadApplied = zineCreatorReducer(crossFieldReady, {
+      type: "APPLY_RECIPE",
+      pageId: first.left.id,
+      recipeRef: { id: "chromatic-cross-field-note-v1", version: 1 },
+    }, developmentManualRecipeRuntimePolicy.resolve);
+    expect(spreadApplied.draft.manualSpreads?.[0]?.left?.recipeApplication).toMatchObject({
+      recipeId: "chromatic-cross-field-note-v1",
+      scope: "spread",
+      targetPageIds: [first.left.id, first.right.id],
+    });
+    expect(spreadApplied.draft.manualSpreads?.[0]?.right?.recipeApplication)
+      .toBe(spreadApplied.draft.manualSpreads?.[0]?.left?.recipeApplication);
+  });
+
+  it("keeps production draft dispatch immutable while development draft history supports undo and redo", () => {
+    const withPhotos = zineCreatorReducer(initialZineCreatorState, {
+      type: "ADD_PHOTOS",
+      photos: [photo("one", 4, 3)],
+    });
+    const manual = zineCreatorReducer(
+      zineCreatorReducer(withPhotos, { type: "SET_STYLE", styleId: "editorial" }),
+      { type: "GO_TO", step: "manual" },
+    );
+    const pageId = manual.draft.manualSpreads?.[0]?.left?.id ?? "";
+    const draftRef = { id: "quiet-held-field-test-draft-v1", version: 1 } as const;
+    const sourceEntry = recipeCatalogEntries.find((entry) => entry.recipe.id === "quiet-held-field-v1");
+    const sourceResolution = resolveActiveRecipe({ id: "quiet-held-field-v1", version: 1 });
+    if (!sourceEntry || !sourceResolution) return;
+    const draftRecipe = { ...sourceResolution.definition, id: draftRef.id };
+    const draftPolicy = createRecipeRuntimePolicy(
+      ["active", "draft"],
+      [{ ...sourceEntry, recipe: draftRef, status: "draft" }],
+      [draftRecipe],
+    );
+    const draftAction = {
+      type: "APPLY_RECIPE" as const,
+      pageId,
+      recipeRef: draftRef,
+    };
+    expect(zineCreatorReducer(manual, draftAction, productionRecipeRuntimePolicy.resolve)).toBe(manual);
+    const history = { ...initialZineCreatorHistoryState, present: manual };
+    const applied = zineCreatorHistoryReducer(history, draftAction, draftPolicy.resolve);
+    const undone = zineCreatorHistoryReducer(applied, { type: "UNDO" }, draftPolicy.resolve);
+    const redone = zineCreatorHistoryReducer(undone, { type: "REDO" }, draftPolicy.resolve);
+
+    expect(applied.past).toHaveLength(1);
+    expect(applied.present.draft.manualSpreads?.[0]?.left?.recipeApplication?.recipeId).toBe(draftRef.id);
+    expect(undone.present).toBe(manual);
+    expect(redone.present).toBe(applied.present);
+  });
+
+  it("returns an unused photo to unplaced usage when a development draft changes topology", () => {
+    const scale = developmentManualRecipeRuntimePolicy.resolve({ id: "quiet-scale-echo-v1", version: 1 });
+    const scaleEntry = recipeCatalogEntries.find((entry) => entry.recipe.id === "quiet-scale-echo-v1");
+    if (!scale || !scaleEntry) return;
+    const oneSlotDraft = {
+      ...scale,
+      id: "test-draft-one-slot-v1",
+      name: "Test draft one slot",
+      capabilities: { ...scale.capabilities, photos: { min: 1, max: 2 }, notes: { mode: "none" as const } },
+      slots: scale.slots.filter((slot) => slot.kind === "photo").slice(0, 1),
+      noteRelations: [],
+    } as RecipeDefinition;
+    const oneSlotEntry = {
+      ...scaleEntry,
+      recipe: { id: oneSlotDraft.id, version: oneSlotDraft.version },
+      status: "draft" as const,
+      authoring: { ...scaleEntry.authoring, slotTopology: "single" as const },
+    };
+    const oneSlotPolicy = createRecipeRuntimePolicy(["active", "draft"], [oneSlotEntry], [oneSlotDraft]);
+    const withPhotos = zineCreatorReducer(initialZineCreatorState, {
+      type: "ADD_PHOTOS",
+      photos: [photo("one", 4, 3), photo("two", 4, 3)],
+    });
+    const manual = zineCreatorReducer(
+      zineCreatorReducer(withPhotos, { type: "SET_STYLE", styleId: "contact" }),
+      { type: "GO_TO", step: "manual" },
+      developmentManualRecipeRuntimePolicy.resolve,
+    );
+    const pageId = manual.draft.manualSpreads?.[0]?.left?.id ?? "";
+    const paired = zineCreatorReducer(manual, {
+      type: "APPLY_RECIPE", pageId, recipeRef: { id: scale.id, version: scale.version },
+    }, developmentManualRecipeRuntimePolicy.resolve);
+    const narrowed = zineCreatorReducer(paired, {
+      type: "APPLY_RECIPE", pageId, recipeRef: oneSlotEntry.recipe,
+    }, oneSlotPolicy.resolve);
+
+    const application = narrowed.draft.manualSpreads?.[0]?.left?.recipeApplication;
+    const unplacedPhotoId = application?.unplacedPhotoIds[0] ?? "";
+    expect(application?.unplacedPhotoIds).toHaveLength(1);
+    expect(getPhotoUseCounts(narrowed.draft.manualSpreads).get(unplacedPhotoId)).toBeUndefined();
+  });
+
+  it("uses the same owned authored-text content semantics when rejecting an incomplete Lead Story", () => {
+    const withPhotos = zineCreatorReducer(initialZineCreatorState, {
+      type: "ADD_PHOTOS",
+      photos: [photo("one", 4, 3)],
+    });
+    const manual = zineCreatorReducer(
+      zineCreatorReducer(withPhotos, { type: "SET_STYLE", styleId: "editorial" }),
+      { type: "GO_TO", step: "manual" },
+      developmentManualRecipeRuntimePolicy.resolve,
+    );
+    const page = manual.draft.manualSpreads?.[0]?.left;
+    const recipe = developmentManualRecipeRuntimePolicy.resolve({ id: "editorial-lead-story-v1", version: 1 });
+    if (!page || !recipe) return;
+    const content = createRecipeContentForManualPages({
+      recipe,
+      anchorPageId: page.id,
+      targetPages: [page],
+      photos: manual.draft.photos,
+      authoredTextItems: [],
+    });
+    expect(evaluateRecipeCompatibility(recipe, content).code).toBe("authored-text-missing");
+    expect(zineCreatorReducer(manual, {
+      type: "APPLY_RECIPE",
+      pageId: page.id,
+      recipeRef: { id: recipe.id, version: recipe.version },
+    }, developmentManualRecipeRuntimePolicy.resolve)).toBe(manual);
   });
 });
 

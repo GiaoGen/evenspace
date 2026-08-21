@@ -178,9 +178,33 @@ function PhotoSlot({
             style={imageStyle}
           />
         ) : slot.showPhotoPlaceholder ? (
-          <span className={styles.recipePhotoPlaceholder} aria-label="Empty photo slot" />
+          slot.interactivePhotoPlaceholder ? (
+            <button
+              type="button"
+              className={styles.recipePhotoPlaceholder}
+              data-zine-empty-photo-slot="true"
+              data-zine-slot-id={slot.id}
+              data-zine-page-id={slot.pageId}
+              aria-label="Add photo to empty layout slot"
+            >
+              <span aria-hidden="true">+</span>
+            </button>
+          ) : <span className={styles.recipePhotoPlaceholder} aria-label="Empty photo slot" />
         ) : null}
       </div>
+      {photo && slot.interactivePhotoPlaceholder ? (
+        <button
+          type="button"
+          className={styles.recipePhotoRemove}
+          data-zine-remove-photo="true"
+          data-zine-placement-id={slot.placementId}
+          data-zine-slot-id={slot.id}
+          data-zine-page-id={slot.pageId}
+          aria-label="Remove photo from layout"
+        >
+          ×
+        </button>
+      ) : null}
     </figure>
   );
 }

@@ -302,6 +302,51 @@
 
 .recipeWaterfall { gap: 8px; }
 
+.authoredTextEditor {
+  min-width: 0;
+  max-height: 132px;
+  margin: 0 0 8px;
+  padding: 8px;
+  overflow: auto;
+  border: 1px solid color-mix(in srgb, var(--ink) 14%, transparent);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--surface-2) 72%, transparent);
+}
+
+.authoredTextEditorHeading,
+.authoredTextEditorHeading strong,
+.authoredTextEditorHeading small,
+.authoredTextField > span,
+.authoredTextField > span strong,
+.authoredTextField > span small { display: block; }
+.authoredTextEditorHeading { margin-bottom: 7px; }
+.authoredTextEditorHeading strong { font-size: 7px; }
+.authoredTextEditorHeading small,
+.authoredTextField > span small,
+.authoredTextField > small { color: var(--muted); font-size: 6px; }
+
+.authoredTextFields { display: grid; gap: 7px; }
+.authoredTextField { display: grid; gap: 3px; }
+.authoredTextField > span { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.authoredTextField > span strong { font-size: 7px; text-transform: capitalize; }
+.authoredTextField > span small { text-align: right; }
+.authoredTextField textarea {
+  width: 100%;
+  min-height: 28px;
+  box-sizing: border-box;
+  resize: vertical;
+  padding: 5px 6px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-size: 8px;
+  line-height: 1.35;
+}
+.authoredTextField[data-invalid="true"] textarea { border-color: #a04a3a; }
+.authoredTextField[data-invalid="true"] > small { color: #a04a3a; }
+
 .recipeChoice {
   width: 188px;
   min-width: 188px;
@@ -323,6 +368,7 @@
 }
 
 .recipeChoice[data-selected="true"] { box-shadow: inset 0 0 0 2px var(--ink); }
+.recipeChoice[data-preparing-text="true"] { box-shadow: inset 0 0 0 2px #8b5e22; }
 .recipeChoice:disabled { cursor: default; opacity: .45; }
 .recipeChoice:disabled > span small { color: var(--muted); }
 .recipeChoice > div { width: 70px; min-width: 70px; box-shadow: none; }
@@ -340,6 +386,11 @@
 .recipeChoice .recipeStatus[data-status="too-much-content"],
 .recipeChoice .recipeStatus[data-status="note-too-long"],
 .recipeChoice .recipeStatus[data-status="note-too-many-lines"],
+.recipeChoice .recipeStatus[data-status="authored-text-missing"],
+.recipeChoice .recipeStatus[data-status="authored-text-too-long"],
+.recipeChoice .recipeStatus[data-status="authored-text-too-many-lines"],
+.recipeChoice .recipeStatus[data-status="authored-text-owner-mismatch"],
+.recipeChoice .recipeStatus[data-status="authored-text-invalid"],
 .recipeChoice .recipeStatus[data-status="incompatible"] { color: #a04a3a; }
 
 .drawerCollapse {
@@ -362,6 +413,7 @@
 .focusTools button:focus-visible,
 .photoChoice:focus-visible,
 .recipeChoice:focus-visible,
+.authoredTextField textarea:focus-visible,
 .drawerCollapse:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
 
 @media (min-width: 641px) {

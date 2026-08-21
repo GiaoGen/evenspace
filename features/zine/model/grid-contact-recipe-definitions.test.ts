@@ -264,22 +264,25 @@ describe("Phase F3-B3 Grid/Contact formal Recipe Definitions", () => {
     expect(rightPlan.slots.some((slot) => slot.id === "folio-left")).toBe(false);
   });
 
-  it("registers exact refs, valid draft Catalog entries, and no active/menu or legacy additions", () => {
-    expect(formalRecipeDefinitions).toHaveLength(9);
-    expect(runtimeRecipeDefinitions).toHaveLength(15);
+  it("registers exact active Catalog refs without legacy additions", () => {
+    expect(formalRecipeDefinitions).toHaveLength(15);
+    expect(runtimeRecipeDefinitions).toHaveLength(21);
     expect(validateRecipeCatalog()).toEqual([]);
-    expect(getActiveRecipeCatalogEntries()).toHaveLength(6);
+    expect(getActiveRecipeCatalogEntries()).toHaveLength(21);
+    const formalIds = new Set<string>(gridContactRecipeDefinitions.map((definition) => definition.id));
+    expect(getActiveRecipeCatalogEntries().filter((entry) => formalIds.has(entry.recipe.id))).toHaveLength(3);
     for (const definition of gridContactRecipeDefinitions) {
       expect(getRuntimeRecipeDefinitionByRef({ id: definition.id, version: 1 })).toBe(definition);
       expect(getRuntimeRecipeDefinitionByRef({ id: definition.id, version: 2 })).toBeNull();
       expect(getGridContactRecipeDefinition(definition.id, 2)).toBeNull();
       expect(resolveDevelopmentRecipe({ id: definition.id, version: 1 })).toMatchObject({
-        entry: { familyId: "grid-contact", status: "draft" },
+        entry: { familyId: "grid-contact", status: "active" },
         definition,
         validation: { valid: true },
       });
-      expect(getActiveRecipeDefinition({ id: definition.id, version: 1 })).toBeNull();
-      expect(getRecipeCatalogEntry({ id: definition.id, version: 1 })?.status).toBe("draft");
+      expect(definition.status).toBe("draft");
+      expect(getActiveRecipeDefinition({ id: definition.id, version: 1 })).toBe(definition);
+      expect(getRecipeCatalogEntry({ id: definition.id, version: 1 })?.status).toBe("active");
       expect(definition).not.toHaveProperty("legacy");
       expect(definition).not.toHaveProperty("legacyStyleId");
     }

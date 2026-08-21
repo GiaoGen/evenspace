@@ -8,6 +8,10 @@ import {
   type EditableZineStep,
   type ZinePhoto,
 } from "../model/zine-draft";
+import {
+  developmentManualRecipeRuntimePolicy,
+  productionRecipeRuntimePolicy,
+} from "../model/recipe-catalog";
 import { NameStep } from "./steps/name-step";
 import { OverviewStep } from "./steps/overview-step";
 import { PhotosStep } from "./steps/photos-step";
@@ -17,7 +21,15 @@ import { ZineReader } from "./reader/zine-reader";
 import { ZineShell } from "./zine-shell";
 
 export function ZineCreator() {
-  const [history, dispatch] = useReducer(zineCreatorHistoryReducer, initialZineCreatorHistoryState);
+  // Environment selection belongs to the product composition layer. The model
+  // receives only this resolver and remains independent of Next/runtime env.
+  const recipeRuntimePolicy = process.env.NODE_ENV === "development"
+    ? developmentManualRecipeRuntimePolicy
+    : productionRecipeRuntimePolicy;
+  const [history, dispatch] = useReducer(
+    (currentHistory, action) => zineCreatorHistoryReducer(currentHistory, action, recipeRuntimePolicy.resolve),
+    initialZineCreatorHistoryState,
+  );
   const state = history.present;
   const [nameAttempted, setNameAttempted] = useState(false);
   const [aiLayoutEnabled, setAiLayoutEnabled] = useState(false);
@@ -103,6 +115,7 @@ export function ZineCreator() {
     return (
       <ZineReader
         draft={state.draft}
+        resolveRecipe={recipeRuntimePolicy.resolve}
         onClose={() => dispatch({ type: "GO_TO", step: aiLayoutEnabled ? "overview" : "manual" })}
       />
     );
@@ -147,6 +160,7 @@ export function ZineCreator() {
       ) : state.step === "manual" ? (
         <ManualLayoutStep
           draft={state.draft}
+          recipeRuntimePolicy={recipeRuntimePolicy}
           canUndo={history.past.length > 0}
           canRedo={history.future.length > 0}
           onUndo={() => dispatch({ type: "UNDO" })}
@@ -170,10 +184,33 @@ export function ZineCreator() {
             photoId,
             replacePhotoId,
           })}
+          onPlacePhotoInRecipeSlot={(pageId, recipeRef, photoSlotId, photoId) => dispatch({
+            type: "PLACE_MANUAL_PHOTO_IN_RECIPE_SLOT",
+            pageId,
+            recipeRef,
+            photoSlotId,
+            photoId,
+          })}
+          onRemoveRecipePhoto={(pageId, placementId, photoSlotId) => dispatch({
+            type: "REMOVE_MANUAL_RECIPE_PHOTO",
+            pageId,
+            placementId,
+            photoSlotId,
+          })}
           onApplyRecipe={(pageId, recipeRef) => dispatch({
             type: "APPLY_RECIPE",
             pageId,
             recipeRef,
+          })}
+          onUpsertAuthoredText={(item) => dispatch({ type: "UPSERT_AUTHORED_TEXT", item })}
+          onUpdateAuthoredText={(textContentId, text) => dispatch({
+            type: "UPDATE_AUTHORED_TEXT",
+            textContentId,
+            text,
+          })}
+          onDeleteAuthoredText={(textContentId) => dispatch({
+            type: "DELETE_AUTHORED_TEXT",
+            textContentId,
           })}
         />
       ) : (
